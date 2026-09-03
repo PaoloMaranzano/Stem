@@ -1,217 +1,712 @@
-#' STEM Clustered Regression
+#' Spatially-clustered STEM estimation
 #'
+#' @description
+#' \code{SCSTEM_Estim} fits a spatially-clustered spatio-temporal
+#' expectation-maximization (SC-STEM) model. The \eqn{d} monitoring locations
+#' are partitioned into \eqn{k} latent spatial regimes, and a separate
+#' \dQuote{STEM_Model} is estimated within each regime, so that regression
+#' coefficients, variance components and latent temporal dynamics are all
+#' cluster-specific. The partition and the parameters are estimated jointly by
+#' alternating optimization of a Potts-penalised log-likelihood.
 #'
-#' @description The function \code{SCSTEM_Estim} computes the spatio-temporal clustered regression with the STEM_estimation method for the regression.
+#' @details
+#' \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
+#' \eqn{k}, the SC-STEM model is the cluster-specific STEM model
+#' \deqn{z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+#'       y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,}
+#' with \eqn{e_t \sim N(0, \Sigma_{e,k})},
+#' \eqn{\Sigma_{e,k} = \sigma^2_{\epsilon k} I + \sigma^2_{\omega k} C(h;\theta_k)}
+#' and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{k = 1}
+#' recovers the pooled \code{\link{STEM_Estimation}} fit.
 #'
-#' @param StemModel an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.
-#' @param precision  a small positive number used for the EM algorithm convergence in every step of the clustered regression. Default is equal to 0.1. See \code{DETAILS} below.
-#' @param precision_full_dataset a small positive number used for the EM algorithm convergence at the inizialization step of the EM algorithm. Default is equal to 0.1. See \code{DETAILS} below.
-#' @param max_iter maximum number of iterations for the spatio temporal clustered regression algorithm.
-#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
-#' @param regularization a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01
-#' @param crs Integer value. Coordinate reference sySTEM_ something suitable as input to st_crs.command from the sf package (see its documentation for details). Default is set to 4326.
-#' @param knn Integer value. The number of nearest neighbour to be taken into account for te spatial penalty, Default is set to 5
-#' @param k Integer value. The number of clusters for the clustered regression. Default is set to 3.
-#' @param init_method Character. Must be one of: 'AMKM' or 'K-means'. If init_method='AMKM', the Adjacent Matrix K-Means clustering is performed. If method='K-means', K-means clustering is performed.
-#' @param nugget_var Logical. If FALSE it returns the Sugasawa clustered regression. If TRUE the STEM spatio temporal clustered regression is performed. Default is set to TRUE
-#' @param phi_penalty a small positive number. It is the spatial penalty weight for the clustered regression. Default is set to 1.
-#' @param share2conv a small positive number. It is the minimum percentage of observations that must change clusters for the algorithm not to converge. Default is set equal to 0.05
+#' \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
+#' by maximizing the penalised log-likelihood
+#' \deqn{Q = \sum_{i=1}^{d} \ell_{i k_i} +
+#'           \phi\, c \sum_{i<j} w_{ij} I(k_i = k_j),}
+#' where \eqn{\ell_{ik}} is the log-likelihood contribution of location \eqn{i}
+#' under the parameters of cluster \eqn{k}, \eqn{w_{ij}} is the symmetrised
+#' \code{knn} adjacency indicator and \eqn{c > 0} is the scale factor discussed
+#' below. This is the Potts-type penalty of Sugasawa and Murakami (2021), in the
+#' form used for spatially-clustered Fay-Herriot and spatial autoregressive
+#' models by Cerqueti, Maranzano and Mattera (2025).
 #'
-#'
-#'
-#' @return The function returns a list given by:
+#' \strong{Scale of the penalty.} In cross-sectional spatially-clustered models
+#' each unit contributes a single observation to the likelihood, so that
+#' \eqn{\phi} of order one balances fit against spatial cohesion. Here each
+#' location contributes \eqn{T} observations, and the log-likelihood differences
+#' between clusters grow with \eqn{T} and with the scale of the response. The
+#' factor \eqn{c} restores a comparable interpretation:
 #' \itemize{
-#' \code{phi.hat} is a matrix with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}) for each cluster.
-#' \code{clusters} is a df with 3 columns. Longitude, Latitude and cluster for each observation.
-#' \code{fit_list} a list that contains the single cluster model output.
+#'   \item \code{phi_scale = "auto"} (default) sets \eqn{c} to the median across
+#'     locations of the spread \eqn{\max_k \ell_{ik} - \min_k \ell_{ik}},
+#'     divided by the average number of neighbours. With this normalisation
+#'     \eqn{\phi = 1} is the point at which full agreement with the
+#'     neighbourhood is worth about as much as the typical gain from picking the
+#'     best-fitting cluster, so that a grid \eqn{\phi \in [0, 2]} is informative
+#'     on any dataset. The factor is computed once, at the first sweep, and is
+#'     returned in \code{phi_multiplier}.
+#'   \item \code{phi_scale = "per-observation"} sets \eqn{c = T}, which makes
+#'     \eqn{\phi} invariant to the length of the series and directly comparable
+#'     with the cross-sectional literature, but leaves it dependent on the scale
+#'     of the response.
+#'   \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalising on the
+#'     untransformed likelihood scale.
+#' }
+#' The effective penalty actually applied is always reported in
+#' \code{phi_effective}.
+#'
+#' \strong{Algorithm.} The two steps are iterated until convergence:
+#' \enumerate{
+#'   \item \emph{Parameter update given labels.} A STEM model is estimated by
+#'     \code{\link{STEM_Estimation}} on each cluster. A cluster that falls below
+#'     the minimum admissible size keeps its last valid parameters
+#'     (\dQuote{stale freeze}) instead of aborting the algorithm; a cluster that
+#'     never obtained a valid fit is excluded from the assignment step.
+#'   \item \emph{Label update given parameters.} With
+#'     \code{label_update = "ICM"} (the default) locations are visited
+#'     sequentially and each label maximizes its own penalised contribution
+#'     given the current labels of all the others, in the spirit of the
+#'     Iterated Conditional Modes algorithm of Besag (1986). For fixed
+#'     parameters this sweep cannot decrease \eqn{Q}, which rules out the label
+#'     cycling that a simultaneous update can produce.
+#'     \code{label_update = "simultaneous"} reproduces the joint update of all
+#'     labels used in earlier versions of the package and in Sugasawa and
+#'     Murakami (2021).
+#' }
+#' The loop stops when the partition is unchanged, when the improvement of
+#' \eqn{Q} falls below \code{abs_tol}/\code{rel_tol}, when a previously visited
+#' partition reappears (the best visited partition is then returned), or when
+#' \code{max_iter} is reached.
+#'
+#' \strong{Degeneracy and the minimum-size constraint.} Within-cluster
+#' homogeneity is exactly what the assignment step seeks, so the cluster-wise
+#' variance components \eqn{\sigma^2_{\epsilon k} + \sigma^2_{\omega k}} shrink
+#' as locations are reallocated. Left unconstrained, the cluster with the
+#' smallest residual variance then attracts every location and the partition
+#' collapses -- the clusterwise counterpart of the degenerate-likelihood problem
+#' of Gaussian mixtures, and of the boundary solutions documented for
+#' spatially-clustered Fay-Herriot models. With \code{enforce_min_size = TRUE}
+#' (the default) a location may leave its cluster only if that cluster stays at
+#' or above \code{min_cluster_size}, which keeps every visited configuration
+#' admissible while preserving the monotonicity of the ICM sweep within the
+#' feasible set. The constraint matters most when the number of locations is
+#' small relative to \eqn{k}; it can be lifted with
+#' \code{enforce_min_size = FALSE}.
+#'
+#' \strong{Final refit and information criteria.} On convergence the
+#' cluster-wise STEM models are re-estimated once on the final partition. All
+#' reported coefficients, variance components and information criteria come
+#' from this refit and are based on the \emph{exact} cluster-wise
+#' log-likelihoods returned by \code{\link{STEM_Estimation}}, not on the
+#' pseudo-likelihood used to rank clusters during the assignment step. The
+#' number of free parameters is \eqn{k_{eff} (r + 3 + 3p)} for a diagonal
+#' specification with \eqn{r} covariates and latent dimension \eqn{p}, where
+#' \eqn{k_{eff}} counts the clusters that could actually be re-estimated.
+#'
+#' @param StemModel an object of class \dQuote{STEM_Model} given as output by
+#'   the \code{\link{STEM_Model}} function.
+#' @param k integer, the number of spatial clusters. \code{k = 1} returns the
+#'   pooled STEM fit. Default is 3.
+#' @param phi_penalty non-negative number, the weight of the Potts spatial
+#'   penalty. \code{phi_penalty = 0} gives non-spatial clusterwise STEM.
+#'   Default is 1.
+#' @param phi_scale character, one of \code{"auto"} (default),
+#'   \code{"per-observation"} or \code{"raw"}, setting the scale factor of the
+#'   spatial penalty. See \code{Details}.
+#' @param knn integer, the number of nearest neighbours used to build the
+#'   spatial penalty graph. The graph is symmetrised. Default is 5.
+#' @param distance character, \code{"euclidean"} for Euclidean distance or
+#'   \code{"geo"} for geodesic distance. Use \code{"geo"} only when the
+#'   coordinates are longitude/latitude. Default is \code{"geo"}.
+#' @param init_method character, one of \code{"kmeans"} (default),
+#'   \code{"coordinates"} or \code{"AMKM"}. \code{"kmeans"} runs k-means on the
+#'   PCA-compressed location-wise covariate means with multiple restarts and a
+#'   minimum-cluster-size filter; \code{"coordinates"} clusters the coordinates;
+#'   \code{"AMKM"} reproduces the pre-2.0.0 behaviour and requires the
+#'   non-CRAN package \pkg{SCDA}.
+#' @param label_update character, \code{"ICM"} (default) for the sequential
+#'   Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
+#'   update of all labels.
+#' @param precision small positive number, the convergence tolerance of the EM
+#'   algorithm in each cluster-wise fit. Default is 0.1.
+#' @param precision_full_dataset small positive number, the convergence
+#'   tolerance of the EM algorithm for the pooled fit used to initialise the
+#'   procedure. Default is 0.01.
+#' @param regularization small positive number added to the diagonal of the
+#'   matrices that have to be inverted. Default is 0.01.
+#' @param max_iter integer, the maximum number of alternating iterations.
+#'   Default is 10.
+#' @param abs_tol,rel_tol absolute and relative tolerances on the improvement
+#'   of the penalised objective. Defaults are 1e-5 and 1e-6.
+#' @param min_cluster_size integer or \code{NULL}. Minimum number of locations
+#'   required to estimate a cluster-wise model. When \code{NULL} (default) it is
+#'   set to \code{ncov + 2}.
+#' @param enforce_min_size logical. If \code{TRUE} (default) the assignment
+#'   step never lets a cluster fall below \code{min_cluster_size}. See
+#'   \code{Details}. Set to \code{FALSE} to reproduce the unconstrained sweep.
+#' @param share2conv number in \eqn{[0,1)}. Optional early-stopping rule kept
+#'   for backward compatibility: the loop also stops when the share of
+#'   locations changing cluster falls below this value. Set to 0 (default) to
+#'   rely only on the objective-based criteria.
+#' @param crs integer, coordinate reference system passed to \pkg{sf} when
+#'   \code{init_method = "AMKM"}. Default is 4326.
+#' @param seed integer or \code{NULL}, seed used for the initialisation step so
+#'   that the fit is reproducible. Default is 123456789.
+#' @param verbose logical. If \code{TRUE}, progress information is emitted via
+#'   \code{message()}. Default is \code{FALSE}.
+#'
+#' @return An object of class \dQuote{SCSTEM_Estim}, a list with components:
+#' \itemize{
+#'   \item \code{phi_hat}: \eqn{k} by \eqn{npar} matrix of cluster-wise
+#'     parameter estimates from the final refit.
+#'   \item \code{group}: integer vector of length \eqn{d} with the estimated
+#'     cluster label of each location.
+#'   \item \code{df}: data frame with the coordinates and the estimated labels.
+#'   \item \code{fit_list}: list of the \dQuote{STEM_Model} objects returned by
+#'     \code{\link{STEM_Estimation}} on the final partition.
+#'   \item \code{idx_g}: list of the location indices of each cluster.
+#'   \item \code{info_crit}: named vector with the total log-likelihood, the
+#'     number of free parameters and AIC, BIC and KIC.
+#'   \item \code{loglik_g}: cluster-wise exact log-likelihoods.
+#'   \item \code{final_refit}: logical vector flagging the clusters that could
+#'     be re-estimated on the final partition.
+#'   \item \code{obj_trace}: data frame tracing the penalised objective, the
+#'     number of label changes and the cluster sizes along the iterations.
+#'   \item \code{convergence}: character describing the exit route.
+#'   \item \code{penalised_obj}: value of the penalised objective at the exit.
+#'   \item \code{input_args}: the arguments used for the fit, needed by
+#'     \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Select}}.
 #' }
 #'
+#' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
+#'   Francesco Caccia, Michela Cameletti
 #'
-#' @details This function estimates the spatio temporal clustered regression via the STEM algorithm.
+#' @references
+#' Besag, J. (1986) \emph{On the statistical analysis of dirty pictures}.
+#' Journal of the Royal Statistical Society, Series B, 48, 259--302.
 #'
+#' Cerqueti, R., Maranzano, P., Mattera, R. (2025) \emph{Spatially-clustered
+#' spatial autoregressive models with application to agricultural market
+#' concentration in Europe}. Journal of Agricultural, Biological and
+#' Environmental Statistics. \doi{10.1007/s13253-025-00685-7}
 #'
-#' @author Francesco Caccia  < francesco.caccia2000@gmail.com >
+#' Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring
+#' using heterogeneous networks}. Environmetrics, 18, 245--264.
+#' \doi{10.1002/env.837}
 #'
-#' @references Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal dynamic state-space model with the EM algorithm to patch gaps in daily riverflow series}. Hydrology and Earth System Sciences 9, 209--224.
+#' Fasso, A., Cameletti, M. (2010) \emph{A unified statistical approach for
+#' simulation, modeling, analysis and mapping of environmental data}.
+#' Simulation, 86, 139--153. \doi{10.1177/0037549709102150}
 #'
-#' Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring using heterogeneous networks}. Environmetrics 18, 245--264. <doi: 10.1002/env.837>
-#'
-#' Fasso', A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
-#'
-#' Fassò, A. and M. Cameletti (2010). "A Unified Statistical Approach for Simulation, Modeling, Analysis and Mapping of Environmental Data." SIMULATION 86(3): 139-153. <doi: 10.1177/0037549709102150>
-#'
-#' Cerqueti, R., Maranzano, P., & Mattera, R. (2025). \emph{Spatially-clustered spatial autoregressive models with application to agricultural market concentration in Europe}. Journal of Agricultural, Biological and Environmental Statistics, 1-35.
-#'
-#' Sugasawa, S., & Murakami, D. (2021). \emph{Spatially clustered regression}. Spatial Statistics, 44, 100525.
+#' Sugasawa, S., Murakami, D. (2021) \emph{Spatially clustered regression}.
+#' Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 #'
 #' @examples
 #' \donttest{
-#' #load the data
 #' data(pm10)
 #'
-#' #extract the data
-#' coordinates <- pm10$coords*1000
+#' coordinates <- pm10$coords * 1000
 #' covariates <- pm10$covariates
 #' z <- pm10$z
 #'
-#' #build the parameter list
-#' #(the phi list is used for the algorithm starting values)
-#' phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
-#'             sigma2eps=0.1,
-#'             sigma2omega=0.2,
-#'             theta=0.01,
-#'             G=matrix(0.77,1,1),
-#'             Sigmaeta=matrix(0.3,1,1),
-#'             m0=as.matrix(0),
-#'             C0=as.matrix(1))
+#' phi <- list(beta = matrix(c(3.65, 0.046, -0.904), 3, 1),
+#'             sigma2eps = 0.1,
+#'             sigma2omega = 0.2,
+#'             theta = 0.01,
+#'             G = matrix(0.77, 1, 1),
+#'             Sigmaeta = matrix(0.3, 1, 1),
+#'             m0 = as.matrix(0),
+#'             C0 = as.matrix(1))
 #'
-#' K <-matrix(1,ncol(z),1)
+#' K <- matrix(1, ncol(z), 1)
 #'
-#' mod1 <- STEM_Model(z=z,covariates=covariates,
-#'                    coordinates=coordinates,phi=phi,K=K)
-#' class(mod1)
+#' mod1 <- STEM_Model(z = z, covariates = covariates,
+#'                    coordinates = coordinates, phi = phi, K = K)
 #'
-#' SCSTEM_Estim(StemModel = mod1,distance='euclidean',crs=32632)
+#' fit <- SCSTEM_Estim(mod1, k = 2, phi_penalty = 0.5, distance = "euclidean")
+#' fit$info_crit
+#' table(fit$group)
 #' }
 #'
-#' @seealso See Also \code{\link{STEM_Model}} and \code{\link{pm10}}
+#' @seealso \code{\link{STEM_Model}}, \code{\link{STEM_Estimation}},
+#'   \code{\link{SCSTEM_Infocrit}}, \code{\link{SCSTEM_Select}},
+#'   \code{\link{SCSTEM_Bootstrap}} and \code{\link{pm10}}
 #'
 #' @keywords models spatial
 #'
-#'
-#' @param verbose Logical. If TRUE, convergence information is emitted via message(). Default is FALSE.
-#' @param plot_clusters Logical. If TRUE, the final cluster map is plotted. Default is FALSE.
-#'
 #' @export
+SCSTEM_Estim <- function(StemModel,
+                         k = 3,
+                         phi_penalty = 1,
+                         phi_scale = c("auto", "per-observation", "raw"),
+                         knn = 5,
+                         distance = c("geo", "euclidean"),
+                         init_method = c("kmeans", "coordinates", "AMKM"),
+                         label_update = c("ICM", "simultaneous"),
+                         precision = 0.1,
+                         precision_full_dataset = 0.01,
+                         regularization = 0.01,
+                         max_iter = 10,
+                         abs_tol = 1e-5,
+                         rel_tol = 1e-6,
+                         min_cluster_size = NULL,
+                         enforce_min_size = TRUE,
+                         share2conv = 0,
+                         crs = 4326,
+                         seed = 123456789,
+                         verbose = FALSE) {
 
-SCSTEM_Estim<-function(StemModel,crs=4326,distance='geo',knn=5,k=3,init_method='AMKM',nugget_var=TRUE,precision_full_dataset=0.01,precision=0.1,regularization=0.01,phi_penalty=1,max_iter=10,share2conv=0.05,verbose=FALSE,plot_clusters=FALSE){
+  ##############################
+  ########## Checks ###########
+  ##############################
 
-  l<-list()
-  z<-StemModel$data$z
-  coordinates<-StemModel$data$coordinates
-  covariates<-StemModel$data$covariates
-  phi<-StemModel$skeleton$phi
-  K<-StemModel$skeleton$K
-  n<-ncol(z)
-  day<-nrow(z)
-  ncov<-ncol(covariates)
-  mod1 <- STEM_Model(z = z, covariates = covariates,coordinates = coordinates, phi = phi, K = K)
-  mod1.est <- STEM_Estimation(mod1, precision = precision_full_dataset,distance=distance,regularization = regularization)
-  if(k==1){
-    l<-list(unlist(mod1.est$estimates$phi.hat),mod1.est)
-    names(l)<-c('phi_hat','fit_list')
-    }
-  if (k>=2){
-    nb <- spdep::knn2nb(spdep::knearneigh(coordinates, k = knn))  #  vicini più prossimi
-    W <- spdep::nb2mat(nb, style = "B", zero.policy = TRUE)
-    block_size <- day  # Numero di righe per blocco
-    covariates3<-as.data.frame(covariates)
-    # Aggiungiamo un identificatore di blocco
-    covariates3 <- covariates3 %>%
-      dplyr::mutate(block = rep(1:(nrow(covariates3) / block_size), each = block_size))
-      # Calcoliamo la media per ogni blocco e colonna
-    new_dataset <- covariates3 %>%
-      dplyr::group_by(.data$block) %>%
-      dplyr::summarise(dplyr::across(dplyr::everything(), ~ mean(.x, na.rm = TRUE)))  # Rimuoviamo la colonna block
-    new_dataset<-new_dataset[,-1]
-    # Inizializzazione dei cluster spazio-temporali
-    dati<-cbind(coordinates,new_dataset[,-c(1)])
-    clusters <-SCDA::SC_AMKM(Data_sf=sf::st_as_sf(dati, coords = c(1, 2)),Method = init_method,MinNc =k,MaxNc = k,IndexCol = 0,CRS = crs)  # Cluster iniziali k
-    clusters<-clusters$df$cluster
-    if (sum((table(clusters)<=1))>0){
-      stop('A cluster contains 1 observation, change init_method or try a smaller k')
-    }
-    G<-max(as.numeric(clusters))
+  if (!inherits(StemModel, "STEM_Model")) {
+    stop("'StemModel' must be an object of class 'STEM_Model'.", call. = FALSE)
+  }
+  phi_scale <- match.arg(phi_scale)
+  distance <- match.arg(distance)
+  init_method <- match.arg(init_method)
+  label_update <- match.arg(label_update)
 
-    phi_penalty <-phi_penalty # Penalizzazione spaziale
+  if (length(k) != 1L || is.na(k) || k < 1 || k != round(k)) {
+    stop("'k' must be a single positive integer.", call. = FALSE)
+  }
+  k <- as.integer(k)
+  if (length(phi_penalty) != 1L || is.na(phi_penalty) || phi_penalty < 0) {
+    stop("'phi_penalty' must be a single non-negative number.", call. = FALSE)
+  }
+  if (share2conv < 0 || share2conv >= 1) {
+    stop("'share2conv' must lie in [0, 1).", call. = FALSE)
+  }
 
-    max_iter <- max_iter # Numero massimo di iterazioni
-    for (iter in 1:max_iter) {
-      if (isTRUE(verbose)) message('SCSTEM iteration: ', iter)
-      # Step A: Stima dei parametri spazio-temporali per ogni cluster
-      phi_hat <- matrix(0, G, 10 )#10 npar
-      colnames(phi_hat)<-names(unlist(mod1.est$estimates$phi.hat))
-      loglik<-matrix(0,G,1)
-      fit_list<-list()
-      for (g in 1:G) {
-        if (!(g %in% clusters)) next
-        indices <- which(clusters == g)  # Seleziona le stazioni appartenenti al cluster g
-        # Estraggo le righe temporali per ogni stazione
-        idx_list <- unlist(lapply(indices, function(i) {
-          start_idx <- (i - 1) * day + 1
-          end_idx <- i * day
-          start_idx:end_idx
-          }))
-        K_cluster <- matrix(1, length(indices), 1)
+  ##############################
+  ########## Setup ############
+  ##############################
 
-        model_cluster <- STEM_Model(z = z[, indices], covariates = covariates[idx_list, ],
-                                    coordinates = coordinates[indices, ], phi = phi, K = K_cluster)
+  z <- StemModel$data$z
+  coordinates <- StemModel$data$coordinates
+  covariates <- StemModel$data$covariates
+  phi0 <- StemModel$skeleton$phi
+  Kmat <- StemModel$skeleton$K
+  pdim <- StemModel$skeleton$p
 
-        fit <- STEM_Estimation(model_cluster,precision=precision,regularization = regularization,distance=distance)
-        phi_hat[g, ] <- unlist(fit$estimates$phi.hat)
-        fit_list[[g]] <-fit
+  d <- ncol(z)
+  Tobs <- nrow(z)
+  ncov <- ncol(covariates)
+  Nobs <- d * Tobs
+
+  if (is.null(min_cluster_size)) min_cluster_size <- ncov + 2L
+  min_cluster_size <- max(2L, as.integer(min_cluster_size))
+
+  if (k > 1 && d < k * min_cluster_size) {
+    stop("Too few locations (", d, ") for k = ", k,
+         " clusters of at least ", min_cluster_size, " locations each.", call. = FALSE)
+  }
+
+  ### Penalty multiplier: see the "Scale of the penalty" paragraph in Details.
+  ### Under "auto" the multiplier is data-driven and is computed once, at the
+  ### first assignment step, from the spread of the location-wise
+  ### log-likelihood contributions across clusters.
+  pen_mult <- switch(phi_scale,
+                     "per-observation" = Tobs,
+                     "raw" = 1,
+                     "auto" = NA_real_)
+  phi_eff <- phi_penalty * pen_mult
+
+  npar_g <- scstem_npar(ncov = ncov, pdim = pdim)
+
+  if (k == 1L) {
+    ### Pooled model: a single STEM fit on the whole network
+    if (isTRUE(verbose)) message("Pooled STEM fit (k = 1) ...")
+    pooled <- STEM_Estimation(StemModel, precision = precision_full_dataset,
+                              distance = distance, regularization = regularization,
+                              verbose = FALSE)
+    par_names <- names(unlist(pooled$estimates$phi.hat))
+    loglik <- as.numeric(pooled$estimates$loglik)
+    info <- c(loglik = loglik, k = npar_g,
+              AIC = -2 * loglik + 2 * npar_g,
+              BIC = -2 * loglik + log(Nobs) * npar_g,
+              KIC = -2 * loglik + 3 * npar_g)
+    out <- list(
+      phi_hat = matrix(unlist(pooled$estimates$phi.hat), nrow = 1,
+                       dimnames = list("cluster 1", par_names)),
+      group = rep(1L, d),
+      df = data.frame(coordinates, cluster = 1L),
+      fit_list = list(pooled),
+      idx_g = list(seq_len(d)),
+      info_crit = info,
+      loglik_g = loglik,
+      final_refit = TRUE,
+      obj_trace = data.frame(iter = integer(0), objective = numeric(0),
+                             label_changes = integer(0)),
+      convergence = "Pooled model (k = 1): no clustering performed",
+      penalised_obj = NA_real_,
+      input_args = list(StemModel = StemModel, k = 1L, phi_penalty = phi_penalty,
+                        phi_scale = phi_scale, knn = knn, distance = distance,
+                        init_method = init_method, label_update = label_update,
+                        precision = precision,
+                        precision_full_dataset = precision_full_dataset,
+                        regularization = regularization, max_iter = max_iter,
+                        abs_tol = abs_tol, rel_tol = rel_tol,
+                        min_cluster_size = min_cluster_size,
+                        enforce_min_size = enforce_min_size,
+                        share2conv = share2conv, crs = crs, seed = seed,
+                        Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
+                        npar_g = npar_g, Nobs = Nobs)
+    )
+    class(out) <- c("SCSTEM_Estim", "list")
+    return(out)
+  }
+
+  ### Spatial penalty graph (symmetrised knn)
+  nbinfo <- scstem_neighbours(coordinates, knn = knn)
+  nb <- nbinfo$nb
+  W <- nbinfo$W
+
+  ### Initial partition. The seed is applied through scstem_with_seed(), which
+  ### restores the RNG stream on exit so that the user's workspace is left
+  ### untouched (CRAN policy on .GlobalEnv).
+  Xmeans <- scstem_covariate_means(covariates, d = d, Tobs = Tobs)
+  labels <- scstem_with_seed(
+    seed,
+    scstem_init(Xmeans = Xmeans, coords = coordinates, k = k,
+                method = init_method, min_size = min_cluster_size,
+                crs = crs)
+  )
+  if (length(unique(labels)) < k) {
+    stop("The initialisation returned fewer than k = ", k,
+         " non-empty clusters. Try a smaller k or a different init_method.",
+         call. = FALSE)
+  }
+
+  ##########################################
+  ########## Alternating algorithm #########
+  ##########################################
+
+  beta_g <- matrix(NA_real_, nrow = k, ncol = ncov)
+  s2eps_g <- s2omega_g <- rep(NA_real_, k)
+  ysm_g <- vector("list", k)
+  fit <- vector("list", k)
+  has_valid <- rep(FALSE, k)
+  stale_warned <- FALSE
+
+  obj_prev <- -Inf
+  best_obj <- -Inf
+  best_labels <- labels
+  label_history <- character(0)
+  obj_trace <- data.frame(iter = integer(0), objective = numeric(0),
+                          label_changes = integer(0), min_cluster = integer(0))
+  convergence <- "Maximum number of iterations reached"
+
+  for (it in seq_len(max_iter)) {
+
+    labels_prev <- labels
+
+    ### ---------------------------------------------------------------
+    ### Step 1: cluster-wise parameter update, given the labels
+    ### ---------------------------------------------------------------
+    for (g in seq_len(k)) {
+      idx <- which(labels == g)
+      if (length(idx) >= min_cluster_size) {
+        mod_g <- try(
+          STEM_Model(z = z[, idx, drop = FALSE],
+                     covariates = covariates[scstem_rows(idx, Tobs), , drop = FALSE],
+                     coordinates = coordinates[idx, , drop = FALSE],
+                     phi = phi0,
+                     K = Kmat[idx, , drop = FALSE]),
+          silent = TRUE)
+        fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
+          STEM_Estimation(mod_g, precision = precision, distance = distance,
+                          regularization = regularization, verbose = FALSE),
+          silent = TRUE)
+
+        if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
+          fit[[g]] <- fit_g
+          beta_g[g, ] <- as.numeric(fit_g$estimates$phi.hat$beta)
+          s2eps_g[g] <- as.numeric(fit_g$estimates$phi.hat$sigma2eps)
+          s2omega_g[g] <- as.numeric(fit_g$estimates$phi.hat$sigma2omega)
+          ysm_g[[g]] <- as.matrix(fit_g$estimates$y.smoothed)
+          has_valid[g] <- TRUE
         }
-
-      # Step B: Riassegnazione ai cluster basata su componente spazio-temporale
-      new_clusters <- clusters
-      likelihoods <- matrix(0, n,G)
-      a<-matrix(0,n,G)
-      b<-matrix(0,n,G)
-      for (i in 1:ncol(z)) {
-        for (g in 1:G) {
-          #Se il cluster g non ha osservazioni, skip
-          if (!(g %in% clusters)) next
-          # Parametri stimati per il cluster g
-          beta_g <- phi_hat[g, 2:(ncov+1)]  # Coefficienti delle covariate
-          sigma2_omega_g <- mod1.est$estimates$phi.hat$sigma2omega
-          sigma2eps_g<-mod1.est$estimates$phi.hat$sigma2eps
-          # Seleziona la serie temporale della stazione i
-          z_i <- z[, i]
-          X_i <- covariates[((i-1) * day + 1):(i * day), ]
-          y_t <- fit_list[[g]]$estimates$y.smoothed
-          l_y_t<-c(phi_hat[g,(ncov+4)],y_t[1:(day-1)])
-          # Calcola la previsione condizionata
-          f_t <- X_i %*% beta_g + l_y_t
-          var_g<-(1+(sigma2eps_g/sigma2_omega_g))
-
-          a[i,g]<-(-day/2)*log((sigma2_omega_g*var_g))
-          b[i,g]<--0.5*sum((z_i-f_t)^2/(sigma2_omega_g*var_g))
-          # Calcolo della log-verosimiglianza condizionata
-          likelihoods[i,g] <-(
-            (-day/2)*log((sigma2_omega_g*var_g))
-            -0.5*sum((z_i-f_t)^2/(sigma2_omega_g*var_g))
-            -0.5*log(phi_hat[g,(ncov+5)])
-            -0.5*(y_t[1]-phi_hat[g,(ncov+4)])^2
-            -(day/2)*log(phi_hat[g,(ncov+3)])
-            -0.5*sum((y_t-phi_hat[g,(ncov+2)]*l_y_t)^2/phi_hat[g,(ncov+4)]))
-          }
-        # Penalità spaziale basata sul modello di Potts
-        penalty <- phi_penalty * colSums(W[i, ] * (clusters == matrix(1:G, ncol(z), G, byrow = TRUE)))
-        # Massimizzazione della funzione obiettivo
-        if (isTRUE(nugget_var)) {new_clusters[i] <- which.max((a[i,]+b[i,])/n + penalty)}
-        if (!isTRUE(nugget_var)) {new_clusters[i] <- which.max((b[i,])/n + penalty)}
+      } else if (has_valid[g]) {
+        ### stale freeze: keep the last valid parameters
+        if (!stale_warned && isTRUE(verbose)) {
+          message("* Cluster ", g, " fell below the minimum size (", min_cluster_size,
+                  ") at iteration ", it, ": its parameters are kept frozen.")
+          stale_warned <- TRUE
         }
-      # Controllo di convergenza
-      if (sum(new_clusters != clusters) == 0) {
-        if (isTRUE(verbose)) message('Exact convergence met in ', iter, ' iteration.')
-        break
-        }
-      if (((sum(new_clusters != clusters))/n) <= share2conv) {
-        if (isTRUE(verbose)) message('Convergence reached: less than ', share2conv * 100, '% of the observations change cluster at iteration ', iter, '.')
-        break
       }
-      if (sum((table(new_clusters)<=1))>0){
-        stop('Convergence not reached: A cluster contains 0 or 1 observation, a smaller number of clusters may be required')
-        break
-      }
-      clusters <- new_clusters
-      }
-    clusters <- new_clusters
-    if (isTRUE(plot_clusters)) plot(coordinates, col = clusters, pch = 19, main = "Cluster")
-    l<-list(phi_hat,cbind(coordinates,clusters),fit_list)
-    names(l)<-c('phi_hat','df','fit_list')
     }
 
-  return(l)
+    if (!any(has_valid)) {
+      stop("No cluster could be estimated: try a smaller k, a larger ",
+           "min_cluster_size or looser convergence settings.", call. = FALSE)
+    }
+
+    ### ---------------------------------------------------------------
+    ### Step 2: label update, given the parameters
+    ### ---------------------------------------------------------------
+    LL <- matrix(-Inf, nrow = d, ncol = k)
+    for (g in seq_len(k)) {
+      if (!has_valid[g]) next
+      for (i in seq_len(d)) {
+        LL[i, g] <- scstem_loglike_i(
+          z_i = z[, i],
+          X_i = covariates[scstem_rows(i, Tobs), , drop = FALSE],
+          beta = beta_g[g, ],
+          ysm = ysm_g[[g]],
+          K_i = Kmat[i, , drop = FALSE],
+          sigma2eps = s2eps_g[g],
+          sigma2omega = s2omega_g[g]
+        )
+      }
+    }
+    LL[!is.finite(LL)] <- -Inf
+
+    ### Data-driven penalty scale, fixed once at the first sweep so that the
+    ### objective stays comparable along the iterations. The multiplier is the
+    ### median across locations of the spread of the log-likelihood
+    ### contributions across clusters, divided by the average number of
+    ### neighbours: phi_penalty = 1 is then the point at which full agreement
+    ### with the neighbourhood is worth as much as the typical gain from
+    ### picking the best-fitting cluster.
+    if (phi_scale == "auto" && !is.finite(phi_eff)) {
+      rng <- apply(LL, 1, function(r) {
+        r <- r[is.finite(r)]
+        if (length(r) < 2) NA_real_ else max(r) - min(r)
+      })
+      mean_nb <- mean(vapply(nb, length, integer(1)))
+      pen_mult <- stats::median(rng, na.rm = TRUE) / max(mean_nb, 1)
+      if (!is.finite(pen_mult) || pen_mult <= 0) pen_mult <- 1
+      phi_eff <- phi_penalty * pen_mult
+      if (isTRUE(verbose)) {
+        message("* Penalty scale (auto): multiplier = ", signif(pen_mult, 4),
+                " ; effective phi = ", signif(phi_eff, 4))
+      }
+    }
+
+    ### Clusters that never obtained a valid fit cannot receive locations.
+    LL[, !has_valid] <- -Inf
+
+    if (label_update == "ICM") {
+      ### Sequential (Gauss-Seidel) sweep: each label maximizes its own
+      ### penalised contribution given the CURRENT labels of all the others,
+      ### already-updated neighbours included.
+      ###
+      ### The sweep is constrained: a location may leave its cluster only if
+      ### that cluster would stay at or above min_cluster_size. Without this
+      ### constraint the cluster with the smallest residual variance attracts
+      ### every location -- the clusterwise analogue of the degenerate-likelihood
+      ### problem of Gaussian mixtures, and of the boundary solutions discussed
+      ### for spatially-clustered Fay-Herriot models -- and the partition
+      ### collapses. Restricting the moves keeps every configuration admissible
+      ### and preserves the monotonicity of the sweep within the feasible set.
+      sizes <- tabulate(labels, nbins = k)
+      for (i in seq_len(d)) {
+        nbi <- nb[[i]]
+        penvec <- if (length(nbi)) tabulate(labels[nbi], nbins = k) else rep(0, k)
+        qd <- LL[i, ] + phi_eff * penvec
+        gi <- labels[i]
+        if (isTRUE(enforce_min_size) && sizes[gi] <= min_cluster_size) {
+          ### the current cluster cannot afford to lose this location
+          next
+        }
+        gnew <- which.max(qd)
+        if (gnew != gi) {
+          sizes[gi] <- sizes[gi] - 1L
+          sizes[gnew] <- sizes[gnew] + 1L
+          labels[i] <- gnew
+        }
+      }
+    } else {
+      ### Joint update of all labels, with the penalty evaluated at the labels
+      ### of the previous iteration (pre-2.0.0 behaviour). The joint update
+      ### offers no way to impose the size constraint move by move, so an
+      ### inadmissible configuration is repaired afterwards.
+      Ind <- matrix(0, nrow = d, ncol = k)
+      Ind[cbind(seq_len(d), labels_prev)] <- 1
+      Pen <- W %*% Ind
+      labels <- apply(LL + phi_eff * as.matrix(Pen), 1, which.max)
+      if (isTRUE(enforce_min_size) && any(tabulate(labels, nbins = k) < min_cluster_size)) {
+        labels <- scstem_repair_partition(labels, feat = Xmeans, k = k,
+                                          min_size = min_cluster_size)
+      }
+    }
+
+    ### ---------------------------------------------------------------
+    ### Penalised objective at the current (parameters, labels)
+    ### ---------------------------------------------------------------
+    obj <- sum(LL[cbind(seq_len(d), labels)]) +
+      phi_eff * scstem_potts_pairs(labels, nb)
+    n_changes <- sum(labels != labels_prev)
+    obj_trace <- rbind(obj_trace,
+                       data.frame(iter = it, objective = obj,
+                                  label_changes = n_changes,
+                                  min_cluster = min(tabulate(labels, nbins = k))))
+    if (is.finite(obj) && obj > best_obj) {
+      best_obj <- obj
+      best_labels <- labels
+    }
+
+    if (isTRUE(verbose)) {
+      message("* Iteration ", it, ": penalised objective = ", round(obj, 4),
+              " ; label changes = ", n_changes,
+              " ; smallest cluster = ", min(tabulate(labels, nbins = k)))
+    }
+
+    ### ---------------------------------------------------------------
+    ### Exit conditions
+    ### ---------------------------------------------------------------
+    if (n_changes == 0) {
+      convergence <- "Convergence reached (labels stable)"
+      break
+    }
+    abs_imp <- abs(obj - obj_prev)
+    rel_imp <- abs_imp / (abs(obj_prev) + .Machine$double.eps)
+    if (it > 1 && (abs_imp < abs_tol || rel_imp < rel_tol)) {
+      convergence <- "Convergence reached (objective stable)"
+      break
+    }
+    if (share2conv > 0 && (n_changes / d) <= share2conv) {
+      convergence <- paste0("Convergence reached (fewer than ", share2conv * 100,
+                            "% of the locations changed cluster)")
+      break
+    }
+    lab_hash <- paste(labels, collapse = ",")
+    if (lab_hash %in% label_history) {
+      labels <- best_labels
+      convergence <- "Exited on label cycle: best visited partition returned"
+      warning("SCSTEM_Estim: label cycle detected; the best visited partition was returned.",
+              call. = FALSE)
+      break
+    }
+    label_history <- c(label_history, lab_hash)
+    obj_prev <- obj
+  }
+
+  if (convergence == "Maximum number of iterations reached") labels <- best_labels
+
+  ##########################################
+  ########## Final refit ###################
+  ##########################################
+
+  loglik_g <- rep(NA_real_, k)
+  final_refit <- rep(FALSE, k)
+  idx_g <- vector("list", k)
+  fit_final <- vector("list", k)
+  par_list <- vector("list", k)
+
+  for (g in seq_len(k)) {
+    idx_g[[g]] <- which(labels == g)
+    if (length(idx_g[[g]]) < min_cluster_size) next
+    mod_g <- try(
+      STEM_Model(z = z[, idx_g[[g]], drop = FALSE],
+                 covariates = covariates[scstem_rows(idx_g[[g]], Tobs), , drop = FALSE],
+                 coordinates = coordinates[idx_g[[g]], , drop = FALSE],
+                 phi = phi0,
+                 K = Kmat[idx_g[[g]], , drop = FALSE]),
+      silent = TRUE)
+    fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
+      STEM_Estimation(mod_g, precision = precision, distance = distance,
+                      regularization = regularization, verbose = FALSE),
+      silent = TRUE)
+    if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
+      fit_final[[g]] <- fit_g
+      par_list[[g]] <- unlist(fit_g$estimates$phi.hat)
+      loglik_g[g] <- as.numeric(fit_g$estimates$loglik)
+      final_refit[g] <- TRUE
+    }
+  }
+
+  if (!any(final_refit)) {
+    stop("No cluster could be re-estimated on the final partition. ",
+         "Try a smaller k, a larger min_cluster_size, or a stronger phi_penalty.",
+         call. = FALSE)
+  }
+
+  par_names <- names(par_list[[which(final_refit)[1]]])
+  phi_hat <- matrix(NA_real_, nrow = k, ncol = length(par_names),
+                    dimnames = list(paste("cluster", seq_len(k)), par_names))
+  for (g in which(final_refit)) phi_hat[g, ] <- par_list[[g]][par_names]
+
+  if (any(!final_refit)) {
+    warning("SCSTEM_Estim: cluster(s) ",
+            paste(which(!final_refit), collapse = ", "),
+            " could not be re-estimated on the final partition (size below ",
+            min_cluster_size, " or failed fit). Their estimates are NA.",
+            call. = FALSE)
+  }
+
+  ### Exact total log-likelihood and information criteria
+  k_eff <- sum(final_refit)
+  loglik_tot <- sum(loglik_g[final_refit])
+  k_par <- k_eff * npar_g
+  info <- c(loglik = loglik_tot, k = k_par,
+            AIC = -2 * loglik_tot + 2 * k_par,
+            BIC = -2 * loglik_tot + log(Nobs) * k_par,
+            KIC = -2 * loglik_tot + 3 * k_par)
+
+  if (isTRUE(verbose)) {
+    message("SC-STEM estimation ended (", convergence, "); k_eff = ", k_eff,
+            " ; BIC = ", round(info[["BIC"]], 3))
+  }
+
+  out <- list(
+    phi_hat = phi_hat,
+    group = as.integer(labels),
+    df = data.frame(coordinates, cluster = as.integer(labels)),
+    fit_list = fit_final,
+    idx_g = idx_g,
+    info_crit = info,
+    loglik_g = loglik_g,
+    final_refit = final_refit,
+    obj_trace = obj_trace,
+    convergence = convergence,
+    penalised_obj = if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else NA_real_,
+    phi_effective = phi_eff,
+    phi_multiplier = pen_mult,
+    input_args = list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
+                      phi_scale = phi_scale, knn = knn, distance = distance,
+                      init_method = init_method, label_update = label_update,
+                      precision = precision,
+                      precision_full_dataset = precision_full_dataset,
+                      regularization = regularization, max_iter = max_iter,
+                      abs_tol = abs_tol, rel_tol = rel_tol,
+                      min_cluster_size = min_cluster_size,
+                      enforce_min_size = enforce_min_size,
+                      share2conv = share2conv, crs = crs, seed = seed,
+                      Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
+                      npar_g = npar_g, Nobs = Nobs)
+  )
+  class(out) <- c("SCSTEM_Estim", "list")
+  out
 }
 
+
+#' Print method for SC-STEM fits
+#'
+#' @param x an object of class \dQuote{SCSTEM_Estim}.
+#' @param digits integer, number of significant digits. Default is 4.
+#' @param ... further arguments, currently ignored.
+#'
+#' @return \code{x}, invisibly. Called for its side effect of printing a
+#'   compact summary of the fit.
+#'
+#' @export
+print.SCSTEM_Estim <- function(x, digits = 4, ...) {
+  cat("Spatially-clustered STEM model\n")
+  cat("  clusters requested : ", x$input_args$k, "\n", sep = "")
+  cat("  clusters estimated : ", sum(x$final_refit), "\n", sep = "")
+  cat("  spatial penalty    : phi = ", x$input_args$phi_penalty,
+      " (", x$input_args$phi_scale, ", knn = ", x$input_args$knn, ")\n", sep = "")
+  cat("  label update       : ", x$input_args$label_update, "\n", sep = "")
+  cat("  convergence        : ", x$convergence, "\n", sep = "")
+  cat("  cluster sizes      : ",
+      paste(as.integer(table(factor(x$group, levels = seq_len(x$input_args$k)))),
+            collapse = ", "), "\n", sep = "")
+  cat("\nInformation criteria\n")
+  print(round(x$info_crit, digits))
+  cat("\nCluster-wise estimates\n")
+  print(round(x$phi_hat, digits))
+  invisible(x)
+}
