@@ -135,6 +135,7 @@ iterNR 		= c()
 converged_EM_1 	= FALSE
 converged_EM_2 	= FALSE
 n_iter_EM     	= 1
+step_last     	= NULL
 
 	if (isTRUE(verbose)) message("**** EM Algorithm - iteration n. ", n_iter_EM)
 while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
@@ -159,7 +160,25 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
 	iterNR[n_iter_EM] 	= step$n_iter_NR
 	step$phi$loglik 		= -2*step$phi$loglik
 	par           		= t(matrix(unlist(step$phi)))
+
+	### Robustness: an EM step that returns non-finite parameters (which the
+	### inner Newton-Raphson can produce on small or nearly collinear subsets of
+	### locations) used to propagate NaN into the convergence tests and abort
+	### the fit with "missing value where TRUE/FALSE needed". The iteration is
+	### now discarded and the last valid iterate is returned instead, so that a
+	### clusterwise algorithm calling this function on many candidate subsets
+	### degrades gracefully rather than failing.
+	if(!all(is.finite(par))) {
+		if(n_iter_EM == 1) {
+			stop("The EM algorithm produced non-finite parameters at the first iteration: check the starting values in 'phi' and the conditioning of the data.", call. = FALSE)
+		}
+		warning("The EM algorithm produced non-finite parameters at iteration ", n_iter_EM,
+			"; the last valid iterate is returned.", call. = FALSE)
+		break
+	}
+
 	parameters_mat[n_iter_EM,] = cbind(n_iter_EM, par)
+	step_last = step
 
 	if(n_iter_EM==1) {
   		prev_lik = 0
@@ -176,16 +195,20 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
   	}
 
 	dist_rel_num = sqrt(t(parameters_mat[n_iter_EM,-c(1,2)] - unlist(prev_par)) %*% (parameters_mat[n_iter_EM,-c(1,2)] - unlist(prev_par)))
-	dist_rel_den = sqrt(t(unlist(prev_par)) %*% unlist(prev_par))
+	### Floor on the denominators: both relative criteria are undefined at the
+	### first iteration, where the reference vector is exactly zero.
+	dist_rel_den = max(sqrt(t(unlist(prev_par)) %*% unlist(prev_par)), .Machine$double.eps)
 	dist_rel = dist_rel_num / dist_rel_den
 	distance_mat[n_iter_EM,] = dist_rel
 
-	diff_rel_loglik = abs(step$phi$loglik - prev_lik) / abs(prev_lik)
+	diff_rel_loglik = abs(step$phi$loglik - prev_lik) / max(abs(prev_lik), .Machine$double.eps)
 	distancelog_mat[n_iter_EM] = diff_rel_loglik
 
 	###Check the convergence!
-	converged_EM_1 = diff_rel_loglik < precision
-	converged_EM_2 = dist_rel < precision
+	### isTRUE() so that a non-finite criterion counts as "not converged"
+	### instead of turning the loop condition into NA.
+	converged_EM_1 = isTRUE(as.logical(diff_rel_loglik < precision))
+	converged_EM_2 = isTRUE(as.logical(dist_rel < precision))
 
 	Q_mat[n_iter_EM,] = c(unlist(step$Q_prev),unlist(step$Q_new))
 
@@ -204,7 +227,9 @@ phi_start = phi_start[-which(names(phi_start) == "logb")]
 phi.estimated= phi_start
 
 StemModel$estimates$phi.hat = phi.estimated
-StemModel$estimates$y.smoothed = step$m.smoother
+### the last VALID Kalman step, which differs from the last attempted one when
+### the loop broke out on a non-finite iterate
+StemModel$estimates$y.smoothed = step_last$m.smoother
 StemModel$estimates$loglik = (parameters_mat[(n_iter_EM-1),2])*(-2)
 convergence.par 			= list(conv.log = converged_EM_1,
 						conv.par = converged_EM_2,

@@ -265,13 +265,23 @@
 
 
         hessiana  = matrix( c(derivata_seconda_logtheta, derivata_mista, derivata_mista, derivata_seconda_logb),2,2)
-        cond.hessiana = det(hessiana) > 10^(-3)
+        ### Robustness: with isTRUE() a non-finite determinant counts as "not
+        ### well conditioned" instead of turning the loop condition into NA.
+        cond.hessiana = isTRUE(det(hessiana) > 10^(-3))
+        ### A Hessian with non-finite entries cannot be repaired by the grid
+        ### search below: leave the inner loop and let the guarded Newton step
+        ### decide what to do.
+        if(!all(is.finite(hessiana))) break
 
         if(!cond.hessiana) {
           kk1=10
           kk2=10
-          logtheta_vec = log(seq((0.01*exp(logtheta)),(10*exp(logtheta)),length=kk1))
-          logb_vec  = log(seq((0.01*exp(logb)),(10*exp(logb)),length=kk2))
+          ### Guard against an underflowed scale, which would make seq() start
+          ### at exactly 0 and produce log(0) = -Inf in the grid.
+          theta.scale = max(exp(logtheta), .Machine$double.xmin)
+          b.scale     = max(exp(logb),     .Machine$double.xmin)
+          logtheta_vec = log(seq((0.01*theta.scale),(10*theta.scale),length=kk1))
+          logb_vec  = log(seq((0.01*b.scale),(10*b.scale),length=kk2))
           QQ=matrix(NA,kk1,kk2)
 
           for(i in 1:kk1){
@@ -299,14 +309,37 @@
       gradiente = matrix( c(derivata_prima_logtheta, derivata_prima_logb),2,1)
 
       logtheta.logb_old = matrix(c(logtheta , logb),2,1)
-      delta = solve(hessiana+ diag(regularization, nrow(hessiana))) %*% gradiente
+
+      ### Robustness of the Newton step. A singular or non-finite Hessian, or a
+      ### step that leaves the finite range, used to propagate NaN into the
+      ### convergence test and abort the whole fit with "missing value where
+      ### TRUE/FALSE needed". This is harmless for a single pooled fit, where
+      ### such subsets are rare, but it makes the clusterwise algorithm brittle,
+      ### since every candidate partition produces a new subset of locations.
+      ### The step is now validated and, when it is not usable, the loop exits
+      ### keeping the last valid iterate.
+      delta = try(solve(hessiana + diag(regularization, nrow(hessiana))) %*% gradiente,
+                  silent = TRUE)
+      if(inherits(delta, "try-error") || !all(is.finite(delta))) {
+        n_iter_Hess.list[[n_iter_NR]] = n_iter_Hess - 1
+        n_iter_NR = n_iter_NR + 1
+        break
+      }
       logtheta.logb_new = logtheta.logb_old - delta
+      if(!all(is.finite(logtheta.logb_new))) {
+        n_iter_Hess.list[[n_iter_NR]] = n_iter_Hess - 1
+        n_iter_NR = n_iter_NR + 1
+        break
+      }
 
       dist_rel_num = sqrt(t(logtheta.logb_new - logtheta.logb_old) %*% (logtheta.logb_new - logtheta.logb_old))
-      dist_rel_den = sqrt(t(logtheta.logb_old) %*% logtheta.logb_old)
+      ### Floor on the denominator: the relative criterion is undefined when the
+      ### current iterate sits exactly at the origin.
+      dist_rel_den = max(sqrt(t(logtheta.logb_old) %*% logtheta.logb_old),
+                         .Machine$double.eps)
       dist_rel = dist_rel_num / dist_rel_den
 
-      convergence_NR = dist_rel < precision
+      convergence_NR = isTRUE(as.logical(dist_rel < precision))
       logb  = logtheta.logb_new[2,]
       logtheta = logtheta.logb_new[1,]
 

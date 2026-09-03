@@ -100,7 +100,7 @@ function (StemModel,distance='euclidean'){
   C0   = phi$C0
 
   #####################
-  y0 = matrix(mvrnorm(n=1, mu=m0, Sigma=C0),nrow=p, ncol=1)
+  y0 = matrix(MASS::mvrnorm(n=1, mu=m0, Sigma=C0),nrow=p, ncol=1)
 
   #t=1
   y[,1] = Gmat %*% y0 + MASS::mvrnorm(n=1, mu=matrix(0,nrow=p,ncol=1), Sigma=Wmat)

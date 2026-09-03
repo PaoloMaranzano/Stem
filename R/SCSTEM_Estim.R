@@ -93,6 +93,17 @@
 #' small relative to \eqn{k}; it can be lifted with
 #' \code{enforce_min_size = FALSE}.
 #'
+#' The constraint has a cost of its own: a location sitting in a cluster that is
+#' exactly at the minimum size can never move, so with small networks a large
+#' share of the partition may stay frozen at its initial value. Each sweep is
+#' therefore followed by a \emph{size-preserving swap pass}
+#' (\code{swap_pass = TRUE}, the default): the labels of two locations in
+#' different clusters are exchanged whenever the exchange strictly increases
+#' \eqn{Q}. A swap leaves every cluster size unchanged, so feasibility holds by
+#' construction, and it is accepted only on strict improvement, so the
+#' monotonicity of the algorithm is preserved. The number of accepted swaps is
+#' reported in \code{obj_trace}.
+#'
 #' \strong{Final refit and information criteria.} On convergence the
 #' cluster-wise STEM models are re-estimated once on the final partition. All
 #' reported coefficients, variance components and information criteria come
@@ -144,6 +155,9 @@
 #' @param enforce_min_size logical. If \code{TRUE} (default) the assignment
 #'   step never lets a cluster fall below \code{min_cluster_size}. See
 #'   \code{Details}. Set to \code{FALSE} to reproduce the unconstrained sweep.
+#' @param swap_pass logical. If \code{TRUE} (default) each sweep is followed
+#'   by a size-preserving swap pass that exchanges the labels of pairs of
+#'   locations whenever this increases the objective. See \code{Details}.
 #' @param share2conv number in \eqn{[0,1)}. Optional early-stopping rule kept
 #'   for backward compatibility: the loop also stops when the share of
 #'   locations changing cluster falls below this value. Set to 0 (default) to
@@ -251,6 +265,7 @@ SCSTEM_Estim <- function(StemModel,
                          rel_tol = 1e-6,
                          min_cluster_size = NULL,
                          enforce_min_size = TRUE,
+                         swap_pass = TRUE,
                          share2conv = 0,
                          crs = 4326,
                          seed = 123456789,
@@ -350,6 +365,7 @@ SCSTEM_Estim <- function(StemModel,
                         abs_tol = abs_tol, rel_tol = rel_tol,
                         min_cluster_size = min_cluster_size,
                         enforce_min_size = enforce_min_size,
+                        swap_pass = swap_pass,
                         share2conv = share2conv, crs = crs, seed = seed,
                         Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                         npar_g = npar_g, Nobs = Nobs)
@@ -394,7 +410,7 @@ SCSTEM_Estim <- function(StemModel,
   best_obj <- -Inf
   best_labels <- labels
   label_history <- character(0)
-  obj_trace <- data.frame(iter = integer(0), objective = numeric(0),
+  obj_trace <- data.frame(iter = integer(0), objective = numeric(0), swaps = integer(0),
                           label_changes = integer(0), min_cluster = integer(0))
   convergence <- "Maximum number of iterations reached"
 
@@ -534,6 +550,22 @@ SCSTEM_Estim <- function(StemModel,
     }
 
     ### ---------------------------------------------------------------
+    ### Size-preserving swap pass
+    ### ---------------------------------------------------------------
+    ### The constrained sweep above cannot move a location out of a cluster
+    ### sitting at the minimum size, which with small networks can freeze a
+    ### large share of the partition at its initial value. Exchanging the
+    ### labels of two locations leaves all cluster sizes unchanged, so it is
+    ### always feasible, and it is accepted only when it strictly increases
+    ### the penalised objective.
+    n_swap <- 0L
+    if (isTRUE(swap_pass) && isTRUE(enforce_min_size)) {
+      sw <- scstem_swap_pass(labels, LL, phi_eff, nb)
+      labels <- sw$labels
+      n_swap <- sw$nswap
+    }
+
+    ### ---------------------------------------------------------------
     ### Penalised objective at the current (parameters, labels)
     ### ---------------------------------------------------------------
     obj <- sum(LL[cbind(seq_len(d), labels)]) +
@@ -542,6 +574,7 @@ SCSTEM_Estim <- function(StemModel,
     obj_trace <- rbind(obj_trace,
                        data.frame(iter = it, objective = obj,
                                   label_changes = n_changes,
+                                  swaps = n_swap,
                                   min_cluster = min(tabulate(labels, nbins = k))))
     if (is.finite(obj) && obj > best_obj) {
       best_obj <- obj
@@ -674,6 +707,7 @@ SCSTEM_Estim <- function(StemModel,
                       abs_tol = abs_tol, rel_tol = rel_tol,
                       min_cluster_size = min_cluster_size,
                       enforce_min_size = enforce_min_size,
+                      swap_pass = swap_pass,
                       share2conv = share2conv, crs = crs, seed = seed,
                       Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                       npar_g = npar_g, Nobs = Nobs)

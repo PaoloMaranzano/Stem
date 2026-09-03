@@ -378,3 +378,110 @@ NULL
 
   labels
 }
+
+
+### ---------------------------------------------------------------------------
+### Penalty contribution of the pairs incident to two locations
+### ---------------------------------------------------------------------------
+### Counts, once each, the concordant neighbour pairs that involve i or j. Used
+### to evaluate the exact change of the Potts term produced by swapping the
+### labels of i and j, without recomputing the whole quadratic form.
+`scstem_pen_local` <- function(labels, i, j, nb) {
+  ni <- nb[[i]]; ni <- ni[ni != j]
+  nj <- nb[[j]]; nj <- nj[nj != i]
+  s <- 0
+  if (length(ni)) s <- s + sum(labels[ni] == labels[i])
+  if (length(nj)) s <- s + sum(labels[nj] == labels[j])
+  if (j %in% nb[[i]]) s <- s + as.integer(labels[i] == labels[j])
+  s
+}
+
+
+### ---------------------------------------------------------------------------
+### Size-preserving swap pass
+### ---------------------------------------------------------------------------
+### The constrained ICM sweep cannot move a location out of a cluster that sits
+### at the minimum admissible size, so with few locations a large share of the
+### network can stay frozen at the initial partition. A swap exchanges the
+### labels of two locations in different clusters: it leaves every cluster size
+### unchanged -- hence feasibility is preserved by construction -- and it is
+### accepted only when it strictly increases the penalised objective, so the
+### monotonicity of the alternating algorithm is preserved as well.
+###
+### The pass is greedy: candidate pairs are scanned and every improving swap is
+### applied immediately, repeating until no improving swap is left or max_pass
+### sweeps have been performed.
+###
+### Arguments
+###   labels   current partition
+###   LL       d x k matrix of log-likelihood contributions
+###   phi_eff  effective penalty
+###   nb       neighbour list
+###   tol      minimum improvement required to accept a swap
+###   max_pass maximum number of full scans
+###
+### Value: a list with the updated labels and the number of accepted swaps.
+### The scan is made affordable by an EXACT pruning bound. The penalty term of
+### a swap can gain at most phi_eff * (|nb_i| + |nb_j| + 1), because that is the
+### largest number of concordant pairs the two locations can be involved in.
+### A pair whose likelihood delta already falls below minus that bound can never
+### improve the objective and is discarded without evaluating the Potts term.
+### The likelihood deltas are computed cluster pair by cluster pair with an
+### outer sum, so the only loop left runs over the surviving candidates, which
+### are examined in decreasing order of likelihood gain.
+`scstem_swap_pass` <- function(labels, LL, phi_eff, nb, tol = 1e-8, max_pass = 5L) {
+
+  d <- length(labels)
+  k <- ncol(LL)
+  nswap <- 0L
+  nbsize <- vapply(nb, length, integer(1))
+
+  for (pass in seq_len(max_pass)) {
+
+    improved <- FALSE
+
+    for (a in seq_len(k - 1L)) {
+      for (b in (a + 1L):k) {
+
+        Ia <- which(labels == a)
+        Ib <- which(labels == b)
+        if (!length(Ia) || !length(Ib)) next
+
+        ### likelihood gain of moving i from a to b, and j from b to a
+        gi <- LL[Ia, b] - LL[Ia, a]
+        gj <- LL[Ib, a] - LL[Ib, b]
+        dll <- outer(gi, gj, "+")
+
+        ### exact upper bound on the penalty gain of each candidate pair
+        bound <- phi_eff * outer(nbsize[Ia], nbsize[Ib], "+") + phi_eff
+        cand <- which(is.finite(dll) & (dll + bound > tol), arr.ind = TRUE)
+        if (!nrow(cand)) next
+
+        ### examine the most promising candidates first
+        cand <- cand[order(dll[cand], decreasing = TRUE), , drop = FALSE]
+
+        for (r in seq_len(nrow(cand))) {
+          i <- Ia[cand[r, 1L]]
+          j <- Ib[cand[r, 2L]]
+          ### a previous accepted swap in this scan may have moved i or j
+          if (labels[i] != a || labels[j] != b) next
+          dll_ij <- LL[i, b] + LL[j, a] - LL[i, a] - LL[j, b]
+          if (!is.finite(dll_ij)) next
+          pen_before <- scstem_pen_local(labels, i, j, nb)
+          labels[i] <- b; labels[j] <- a
+          pen_after <- scstem_pen_local(labels, i, j, nb)
+          if (dll_ij + phi_eff * (pen_after - pen_before) > tol) {
+            nswap <- nswap + 1L
+            improved <- TRUE
+          } else {
+            labels[i] <- a; labels[j] <- b
+          }
+        }
+      }
+    }
+
+    if (!improved) break
+  }
+
+  list(labels = labels, nswap = nswap)
+}
