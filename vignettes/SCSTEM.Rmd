@@ -1,0 +1,238 @@
+---
+title: "2. Spatially-clustered STEM models"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{2. Spatially-clustered STEM models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6.5,
+  fig.height = 4.5
+)
+```
+
+```{r load}
+library(Stem)
+```
+
+## Why cluster the regression
+
+A STEM model imposes a single vector of regression coefficients on the whole
+monitoring network. Over a large and heterogeneous domain this is often not
+credible: the way concentrations respond to altitude or to a co-pollutant may
+differ between the centre of a plain and the areas nearer the reliefs.
+
+The spatially-clustered STEM (SC-STEM) model relaxes the assumption. Each
+location $i$ belongs to one of $k$ latent regimes, and conditionally on regime
+$k$
+
+$$
+z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,
+$$
+
+so that coefficients, variance components *and* latent dynamics are all
+regime-specific. Setting $k = 1$ returns the pooled fit.
+
+Labels and parameters are estimated jointly by maximising a Potts-penalised
+log-likelihood
+
+$$
+Q = \sum_{i=1}^{d} \ell_{i k_i}
+  + \phi\, c \sum_{i<j} w_{ij}\, \mathbb{I}(k_i = k_j),
+$$
+
+where $w_{ij}$ is the symmetrised $k$-nearest-neighbour adjacency and $\phi \ge
+0$ controls how strongly neighbouring locations are pushed into the same regime.
+This is the penalty of Sugasawa and Murakami (2021), in the form used for
+spatially-clustered Fay--Herriot and spatial autoregressive models.
+
+## The data
+
+```{r data}
+data(povalley)
+
+Tn <- 365L                       # one year, to keep the vignette quick
+Tfull <- nrow(povalley$z)
+d <- ncol(povalley$z)
+keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, "+"))
+
+z <- povalley$z[seq_len(Tn), ]
+X <- povalley$covariates[keep, ]
+
+dim(z)
+head(round(povalley$coords, 3), 3)
+```
+
+```{r network, fig.alt = "Location of the 36 monitoring stations"}
+plot(povalley$coords, pch = 19, cex = 0.9,
+     xlab = "Longitude", ylab = "Latitude",
+     main = "Po Valley background stations")
+```
+
+```{r model}
+phi <- list(
+  beta        = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+  sigma2eps   = 18.66,
+  sigma2omega = 1e-06,
+  theta       = 2e-06,
+  G           = matrix(0.59, 1, 1),
+  Sigmaeta    = matrix(4.25, 1, 1),
+  m0          = as.matrix(0),
+  C0          = as.matrix(1)
+)
+
+mod <- STEM_Model(z = z, covariates = X, coordinates = povalley$coords,
+                  phi = phi, K = matrix(1, d, 1))
+```
+
+Coordinates are longitude and latitude, so every call below uses
+`distance = "geo"`.
+
+## Fitting an SC-STEM model
+
+```{r fit}
+fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+                    precision = 0.05)
+fit
+```
+
+The algorithm alternates two steps. Given the labels, a STEM model is estimated
+in each regime. Given the parameters, the labels are updated by a sequential
+**ICM** sweep (Besag, 1986): locations are visited in turn and each label
+maximises its own penalised contribution given the current labels of all the
+others. Because the penalty is recomputed on the fly, the sweep cannot decrease
+$Q$ and cannot cycle — unlike the simultaneous update, still available through
+`label_update = "simultaneous"`.
+
+The trace shows the objective increasing until the partition stabilises:
+
+```{r trace}
+fit$obj_trace
+```
+
+```{r map, fig.alt = "Estimated spatial regimes"}
+plot(povalley$coords, col = fit$group, pch = 19, cex = 1.2,
+     xlab = "Longitude", ylab = "Latitude", main = "Estimated regimes")
+legend("topright", legend = paste("regime", seq_len(3)),
+       col = seq_len(3), pch = 19, bty = "n")
+```
+
+### Two safeguards worth knowing about
+
+Within-cluster homogeneity is exactly what the assignment step pursues, so the
+regime-specific variances shrink as locations are reallocated, and the regime
+with the smallest residual variance tends to attract *everything*. This is the
+clusterwise counterpart of the degenerate-likelihood problem of Gaussian
+mixtures. Two defaults keep it under control:
+
+* `enforce_min_size = TRUE` forbids a move that would take a regime below
+  `min_cluster_size`;
+* `swap_pass = TRUE` then restores mobility by exchanging the labels of two
+  locations whenever that increases $Q$, which leaves the regime sizes — and
+  hence feasibility — untouched.
+
+### The scale of the penalty
+
+Each location contributes $T$ observations to the likelihood, so a value of
+$\phi$ borrowed from a cross-sectional clustered model would be far too weak.
+The default `phi_scale = "auto"` rescales the penalty by the typical spread of
+the location-wise log-likelihood contributions, so that $\phi \approx 1$ is the
+point where agreeing with one's neighbours is worth about as much as picking
+the best-fitting regime.
+
+```{r scale}
+c(multiplier = fit$phi_multiplier, effective_phi = fit$phi_effective)
+```
+
+## Choosing $k$ and $\phi$
+
+`SCSTEM_Infocrit()` fits the whole grid and reports the criteria together with
+an admissibility flag.
+
+```{r grid}
+ic <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.25, 0.5, 0.75, 1),
+                      distance = "geo", precision = 0.05)
+ic$table[, c("k", "phi", "k_eff", "admissible", "loglik", "BIC", "min_size")]
+```
+
+Two caveats make a naive "minimise the BIC" rule unsafe here. The partition is
+itself optimised on the data, so the maximised likelihood keeps an optimism bias
+that the parameter count does not fully correct; and the shrinking variance
+components inflate the likelihood of the least regularised configurations. Both
+effects are strongest at $\phi \approx 0$, where in-sample criteria overselect
+$k$ — and where fits often collapse a regime altogether, which is what the
+`admissible` column is for.
+
+`SCSTEM_Select()` therefore applies a two-step rule: pick $k$ by BIC *inside a
+moderate band* of penalties, then pick the smallest $\phi$ on the stability
+plateau of the Adjusted Rand Index.
+
+```{r select}
+sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+sel
+```
+
+The selected model should always be judged against the pooled $k = 1$ reference,
+which `SCSTEM_Select()` reports.
+
+## Uncertainty: the refit-with-clustering bootstrap
+
+Conditioning on the estimated partition would understate the uncertainty,
+because the partition is itself an estimate. `SCSTEM_Bootstrap()` therefore
+generates data regime by regime from the fitted model and re-runs the *entire*
+procedure — clustering included — on every draw.
+
+```{r boot}
+best <- sel$fit
+boot <- SCSTEM_Bootstrap(best, B = 25, seed = 1)
+boot
+```
+
+`SCSTEM_BootInference()` relocates each refit onto the original regimes by the
+majority rule and summarises the draws.
+
+```{r inference}
+inf <- SCSTEM_BootInference(boot)
+inf
+```
+
+Percentile intervals for the regression coefficients:
+
+```{r ci}
+s <- inf$summary
+s[grepl("beta", s$parameter),
+  c("cluster", "parameter", "estimate", "se",
+    grep("^perc_", names(s), value = TRUE))]
+```
+
+And the question that matters substantively — do the regimes really differ?
+
+```{r tests}
+inf$tests[grepl("beta", inf$tests$parameter), ]
+```
+
+The co-clustering matrix records how often two locations end up in the same
+regime across the refits, and is a direct measure of how reproducible the
+partition is:
+
+```{r coclust}
+round(inf$coclustering[1:6, 1:6], 2)
+```
+
+## References
+
+Besag, J. (1986). On the statistical analysis of dirty pictures. *Journal of the
+Royal Statistical Society, Series B*, 48, 259--302.
+
+Cerqueti, R., Maranzano, P. and Mattera, R. (2025). Spatially-clustered spatial
+autoregressive models with application to agricultural market concentration in
+Europe. *Journal of Agricultural, Biological and Environmental Statistics*.
+
+Sugasawa, S. and Murakami, D. (2021). Spatially clustered regression. *Spatial
+Statistics*, 44, 100525.

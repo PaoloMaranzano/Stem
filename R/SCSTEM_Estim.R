@@ -75,8 +75,22 @@
 #' }
 #' The loop stops when the partition is unchanged, when the improvement of
 #' \eqn{Q} falls below \code{abs_tol}/\code{rel_tol}, when a previously visited
-#' partition reappears (the best visited partition is then returned), or when
-#' \code{max_iter} is reached.
+#' partition reappears, or when \code{max_iter} is reached.
+#'
+#' \strong{On monotonicity.} The label step is monotone at fixed parameters, but
+#' the alternation as a whole is \emph{not} guaranteed to increase \eqn{Q}
+#' monotonically, and \code{obj_trace} may well show a decrease. The reason is
+#' structural rather than numerical: the assignment score \eqn{\ell_{ik}} is a
+#' conditional pseudo-likelihood, because the spatial covariance
+#' \eqn{\Sigma_{e,k}} couples the locations and the exact marginal likelihood
+#' does not factorise across them, whereas the parameter step maximises the
+#' exact within-cluster likelihood through the EM algorithm. The two objectives
+#' agree on what a good partition looks like but are not the same function, so a
+#' parameter update can lower \eqn{Q} while raising the exact likelihood. Under
+#' the spatially-clustered Fay-Herriot model, where the area-level contributions
+#' are exact, the same scheme is monotone. To make the answer well defined in
+#' spite of this, the best partition visited along the iterations is always the
+#' one returned.
 #'
 #' \strong{Degeneracy and the minimum-size constraint.} Within-cluster
 #' homogeneity is exactly what the assignment step seeks, so the cluster-wise
@@ -129,12 +143,17 @@
 #' @param distance character, \code{"euclidean"} for Euclidean distance or
 #'   \code{"geo"} for geodesic distance. Use \code{"geo"} only when the
 #'   coordinates are longitude/latitude. Default is \code{"geo"}.
-#' @param init_method character, one of \code{"kmeans"} (default),
-#'   \code{"coordinates"} or \code{"AMKM"}. \code{"kmeans"} runs k-means on the
-#'   PCA-compressed location-wise covariate means with multiple restarts and a
-#'   minimum-cluster-size filter; \code{"coordinates"} clusters the coordinates;
-#'   \code{"AMKM"} reproduces the pre-2.0.0 behaviour and requires the
-#'   non-CRAN package \pkg{SCDA}.
+#' @param init_method character, either \code{"kmeans"} (default) or
+#'   \code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed
+#'   location-wise covariate means, with multiple restarts and a
+#'   minimum-cluster-size filter; \code{"coordinates"} clusters the spatial
+#'   coordinates instead, which is also the fallback for intercept-only models.
+#' @param init_partition optional integer vector of length \eqn{d} giving a
+#'   starting partition, overriding \code{init_method}. Use it to supply an
+#'   externally computed initialisation; for instance the AMKM partition used
+#'   by versions of the package before 2.0.0 can be reproduced by passing
+#'   \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
+#'   violates \code{min_cluster_size}.
 #' @param label_update character, \code{"ICM"} (default) for the sequential
 #'   Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 #'   update of all labels.
@@ -162,8 +181,6 @@
 #'   for backward compatibility: the loop also stops when the share of
 #'   locations changing cluster falls below this value. Set to 0 (default) to
 #'   rely only on the objective-based criteria.
-#' @param crs integer, coordinate reference system passed to \pkg{sf} when
-#'   \code{init_method = "AMKM"}. Default is 4326.
 #' @param seed integer or \code{NULL}, seed used for the initialisation step so
 #'   that the fit is reproducible. Default is 123456789.
 #' @param verbose logical. If \code{TRUE}, progress information is emitted via
@@ -216,30 +233,39 @@
 #' Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 #'
 #' @examples
-#' \donttest{
-#' data(pm10)
+#' # Daily PM2.5 at 36 background stations of the Po Valley. The first 180
+#' # days are used to keep the example fast; the covariates are the intercept,
+#' # the station altitude and the daily PM10 concentration.
+#' data(povalley)
 #'
-#' coordinates <- pm10$coords * 1000
-#' covariates <- pm10$covariates
-#' z <- pm10$z
+#' Tn <- 180L
+#' Tfull <- nrow(povalley$z)
+#' d <- ncol(povalley$z)
+#' # rows of the stacked covariate matrix belonging to the first Tn days
+#' keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
 #'
-#' phi <- list(beta = matrix(c(3.65, 0.046, -0.904), 3, 1),
-#'             sigma2eps = 0.1,
-#'             sigma2omega = 0.2,
-#'             theta = 0.01,
-#'             G = matrix(0.77, 1, 1),
-#'             Sigmaeta = matrix(0.3, 1, 1),
+#' phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+#'             sigma2eps = 18.66,
+#'             sigma2omega = 1e-06,
+#'             theta = 2e-06,
+#'             G = matrix(0.59, 1, 1),
+#'             Sigmaeta = matrix(4.25, 1, 1),
 #'             m0 = as.matrix(0),
 #'             C0 = as.matrix(1))
 #'
-#' K <- matrix(1, ncol(z), 1)
+#' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
+#'                   covariates = povalley$covariates[keep, ],
+#'                   coordinates = povalley$coords,
+#'                   phi = phi, K = matrix(1, d, 1))
 #'
-#' mod1 <- STEM_Model(z = z, covariates = covariates,
-#'                    coordinates = coordinates, phi = phi, K = K)
+#' \donttest{
+#' # three spatial regimes with a moderate spatial penalty
+#' fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = 'geo')
+#' fit
 #'
-#' fit <- SCSTEM_Estim(mod1, k = 2, phi_penalty = 0.5, distance = "euclidean")
-#' fit$info_crit
-#' table(fit$group)
+#' # the estimated regimes on the map
+#' plot(povalley$coords, col = fit$group, pch = 19,
+#'      xlab = 'Longitude', ylab = 'Latitude')
 #' }
 #'
 #' @seealso \code{\link{STEM_Model}}, \code{\link{STEM_Estimation}},
@@ -255,7 +281,8 @@ SCSTEM_Estim <- function(StemModel,
                          phi_scale = c("auto", "per-observation", "raw"),
                          knn = 5,
                          distance = c("geo", "euclidean"),
-                         init_method = c("kmeans", "coordinates", "AMKM"),
+                         init_method = c("kmeans", "coordinates"),
+                         init_partition = NULL,
                          label_update = c("ICM", "simultaneous"),
                          precision = 0.1,
                          precision_full_dataset = 0.01,
@@ -267,7 +294,6 @@ SCSTEM_Estim <- function(StemModel,
                          enforce_min_size = TRUE,
                          swap_pass = TRUE,
                          share2conv = 0,
-                         crs = 4326,
                          seed = 123456789,
                          verbose = FALSE) {
 
@@ -366,7 +392,7 @@ SCSTEM_Estim <- function(StemModel,
                         min_cluster_size = min_cluster_size,
                         enforce_min_size = enforce_min_size,
                         swap_pass = swap_pass,
-                        share2conv = share2conv, crs = crs, seed = seed,
+                        share2conv = share2conv, seed = seed,
                         Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                         npar_g = npar_g, Nobs = Nobs)
     )
@@ -383,12 +409,31 @@ SCSTEM_Estim <- function(StemModel,
   ### restores the RNG stream on exit so that the user's workspace is left
   ### untouched (CRAN policy on .GlobalEnv).
   Xmeans <- scstem_covariate_means(covariates, d = d, Tobs = Tobs)
-  labels <- scstem_with_seed(
-    seed,
-    scstem_init(Xmeans = Xmeans, coords = coordinates, k = k,
-                method = init_method, min_size = min_cluster_size,
-                crs = crs)
-  )
+  if (!is.null(init_partition)) {
+    ### user-supplied starting partition (for instance one obtained with an
+    ### external clustering routine); it is validated and, if needed, repaired
+    ### so that it satisfies the minimum-size requirement
+    labels <- as.integer(as.factor(init_partition))
+    if (length(labels) != d) {
+      stop("'init_partition' must have one label per location (length ", d, ").",
+           call. = FALSE)
+    }
+    if (length(unique(labels)) != k) {
+      stop("'init_partition' defines ", length(unique(labels)),
+           " groups, but k = ", k, " was requested.", call. = FALSE)
+    }
+    if (isTRUE(enforce_min_size) &&
+        any(tabulate(labels, nbins = k) < min_cluster_size)) {
+      labels <- scstem_repair_partition(labels, feat = Xmeans, k = k,
+                                        min_size = min_cluster_size)
+    }
+  } else {
+    labels <- scstem_with_seed(
+      seed,
+      scstem_init(Xmeans = Xmeans, coords = coordinates, k = k,
+                  method = init_method, min_size = min_cluster_size)
+    )
+  }
   if (length(unique(labels)) < k) {
     stop("The initialisation returned fewer than k = ", k,
          " non-empty clusters. Try a smaller k or a different init_method.",
@@ -617,7 +662,25 @@ SCSTEM_Estim <- function(StemModel,
     obj_prev <- obj
   }
 
-  if (convergence == "Maximum number of iterations reached") labels <- best_labels
+  ### Always return the best partition visited.
+  ###
+  ### The ICM sweep is monotone for FIXED parameters, but the alternation as a
+  ### whole is not guaranteed to increase Q. The reason is structural: the
+  ### assignment score is the conditional pseudo-likelihood of
+  ### scstem_loglike_i(), whereas the parameter step maximises the EXACT
+  ### within-cluster likelihood through the EM algorithm. The two objectives
+  ### agree on what a good partition looks like but are not the same function,
+  ### so a parameter update can lower Q even while it raises the exact
+  ### likelihood. (Under the spatially-clustered Fay-Herriot model the per-area
+  ### contributions are exact and the alternation is monotone; here the spatial
+  ### covariance across locations makes an exact decomposition unavailable.)
+  ### Keeping the best visited partition makes the returned solution
+  ### well defined regardless of the path taken.
+  final_obj <- if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else -Inf
+  if (is.finite(best_obj) && best_obj > final_obj + 1e-8) {
+    labels <- best_labels
+    convergence <- paste0(convergence, "; best visited partition returned")
+  }
 
   ##########################################
   ########## Final refit ###################
@@ -695,7 +758,9 @@ SCSTEM_Estim <- function(StemModel,
     final_refit = final_refit,
     obj_trace = obj_trace,
     convergence = convergence,
-    penalised_obj = if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else NA_real_,
+    penalised_obj = if (is.finite(best_obj)) best_obj else NA_real_,
+    best_objective = if (is.finite(best_obj)) best_obj else NA_real_,
+    last_objective = if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else NA_real_,
     phi_effective = phi_eff,
     phi_multiplier = pen_mult,
     input_args = list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
@@ -708,7 +773,7 @@ SCSTEM_Estim <- function(StemModel,
                       min_cluster_size = min_cluster_size,
                       enforce_min_size = enforce_min_size,
                       swap_pass = swap_pass,
-                      share2conv = share2conv, crs = crs, seed = seed,
+                      share2conv = share2conv, seed = seed,
                       Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                       npar_g = npar_g, Nobs = Nobs)
   )

@@ -2,120 +2,327 @@
 % Please edit documentation in R/SCSTEM_Estim.R
 \name{SCSTEM_Estim}
 \alias{SCSTEM_Estim}
-\title{STEM Clustered Regression}
+\title{Spatially-clustered STEM estimation}
 \usage{
 SCSTEM_Estim(
   StemModel,
-  crs = 4326,
-  distance = "geo",
-  knn = 5,
   k = 3,
-  init_method = "AMKM",
-  nugget_var = TRUE,
-  precision_full_dataset = 0.01,
-  precision = 0.1,
-  regularization = 0.01,
   phi_penalty = 1,
+  phi_scale = c("auto", "per-observation", "raw"),
+  knn = 5,
+  distance = c("geo", "euclidean"),
+  init_method = c("kmeans", "coordinates"),
+  init_partition = NULL,
+  label_update = c("ICM", "simultaneous"),
+  precision = 0.1,
+  precision_full_dataset = 0.01,
+  regularization = 0.01,
   max_iter = 10,
-  share2conv = 0.05,
-  verbose = FALSE,
-  plot_clusters = FALSE
+  abs_tol = 1e-05,
+  rel_tol = 1e-06,
+  min_cluster_size = NULL,
+  enforce_min_size = TRUE,
+  swap_pass = TRUE,
+  share2conv = 0,
+  seed = 123456789,
+  verbose = FALSE
 )
 }
 \arguments{
-\item{StemModel}{an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.}
+\item{StemModel}{an object of class \dQuote{STEM_Model} given as output by
+the \code{\link{STEM_Model}} function.}
 
-\item{crs}{Integer value. Coordinate reference sySTEM_ something suitable as input to st_crs.command from the sf package (see its documentation for details). Default is set to 4326.}
+\item{k}{integer, the number of spatial clusters. \code{k = 1} returns the
+pooled STEM fit. Default is 3.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{phi_penalty}{non-negative number, the weight of the Potts spatial
+penalty. \code{phi_penalty = 0} gives non-spatial clusterwise STEM.
+Default is 1.}
 
-\item{knn}{Integer value. The number of nearest neighbour to be taken into account for te spatial penalty, Default is set to 5}
+\item{phi_scale}{character, one of \code{"auto"} (default),
+\code{"per-observation"} or \code{"raw"}, setting the scale factor of the
+spatial penalty. See \code{Details}.}
 
-\item{k}{Integer value. The number of clusters for the clustered regression. Default is set to 3.}
+\item{knn}{integer, the number of nearest neighbours used to build the
+spatial penalty graph. The graph is symmetrised. Default is 5.}
 
-\item{init_method}{Character. Must be one of: 'AMKM' or 'K-means'. If init_method='AMKM', the Adjacent Matrix K-Means clustering is performed. If method='K-means', K-means clustering is performed.}
+\item{distance}{character, \code{"euclidean"} for Euclidean distance or
+\code{"geo"} for geodesic distance. Use \code{"geo"} only when the
+coordinates are longitude/latitude. Default is \code{"geo"}.}
 
-\item{nugget_var}{Logical. If FALSE it returns the Sugasawa clustered regression. If TRUE the STEM spatio temporal clustered regression is performed. Default is set to TRUE}
+\item{init_method}{character, either \code{"kmeans"} (default) or
+\code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed
+location-wise covariate means, with multiple restarts and a
+minimum-cluster-size filter; \code{"coordinates"} clusters the spatial
+coordinates instead, which is also the fallback for intercept-only models.}
 
-\item{precision_full_dataset}{a small positive number used for the EM algorithm convergence at the inizialization step of the EM algorithm. Default is equal to 0.1. See \code{DETAILS} below.}
+\item{init_partition}{optional integer vector of length \eqn{d} giving a
+starting partition, overriding \code{init_method}. Use it to supply an
+externally computed initialisation; for instance the AMKM partition used
+by versions of the package before 2.0.0 can be reproduced by passing
+\code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
+violates \code{min_cluster_size}.}
 
-\item{precision}{a small positive number used for the EM algorithm convergence in every step of the clustered regression. Default is equal to 0.1. See \code{DETAILS} below.}
+\item{label_update}{character, \code{"ICM"} (default) for the sequential
+Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
+update of all labels.}
 
-\item{regularization}{a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01}
+\item{precision}{small positive number, the convergence tolerance of the EM
+algorithm in each cluster-wise fit. Default is 0.1.}
 
-\item{phi_penalty}{a small positive number. It is the spatial penalty weight for the clustered regression. Default is set to 1.}
+\item{precision_full_dataset}{small positive number, the convergence
+tolerance of the EM algorithm for the pooled fit used to initialise the
+procedure. Default is 0.01.}
 
-\item{max_iter}{maximum number of iterations for the spatio temporal clustered regression algorithm.}
+\item{regularization}{small positive number added to the diagonal of the
+matrices that have to be inverted. Default is 0.01.}
 
-\item{share2conv}{a small positive number. It is the minimum percentage of observations that must change clusters for the algorithm not to converge. Default is set equal to 0.05}
+\item{max_iter}{integer, the maximum number of alternating iterations.
+Default is 10.}
 
-\item{verbose}{Logical. If TRUE, convergence information is emitted via message(). Default is FALSE.}
+\item{abs_tol, rel_tol}{absolute and relative tolerances on the improvement
+of the penalised objective. Defaults are 1e-5 and 1e-6.}
 
-\item{plot_clusters}{Logical. If TRUE, the final cluster map is plotted. Default is FALSE.}
+\item{min_cluster_size}{integer or \code{NULL}. Minimum number of locations
+required to estimate a cluster-wise model. When \code{NULL} (default) it is
+set to \code{ncov + 2}.}
+
+\item{enforce_min_size}{logical. If \code{TRUE} (default) the assignment
+step never lets a cluster fall below \code{min_cluster_size}. See
+\code{Details}. Set to \code{FALSE} to reproduce the unconstrained sweep.}
+
+\item{swap_pass}{logical. If \code{TRUE} (default) each sweep is followed
+by a size-preserving swap pass that exchanges the labels of pairs of
+locations whenever this increases the objective. See \code{Details}.}
+
+\item{share2conv}{number in \eqn{[0,1)}. Optional early-stopping rule kept
+for backward compatibility: the loop also stops when the share of
+locations changing cluster falls below this value. Set to 0 (default) to
+rely only on the objective-based criteria.}
+
+\item{seed}{integer or \code{NULL}, seed used for the initialisation step so
+that the fit is reproducible. Default is 123456789.}
+
+\item{verbose}{logical. If \code{TRUE}, progress information is emitted via
+\code{message()}. Default is \code{FALSE}.}
 }
 \value{
-The function returns a list given by:
+An object of class \dQuote{SCSTEM_Estim}, a list with components:
 \itemize{
-\code{phi.hat} is a matrix with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}) for each cluster.
-\code{clusters} is a df with 3 columns. Longitude, Latitude and cluster for each observation.
-\code{fit_list} a list that contains the single cluster model output.
+  \item \code{phi_hat}: \eqn{k} by \eqn{npar} matrix of cluster-wise
+    parameter estimates from the final refit.
+  \item \code{group}: integer vector of length \eqn{d} with the estimated
+    cluster label of each location.
+  \item \code{df}: data frame with the coordinates and the estimated labels.
+  \item \code{fit_list}: list of the \dQuote{STEM_Model} objects returned by
+    \code{\link{STEM_Estimation}} on the final partition.
+  \item \code{idx_g}: list of the location indices of each cluster.
+  \item \code{info_crit}: named vector with the total log-likelihood, the
+    number of free parameters and AIC, BIC and KIC.
+  \item \code{loglik_g}: cluster-wise exact log-likelihoods.
+  \item \code{final_refit}: logical vector flagging the clusters that could
+    be re-estimated on the final partition.
+  \item \code{obj_trace}: data frame tracing the penalised objective, the
+    number of label changes and the cluster sizes along the iterations.
+  \item \code{convergence}: character describing the exit route.
+  \item \code{penalised_obj}: value of the penalised objective at the exit.
+  \item \code{input_args}: the arguments used for the fit, needed by
+    \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Select}}.
 }
 }
 \description{
-The function \code{SCSTEM_Estim} computes the spatio-temporal clustered regression with the STEM_estimation method for the regression.
+\code{SCSTEM_Estim} fits a spatially-clustered spatio-temporal
+expectation-maximization (SC-STEM) model. The \eqn{d} monitoring locations
+are partitioned into \eqn{k} latent spatial regimes, and a separate
+\dQuote{STEM_Model} is estimated within each regime, so that regression
+coefficients, variance components and latent temporal dynamics are all
+cluster-specific. The partition and the parameters are estimated jointly by
+alternating optimization of a Potts-penalised log-likelihood.
 }
 \details{
-This function estimates the spatio temporal clustered regression via the STEM algorithm.
+\strong{Model.} Conditionally on location \eqn{i} belonging to cluster
+\eqn{k}, the SC-STEM model is the cluster-specific STEM model
+\deqn{z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+      y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,}
+with \eqn{e_t \sim N(0, \Sigma_{e,k})},
+\eqn{\Sigma_{e,k} = \sigma^2_{\epsilon k} I + \sigma^2_{\omega k} C(h;\theta_k)}
+and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{k = 1}
+recovers the pooled \code{\link{STEM_Estimation}} fit.
+
+\strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
+by maximizing the penalised log-likelihood
+\deqn{Q = \sum_{i=1}^{d} \ell_{i k_i} +
+          \phi\, c \sum_{i<j} w_{ij} I(k_i = k_j),}
+where \eqn{\ell_{ik}} is the log-likelihood contribution of location \eqn{i}
+under the parameters of cluster \eqn{k}, \eqn{w_{ij}} is the symmetrised
+\code{knn} adjacency indicator and \eqn{c > 0} is the scale factor discussed
+below. This is the Potts-type penalty of Sugasawa and Murakami (2021), in the
+form used for spatially-clustered Fay-Herriot and spatial autoregressive
+models by Cerqueti, Maranzano and Mattera (2025).
+
+\strong{Scale of the penalty.} In cross-sectional spatially-clustered models
+each unit contributes a single observation to the likelihood, so that
+\eqn{\phi} of order one balances fit against spatial cohesion. Here each
+location contributes \eqn{T} observations, and the log-likelihood differences
+between clusters grow with \eqn{T} and with the scale of the response. The
+factor \eqn{c} restores a comparable interpretation:
+\itemize{
+  \item \code{phi_scale = "auto"} (default) sets \eqn{c} to the median across
+    locations of the spread \eqn{\max_k \ell_{ik} - \min_k \ell_{ik}},
+    divided by the average number of neighbours. With this normalisation
+    \eqn{\phi = 1} is the point at which full agreement with the
+    neighbourhood is worth about as much as the typical gain from picking the
+    best-fitting cluster, so that a grid \eqn{\phi \in [0, 2]} is informative
+    on any dataset. The factor is computed once, at the first sweep, and is
+    returned in \code{phi_multiplier}.
+  \item \code{phi_scale = "per-observation"} sets \eqn{c = T}, which makes
+    \eqn{\phi} invariant to the length of the series and directly comparable
+    with the cross-sectional literature, but leaves it dependent on the scale
+    of the response.
+  \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalising on the
+    untransformed likelihood scale.
+}
+The effective penalty actually applied is always reported in
+\code{phi_effective}.
+
+\strong{Algorithm.} The two steps are iterated until convergence:
+\enumerate{
+  \item \emph{Parameter update given labels.} A STEM model is estimated by
+    \code{\link{STEM_Estimation}} on each cluster. A cluster that falls below
+    the minimum admissible size keeps its last valid parameters
+    (\dQuote{stale freeze}) instead of aborting the algorithm; a cluster that
+    never obtained a valid fit is excluded from the assignment step.
+  \item \emph{Label update given parameters.} With
+    \code{label_update = "ICM"} (the default) locations are visited
+    sequentially and each label maximizes its own penalised contribution
+    given the current labels of all the others, in the spirit of the
+    Iterated Conditional Modes algorithm of Besag (1986). For fixed
+    parameters this sweep cannot decrease \eqn{Q}, which rules out the label
+    cycling that a simultaneous update can produce.
+    \code{label_update = "simultaneous"} reproduces the joint update of all
+    labels used in earlier versions of the package and in Sugasawa and
+    Murakami (2021).
+}
+The loop stops when the partition is unchanged, when the improvement of
+\eqn{Q} falls below \code{abs_tol}/\code{rel_tol}, when a previously visited
+partition reappears, or when \code{max_iter} is reached.
+
+\strong{On monotonicity.} The label step is monotone at fixed parameters, but
+the alternation as a whole is \emph{not} guaranteed to increase \eqn{Q}
+monotonically, and \code{obj_trace} may well show a decrease. The reason is
+structural rather than numerical: the assignment score \eqn{\ell_{ik}} is a
+conditional pseudo-likelihood, because the spatial covariance
+\eqn{\Sigma_{e,k}} couples the locations and the exact marginal likelihood
+does not factorise across them, whereas the parameter step maximises the
+exact within-cluster likelihood through the EM algorithm. The two objectives
+agree on what a good partition looks like but are not the same function, so a
+parameter update can lower \eqn{Q} while raising the exact likelihood. Under
+the spatially-clustered Fay-Herriot model, where the area-level contributions
+are exact, the same scheme is monotone. To make the answer well defined in
+spite of this, the best partition visited along the iterations is always the
+one returned.
+
+\strong{Degeneracy and the minimum-size constraint.} Within-cluster
+homogeneity is exactly what the assignment step seeks, so the cluster-wise
+variance components \eqn{\sigma^2_{\epsilon k} + \sigma^2_{\omega k}} shrink
+as locations are reallocated. Left unconstrained, the cluster with the
+smallest residual variance then attracts every location and the partition
+collapses -- the clusterwise counterpart of the degenerate-likelihood problem
+of Gaussian mixtures, and of the boundary solutions documented for
+spatially-clustered Fay-Herriot models. With \code{enforce_min_size = TRUE}
+(the default) a location may leave its cluster only if that cluster stays at
+or above \code{min_cluster_size}, which keeps every visited configuration
+admissible while preserving the monotonicity of the ICM sweep within the
+feasible set. The constraint matters most when the number of locations is
+small relative to \eqn{k}; it can be lifted with
+\code{enforce_min_size = FALSE}.
+
+The constraint has a cost of its own: a location sitting in a cluster that is
+exactly at the minimum size can never move, so with small networks a large
+share of the partition may stay frozen at its initial value. Each sweep is
+therefore followed by a \emph{size-preserving swap pass}
+(\code{swap_pass = TRUE}, the default): the labels of two locations in
+different clusters are exchanged whenever the exchange strictly increases
+\eqn{Q}. A swap leaves every cluster size unchanged, so feasibility holds by
+construction, and it is accepted only on strict improvement, so the
+monotonicity of the algorithm is preserved. The number of accepted swaps is
+reported in \code{obj_trace}.
+
+\strong{Final refit and information criteria.} On convergence the
+cluster-wise STEM models are re-estimated once on the final partition. All
+reported coefficients, variance components and information criteria come
+from this refit and are based on the \emph{exact} cluster-wise
+log-likelihoods returned by \code{\link{STEM_Estimation}}, not on the
+pseudo-likelihood used to rank clusters during the assignment step. The
+number of free parameters is \eqn{k_{eff} (r + 3 + 3p)} for a diagonal
+specification with \eqn{r} covariates and latent dimension \eqn{p}, where
+\eqn{k_{eff}} counts the clusters that could actually be re-estimated.
 }
 \examples{
+# Daily PM2.5 at 36 background stations of the Po Valley. The first 180
+# days are used to keep the example fast; the covariates are the intercept,
+# the station altitude and the daily PM10 concentration.
+data(povalley)
+
+Tn <- 180L
+Tfull <- nrow(povalley$z)
+d <- ncol(povalley$z)
+# rows of the stacked covariate matrix belonging to the first Tn days
+keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
+
+phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+            sigma2eps = 18.66,
+            sigma2omega = 1e-06,
+            theta = 2e-06,
+            G = matrix(0.59, 1, 1),
+            Sigmaeta = matrix(4.25, 1, 1),
+            m0 = as.matrix(0),
+            C0 = as.matrix(1))
+
+mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
+                  covariates = povalley$covariates[keep, ],
+                  coordinates = povalley$coords,
+                  phi = phi, K = matrix(1, d, 1))
+
 \donttest{
-#load the data
-data(pm10)
+# three spatial regimes with a moderate spatial penalty
+fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = 'geo')
+fit
 
-#extract the data
-coordinates <- pm10$coords*1000
-covariates <- pm10$covariates
-z <- pm10$z
-
-#build the parameter list
-#(the phi list is used for the algorithm starting values)
-phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
-            sigma2eps=0.1,
-            sigma2omega=0.2,
-            theta=0.01,
-            G=matrix(0.77,1,1),
-            Sigmaeta=matrix(0.3,1,1),
-            m0=as.matrix(0),
-            C0=as.matrix(1))
-
-K <-matrix(1,ncol(z),1)
-
-mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
-class(mod1)
-
-SCSTEM_Estim(StemModel = mod1,distance='euclidean',crs=32632)
+# the estimated regimes on the map
+plot(povalley$coords, col = fit$group, pch = 19,
+     xlab = 'Longitude', ylab = 'Latitude')
 }
 
 }
 \references{
-Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal dynamic state-space model with the EM algorithm to patch gaps in daily riverflow series}. Hydrology and Earth System Sciences 9, 209--224.
+Besag, J. (1986) \emph{On the statistical analysis of dirty pictures}.
+Journal of the Royal Statistical Society, Series B, 48, 259--302.
 
-Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring using heterogeneous networks}. Environmetrics 18, 245--264. <doi: 10.1002/env.837>
+Cerqueti, R., Maranzano, P., Mattera, R. (2025) \emph{Spatially-clustered
+spatial autoregressive models with application to agricultural market
+concentration in Europe}. Journal of Agricultural, Biological and
+Environmental Statistics. \doi{10.1007/s13253-025-00685-7}
 
-Fasso', A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
+Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring
+using heterogeneous networks}. Environmetrics, 18, 245--264.
+\doi{10.1002/env.837}
 
-Fassò, A. and M. Cameletti (2010). "A Unified Statistical Approach for Simulation, Modeling, Analysis and Mapping of Environmental Data." SIMULATION 86(3): 139-153. <doi: 10.1177/0037549709102150>
+Fasso, A., Cameletti, M. (2010) \emph{A unified statistical approach for
+simulation, modeling, analysis and mapping of environmental data}.
+Simulation, 86, 139--153. \doi{10.1177/0037549709102150}
 
-Cerqueti, R., Maranzano, P., & Mattera, R. (2025). \emph{Spatially-clustered spatial autoregressive models with application to agricultural market concentration in Europe}. Journal of Agricultural, Biological and Environmental Statistics, 1-35.
-
-Sugasawa, S., & Murakami, D. (2021). \emph{Spatially clustered regression}. Spatial Statistics, 44, 100525.
+Sugasawa, S., Murakami, D. (2021) \emph{Spatially clustered regression}.
+Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 }
 \seealso{
-See Also \code{\link{STEM_Model}} and \code{\link{pm10}}
+\code{\link{STEM_Model}}, \code{\link{STEM_Estimation}},
+  \code{\link{SCSTEM_Infocrit}}, \code{\link{SCSTEM_Select}},
+  \code{\link{SCSTEM_Bootstrap}} and \code{\link{pm10}}
 }
 \author{
-Francesco Caccia  < francesco.caccia2000@gmail.com >
+Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
+  Francesco Caccia, Michela Cameletti
 }
 \keyword{models}
 \keyword{spatial}

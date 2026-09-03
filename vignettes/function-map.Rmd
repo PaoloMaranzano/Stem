@@ -1,0 +1,126 @@
+---
+title: "3. Map of the package"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{3. Map of the package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+This vignette is the conceptual map of `Stem`: what each function is for, and
+how they call one another. It is meant to be read once, before diving into the
+manual pages.
+
+```{r diagram, echo = FALSE, out.width = "100%", fig.alt = "Call graph of the Stem package, organised in four layers: data and model object, estimation engine, simulation and prediction, spatially-clustered STEM"}
+knitr::include_graphics("function-map.svg")
+```
+
+The same diagram is installed with the package and can be opened from R:
+
+```{r file, eval = FALSE}
+system.file("extdata", "STEM_function_map.svg", package = "Stem")
+```
+
+## The four layers
+
+### 1. Data and the model object
+
+Everything starts from a `STEM_Model` object, built by `STEM_Model()` from four
+ingredients: the observation matrix `z` ($T \times d$), the stacked covariate
+matrix (`(T \cdot d) \times r`, blocks ordered by location), the coordinates
+($d \times 2$) and a list `phi` of starting values. Two internal constructors do
+the validation: `STEM_Skeleton()` checks the parameter list and the loading
+matrix `K`, `STEM_Data()` checks the data and derives the dimensions.
+
+Two datasets ship with the package: `pm10`, the small 22-station example, and
+`povalley`, a real network of 36 background stations observed daily over
+2019--2023.
+
+### 2. The estimation engine
+
+`STEM_Estimation()` is the entry point and runs the EM loop. Each iteration
+calls `kalman()`, which does the real work:
+
+* `filtering()` / `filterstep()` — the forward Kalman recursions, which also
+  accumulate the log-likelihood through `mvtnorm::dmvnorm()`;
+* `smoothing()` / `smootherstep()` / `smootherstep.uni()` — the backward
+  recursions producing the smoothed latent states;
+* `Q_function_addendo1/2/3()` — the three pieces of the expected complete-data
+  log-likelihood;
+* `d1_Q()`, `d2_Q()`, `d12_Q()` and the `d1/d2_Sigmastar_*()` derivatives — the
+  gradient and Hessian of the Newton-Raphson step that updates $\theta$ and
+  $\log b = \log(\sigma^2_\varepsilon / \sigma^2_\omega)$;
+* `Sigmastar.exp()`, `B_function()`, `cov_lagone()`, `sumMatrices()` and
+  `changedimension_covariates()` — matrix utilities.
+
+Closed-form M-steps update $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and
+$m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
+
+### 3. Simulation, prediction and uncertainty
+
+* `STEM_Simulation()` draws a new dataset from a `STEM_Model` at the parameter
+  values held in its skeleton. It is the generator behind both bootstraps.
+* `STEM_Kriging()` predicts at unobserved locations through `spatial.pred()`.
+* `STEM_Bootstrap()` repeats *simulate, then re-estimate* through
+  `STEM_Bootstrap.fn()`, giving the sampling distribution of the parameters of a
+  single pooled model.
+
+### 4. Spatially-clustered STEM
+
+This layer sits on top of the previous ones: every cluster-wise fit is an
+ordinary `STEM_Model` estimated by `STEM_Estimation()`.
+
+* `SCSTEM_Estim()` alternates between estimating one STEM model per regime and
+  reallocating locations by an ICM sweep on a Potts-penalised objective. Its
+  helpers are `scstem_neighbours()` (symmetrised k-nearest-neighbour graph),
+  `scstem_init()` and `scstem_repair_partition()` (initialisation),
+  `scstem_loglike_i()` (the per-location contribution),
+  `scstem_potts_pairs()` and `scstem_pen_local()` (the penalty),
+  `scstem_swap_pass()` (the size-preserving swap step) and `scstem_npar()`
+  (the parameter count behind the information criteria).
+* `SCSTEM_Infocrit()` loops `SCSTEM_Estim()` over a grid of $(k, \phi)$ and
+  collects the criteria and the admissibility flags.
+* `SCSTEM_Select()` applies the two-step tuning rule to that grid, using
+  `scstem_ari()` for the stability step.
+* `SCSTEM_Bootstrap()` regenerates the data regime by regime with
+  `STEM_Simulation()` and re-runs the whole of `SCSTEM_Estim()` on every draw,
+  so the uncertainty of the partition is propagated.
+* `SCSTEM_BootInference()` aligns the refits with `scstem_align_labels()` and
+  turns the draws into standard errors, confidence intervals and between-regime
+  tests.
+
+## A typical session
+
+```{r session, eval = FALSE}
+library(Stem)
+data(povalley)
+
+# 1. build the model object
+mod <- STEM_Model(z = ..., covariates = ..., coordinates = ...,
+                  phi = ..., K = ...)
+
+# 2. the pooled benchmark
+pooled <- STEM_Estimation(mod, distance = "geo")
+
+# 3. explore the (k, phi) grid and select
+ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = seq(0, 1, by = 0.25),
+                       distance = "geo")
+sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+
+# 4. quantify the uncertainty, partition included
+boot <- SCSTEM_Bootstrap(sel$fit, B = 200, seed = 1)
+inf  <- SCSTEM_BootInference(boot)
+```
+
+## Regenerating the map
+
+The edge list underlying the diagram is obtained by parsing `R/` and recording
+which package functions each function calls; it is stored, in text form, in
+
+```{r edges, eval = FALSE}
+system.file("extdata", "STEM_function_map.md", package = "Stem")
+```

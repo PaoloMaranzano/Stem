@@ -49,4 +49,4 @@ Fassò, A., Cameletti, M. (2007) \emph{A general spatio-temporal model for envir
 \author{
 Michela Cameletti \email{michela.cameletti@unibg.it}
 }
-\keyword{dataset}
+\keyword{datasets}

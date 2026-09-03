@@ -12,7 +12,8 @@ STEM_Estimation(
   flag.Sigmaetadiag = TRUE,
   cov.spat = Sigmastar.exp,
   distance = "euclidean",
-  regularization = 0.01
+  regularization = 0.01,
+  verbose = FALSE
 )
 }
 \arguments{

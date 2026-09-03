@@ -2,7 +2,7 @@ Package: Stem
 Type: Package
 Title: Spatio-Temporal Expectation-Maximization Models
 Version: 2.0.0
-Authors@R: 
+Authors@R:
     c(
     person(
       given = "Michela",
@@ -24,15 +24,42 @@ Authors@R:
       comment = c(ORCID = "0000-0002-9228-2759")
       )
     )
-Imports: dplyr,MASS,mvtnorm,spdep,SCDA,stats,geodist,sf
-Description: Estimation of hierarchical spatio-temporal models using the Expectation-Maximization (EM) algorithm within a likelihood-based framework.
-    Technical details are available in Fassò, Cameletti and Nicolis (2007) <doi:10.1002/env.837>, Fassò and Cameletti (2010) <doi:10.1177/0037549709102150>, and McLachlan and Krishnan (2008, ISBN:9780470191613).
-    Estimation of the parameters is performed via maximum likelihood (ML).
-    Standard errors and prediction (spatial mapping) uncertainty are computed using a spatio-temporal parametric bootstrap.
-    The package also introduces an extended version of STEM models, namely the spatially-clustered STEM (SC-STEM), which allows regression parameters to be spatially varying according to a cluster-wise structure.
-    SC-STEM models are based on the methodology proposed by Sugasawa and Murakami (2021) <doi:10.1016/j.spasta.2021.100525> and Cerqueti, Maranzano and Mattera (2024) <https://arxiv.org/abs/2407.15874>.
-License: GPL (>=2)
+Description: Estimation of hierarchical spatio-temporal models through the
+    Expectation-Maximization (EM) algorithm within a likelihood-based
+    framework, following Fasso, Cameletti and Nicolis (2007)
+    <doi:10.1002/env.837> and Fasso and Cameletti (2010)
+    <doi:10.1177/0037549709102150>, with the EM machinery of McLachlan and
+    Krishnan (2008, ISBN:9780470191613). Parameters are estimated by maximum
+    likelihood via Kalman filtering and smoothing; standard errors and spatial
+    prediction uncertainty are obtained by a spatio-temporal parametric
+    bootstrap. The package also provides the spatially-clustered STEM (SC-STEM)
+    models, an extension in which regression coefficients, variance components
+    and latent dynamics vary across spatial regimes estimated from the data by
+    maximising a Potts-penalised likelihood, in the spirit of the
+    spatially-clustered regression of Sugasawa and Murakami (2021)
+    <doi:10.1016/j.spasta.2021.100525> and of the spatially-clustered spatial
+    autoregressive models of Cerqueti, Maranzano and Mattera (2025)
+    <doi:10.1007/s13253-025-00685-7>. SC-STEM comes with likelihood-based
+    criteria and a stability-based rule for selecting the number of clusters
+    and the spatial penalty, and with a refit-with-clustering parametric
+    bootstrap that propagates the uncertainty of the estimated partition.
+License: GPL (>= 2)
+URL: https://github.com/PaoloMaranzano/Stem
+BugReports: https://github.com/PaoloMaranzano/Stem/issues
 Encoding: UTF-8
 Language: en-US
-RoxygenNote: 7.3.2
+Depends: R (>= 4.1.0)
+Imports:
+    geodist,
+    MASS,
+    mvtnorm,
+    spdep,
+    stats
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
 LazyData: true
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

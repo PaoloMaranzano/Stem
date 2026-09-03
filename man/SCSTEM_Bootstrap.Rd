@@ -2,85 +2,143 @@
 % Please edit documentation in R/SCSTEM_Bootstrap.R
 \name{SCSTEM_Bootstrap}
 \alias{SCSTEM_Bootstrap}
-\title{STEM Clustered Regression parametric bootstrap}
+\title{Refit-with-clustering parametric bootstrap for SC-STEM models}
 \usage{
-SCSTEM_Bootstrap(
-  SCSTEM,
-  B,
-  distance = "geo",
-  precision = 0.1,
-  regularization = 0.01,
-  alfa = 0.05
-)
+SCSTEM_Bootstrap(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
 }
 \arguments{
-\item{SCSTEM}{is the \dQuote{SCSTEM_Estim } function output.}
+\item{SCSTEM}{an object of class \dQuote{SCSTEM_Estim} returned by
+\code{\link{SCSTEM_Estim}}.}
 
-\item{B}{number of bootstrap iterations.}
+\item{B}{integer, the number of bootstrap replicates. Default is 100.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{seed}{integer or \code{NULL}. When supplied, the draws are exactly
+reproducible; the RNG stream is restored on exit. Default is \code{NULL}.}
 
-\item{precision}{a small positive number used for the STEM_Estimation algorithm convergence. Default is equal to 0.01.}
+\item{verbose}{logical. If \code{TRUE}, progress is reported via
+\code{message()}. Default is \code{FALSE}.}
 
-\item{regularization}{a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01}
-
-\item{alfa}{the significance level of the confidence interval. default is set to 0.05}
+\item{...}{further arguments passed to \code{\link{SCSTEM_Estim}} for the
+refits, overriding the settings of the original fit.}
 }
 \value{
-The function returns a list of datframe (one for each cluster).
-each dataframe contains the estimates, the standard error, the t statistic value, the p-value and the confidence interval for each parameter.
+An object of class \dQuote{SCSTEM_Bootstrap}, a list with
+\itemize{
+  \item \code{draws}: a \eqn{B} by \eqn{k} by \eqn{npar} array of the
+    cluster-wise parameter estimates of every refit, with \code{NA} for
+    failed draws.
+  \item \code{groups}: a \eqn{d} by \eqn{B} matrix of the refit partitions.
+  \item \code{loglik}: matrix of the cluster-wise log-likelihoods of the
+    refits.
+  \item \code{info}: a data frame with one row per draw reporting whether the
+    refit succeeded, how many clusters it recovered, its total
+    log-likelihood, the number of iterations and the convergence message.
+  \item \code{original}: the \dQuote{SCSTEM_Estim} object given in input.
+  \item \code{B}, \code{B_valid}: requested and usable number of draws.
+}
 }
 \description{
-The function \code{SCSTEM_Bootstrap} computes the spatio-temporal parametric bootstrap for computing the parameter standard errors of the clustered regression.
+\code{SCSTEM_Bootstrap} implements the parametric bootstrap for
+spatially-clustered STEM models. Bootstrap datasets are generated cluster by
+cluster from the fitted model and the \emph{entire} SC-STEM procedure --
+including the endogenous partitioning -- is re-estimated on every bootstrap
+sample, so that the uncertainty of the partition is propagated to all
+bootstrap statistics.
 }
 \details{
-This function estimates the spatio temporal clustered regression standard error.
+The distinguishing feature of the procedure is that it re-runs the clustering
+at every draw, rather than conditioning on the estimated partition. The
+algorithm is the SC-STEM counterpart of the refit-with-clustering bootstrap
+used for spatially-clustered Fay-Herriot models:
+\enumerate{
+  \item Fit the SC-STEM model on the observed data at fixed \eqn{k} and
+    \eqn{\phi}, obtaining the partition \eqn{\hat{P}} and the cluster-wise
+    parameter estimates \eqn{\hat{\phi}_k}.
+  \item For \eqn{b = 1,\ldots,B} and for each cluster \eqn{k}, simulate a
+    spatio-temporal dataset \eqn{z^{*(b)}} from the STEM model of cluster
+    \eqn{k} evaluated at \eqn{\hat{\phi}_k}, using the observed covariates,
+    coordinates and loading matrix of the locations in that cluster. This is
+    \code{\link{STEM_Simulation}} applied cluster by cluster, so that the
+    within-cluster spatial covariance and the latent temporal dynamics of the
+    fitted model are both reproduced.
+  \item Restore the original ordering of the locations, so that the simulated
+    data are aligned with the rows of the spatial penalty graph and every
+    location keeps its own neighbours.
+  \item Re-run \code{\link{SCSTEM_Estim}} on \eqn{z^{*(b)}} with the same
+    \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
+    estimates, the refit partition and the convergence diagnostics.
+}
+Because each bootstrap sample is generated cluster by cluster from the
+observed covariates and coordinates, the spatial structure of the original
+data is preserved: the fixed-effects surface inherits the contiguity of the
+estimated regimes while every location retains its position in the
+neighbourhood graph.
+
+\strong{Failed refits.} A bootstrap sample whose refit raises an error, or
+whose refit collapses a cluster, is recorded but excluded from the
+inferential summaries computed by \code{\link{SCSTEM_BootInference}}. The
+share of usable draws is reported.
+
+\strong{Label alignment.} The clusters of a refit carry arbitrary labels, so
+they are relocated onto the clusters of the original fit by the majority
+rule before any statistic is computed. The alignment is applied by
+\code{\link{SCSTEM_BootInference}}, and the raw draws are returned here
+unaligned, together with the refit partitions, so that any alternative
+matching can be applied afterwards.
 }
 \examples{
+# Daily PM2.5 at 36 background stations of the Po Valley. The first 180
+# days are used to keep the example fast; the covariates are the intercept,
+# the station altitude and the daily PM10 concentration.
+data(povalley)
+
+Tn <- 180L
+Tfull <- nrow(povalley$z)
+d <- ncol(povalley$z)
+# rows of the stacked covariate matrix belonging to the first Tn days
+keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
+
+phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+            sigma2eps = 18.66,
+            sigma2omega = 1e-06,
+            theta = 2e-06,
+            G = matrix(0.59, 1, 1),
+            Sigmaeta = matrix(4.25, 1, 1),
+            m0 = as.matrix(0),
+            C0 = as.matrix(1))
+
+mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
+                  covariates = povalley$covariates[keep, ],
+                  coordinates = povalley$coords,
+                  phi = phi, K = matrix(1, d, 1))
+
 \donttest{
-#load the data
-data(pm10)
-
-#extract the data
-coordinates <- pm10$coords*1000
-covariates <- pm10$covariates
-z <- pm10$z
-
-#build the parameter list
-#(the phi list is used for the algorithm starting values)
-phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
-            sigma2eps=0.1,
-            sigma2omega=0.2,
-            theta=0.01,
-            G=matrix(0.77,1,1),
-            Sigmaeta=matrix(0.3,1,1),
-            m0=as.matrix(0),
-            C0=as.matrix(1))
-
-K <-matrix(1,ncol(z),1)
-
-mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
-class(mod1)
-
-estim<-SCSTEM_Estim(StemModel = mod1,distance='euclidean',crs=32632)
-SCSTEM_Bootstrap(estim,10,distance='euclidean')
+fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
+boot
 }
 
 }
 \references{
-Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal dynamic state-space model with the EM algorithm to patch gaps in daily riverflow series}. Hydrology and Earth System Sciences 9, 209--224.
-Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring using heterogeneous networks}. Environmetrics 18, 245--264.
-Fasso', A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
-Fassò, A. and M. Cameletti (2010). "A Unified Statistical Approach for Simulation, Modeling, Analysis and Mapping of Environmental Data." SIMULATION 86(3): 139-153. <doi: 10.1177/0037549709102150>
-Cerqueti, R., Maranzano, P., & Mattera, R. (2025). \emph{Spatially-clustered spatial autoregressive models with application to agricultural market concentration in Europe}. Journal of Agricultural, Biological and Environmental Statistics, 1-35.
-Sugasawa, S., & Murakami, D. (2021). \emph{Spatially clustered regression}. Spatial Statistics, 44, 100525.
+Chatterjee, S., Lahiri, P., Li, H. (2008) \emph{Parametric bootstrap
+approximation to the distribution of EBLUP and related prediction intervals
+in linear mixed models}. Annals of Statistics, 36, 1221--1245.
+\doi{10.1214/07-AOS512}
+
+Davison, A.C., Hinkley, D.V. (1997) \emph{Bootstrap Methods and their
+Application}. Cambridge University Press.
+
+Hall, P., Maiti, T. (2006) \emph{On parametric bootstrap methods for small
+area prediction}. Journal of the Royal Statistical Society, Series B, 68,
+221--238. \doi{10.1111/j.1467-9868.2006.00541.x}
 }
 \seealso{
-See Also \code{\link{STEM_Estimation}} and \code{\link{SCSTEM_Estim}}
+\code{\link{SCSTEM_Estim}}, \code{\link{SCSTEM_BootInference}} and
+  \code{\link{STEM_Bootstrap}}
 }
 \author{
-Francesco Caccia  < francesco.caccia2000@gmail.com >
+Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
+  Francesco Caccia, Michela Cameletti
 }
 \keyword{models}
 \keyword{spatial}

@@ -1,0 +1,170 @@
+# Stem 2.0.0
+
+First release of the package after its archival on CRAN, and the first to
+include the spatially-clustered STEM (SC-STEM) model family. The classical STEM
+workflow of version 1.0 is unchanged in its statistical content; what changes is
+its numerical robustness, the whole SC-STEM layer, and the packaging.
+
+## New features
+
+### Spatially-clustered STEM models
+
+* `SCSTEM_Estim()` fits an SC-STEM model: the monitoring locations are
+  partitioned into `k` latent spatial regimes and a separate STEM model is
+  estimated within each of them, so that regression coefficients, variance
+  components and latent temporal dynamics are all cluster-specific. Labels and
+  parameters are estimated jointly by maximising a Potts-penalised
+  log-likelihood.
+* `SCSTEM_Infocrit()` now fits a full `(k, phi)` grid and returns exact
+  log-likelihoods, AIC, BIC and KIC, an admissibility flag, the cluster sizes
+  and the estimated partitions. The pre-2.0.0 `mink`/`maxk` calling convention
+  still works.
+* `SCSTEM_Select()` implements a two-step rule for choosing the
+  hyperparameters: **(S1)** the modal BIC-minimising `k` inside a
+  moderate-penalty band, ties resolved towards the smaller `k`; **(S2)** the
+  smallest `phi` on the stability plateau of the Adjusted Rand Index between
+  neighbouring grid partitions. Only admissible configurations enter the rule,
+  and the pooled `k = 1` model is always retained as the reference.
+* `SCSTEM_Bootstrap()` is now a **refit-with-clustering** parametric bootstrap:
+  data are generated cluster by cluster from the fitted model and the *entire*
+  procedure, endogenous partitioning included, is re-estimated on every draw, so
+  that the uncertainty of the partition is propagated. It replaces the previous
+  bootstrap, which conditioned on the estimated partition and therefore
+  understated the uncertainty.
+* `SCSTEM_BootInference()` aligns every refit onto the original clusters by the
+  majority rule and returns bootstrap standard errors; normal, basic,
+  percentile and bias-corrected confidence intervals; pairwise percentile tests
+  for the differences between clusters; the co-clustering matrix; and the ARI of
+  each refit against the original partition.
+* New classes `SCSTEM_Estim`, `SCSTEM_Infocrit`, `SCSTEM_Select`,
+  `SCSTEM_Bootstrap` and `SCSTEM_BootInference`, each with a `print()` method.
+
+### Algorithmic changes in the SC-STEM assignment step
+
+* The label update is now **ICM** (Iterated Conditional Modes, Besag 1986) by
+  default: locations are visited sequentially and the Potts penalty is
+  recomputed on the fly, so the sweep cannot decrease the objective and cannot
+  cycle. The previous simultaneous update is still available via
+  `label_update = "simultaneous"`.
+* The penalised objective
+  `Q = sum_i l_{i,k_i} + phi * c * #{concordant neighbour pairs}` is now
+  computed explicitly and traced along the iterations (`obj_trace`).
+  Convergence is declared on label stability, on the improvement of `Q`, on
+  cycle detection (the best visited partition is returned) or at `max_iter`.
+* **Minimum-size constraint** (`enforce_min_size = TRUE`). Within-cluster
+  homogeneity is what the assignment step seeks, so the cluster-wise variance
+  components shrink and, left unconstrained, the cluster with the smallest
+  residual variance attracts every location. On the `pm10` example the
+  unconstrained sweep collapses to a single cluster even at `phi = 0`. A
+  location may now leave its cluster only if that cluster stays at or above
+  `min_cluster_size`.
+* **Size-preserving swap pass** (`swap_pass = TRUE`). Since the constraint above
+  freezes any location sitting in a minimum-size cluster, each sweep is followed
+  by a pass that exchanges the labels of two locations whenever this strictly
+  increases `Q`. Swaps leave cluster sizes unchanged, so feasibility and
+  monotonicity both hold. An exact pruning bound keeps the scan affordable.
+* The `knn` graph is **symmetrised**: the Potts penalty is defined on an
+  undirected graph, whereas `spdep::knearneigh()` returns an asymmetric one.
+* New `phi_scale` argument. Each location contributes `T` observations to the
+  likelihood, so a penalty calibrated for cross-sectional models is not
+  transferable. The default `"auto"` normalises the penalty by the median spread
+  of the location-wise log-likelihood contributions, making a grid
+  `phi` in `[0, 2]` informative on any dataset; `"per-observation"` and `"raw"`
+  are also available. The penalty actually applied is reported in
+  `phi_effective`.
+* On convergence the cluster-wise models are **re-estimated once** on the final
+  partition, and every reported quantity comes from that refit.
+
+### Corrections to the SC-STEM assignment score
+
+The score used to allocate locations to clusters before 2.0.0 contained four
+defects, all fixed:
+
+* the quadratic form of the state equation was divided by `m0` instead of
+  `Sigmaeta`, which flips its sign whenever `m0 < 0`;
+* `sigma2omega` and `sigma2eps` were taken from the pooled fit rather than from
+  the candidate cluster, which made the corresponding term constant across
+  clusters and turned the `nugget_var` switch into a no-op;
+* the predictor used the lagged smoothed state `y_{t-1}` instead of the
+  contemporaneous `K_i y_t` of the measurement equation;
+* the score was divided by the number of locations, which left `phi` without a
+  comparable scale.
+
+The contribution is now an explicit conditional pseudo-likelihood, documented as
+such, and used *only* to rank clusters: coefficients, variance components and
+information criteria all come from the exact cluster-wise likelihoods.
+
+### Information criteria
+
+* AIC, BIC and KIC are computed on the exact total log-likelihood of the final
+  refit, with `k_eff * (ncov + 3 + 3p)` free parameters and `n = d * T`
+  observations. The previous implementation used the *number of clusters* as the
+  number of parameters and the number of locations as the sample size.
+
+## Numerical robustness of the STEM core
+
+These were pre-existing defects, harmless for a single pooled fit but fatal for
+a clusterwise algorithm, which refits the model on hundreds of different subsets
+of locations. Both aborted the fit with
+`missing value where TRUE/FALSE needed`:
+
+* `kalman()`: the Newton-Raphson step is validated before use; a singular or
+  non-finite Hessian, or a non-finite step, now exits the loop keeping the last
+  valid iterate instead of propagating `NaN` into the convergence test. The
+  relative criterion has a floor on its denominator, the Hessian condition is
+  evaluated through `isTRUE()`, and the fallback grid search is guarded against
+  an underflowed scale that produced `log(0)`.
+* `STEM_Estimation()`: a non-finite EM iterate is discarded with a warning and
+  the last valid one is returned; both relative convergence criteria have a
+  floor on the denominator and are wrapped in `isTRUE()`.
+
+On the `pm10` example these fixes take the parametric bootstrap from 4 usable
+draws out of 12 to 12 out of 12.
+
+* `STEM_Simulation()` called `mvrnorm()` unqualified, relying on a `NAMESPACE`
+  import; it now calls `MASS::mvrnorm()`.
+
+## CRAN compliance
+
+Addresses the review comments received on the previous submission:
+
+* the redundant "in R" has been removed from the package title;
+* the references in `DESCRIPTION` now carry `<doi:...>`, `<https:...>` and
+  ISBN links in the required format;
+* `T` and `F` have been replaced by `TRUE` and `FALSE` throughout the code and
+  the documentation;
+* all `print()`/`cat()` diagnostics have been replaced by `message()` behind a
+  `verbose = FALSE` argument, threaded through `kalman()`,
+  `STEM_Estimation()`, `STEM_Bootstrap()` and the SC-STEM routines. The only
+  remaining `cat()` calls are inside `print()` methods, where they belong;
+* the package no longer writes to `.GlobalEnv`. Where a seed is needed for
+  reproducibility, the RNG stream is saved and restored on exit.
+
+Further packaging work required before submission:
+
+* `pm10` moved from a 250 KB source file duplicated in `R/` and `data/` to a
+  proper `data/pm10.rda` (25 KB), with `R/pm10.R` reduced to documentation;
+* the dependency on **SCDA**, which is not distributed on CRAN, has been
+  removed. The AMKM initialisation it provided is replaced by an internal
+  k-means initialisation on the PCA-compressed covariate means, with multiple
+  restarts, a minimum-cluster-size filter and a repair step. Any external
+  initialisation, AMKM included, can still be supplied through the new
+  `init_partition` argument;
+* `dplyr` and `sf` were likewise dropped, as nothing in the package needs them
+  any more; every external call is written as `package::function()` and
+  `NAMESPACE` no longer carries `importFrom` directives;
+* `URL` and `BugReports` fields added, along with `LICENSE`, `NEWS.md` and a
+  `testthat` suite.
+
+## Documentation
+
+* New conceptual map of the package under `inst/extdata/`, showing how the STEM
+  and SC-STEM functions call one another, and reachable from R with
+  `system.file("extdata", package = "Stem")`.
+* Vignette rewritten around the full workflow, from `STEM_Model()` to the
+  SC-STEM selection rule and bootstrap.
+
+
+# Stem 1.0
+
+* Original CRAN release by Michela Cameletti, subsequently archived.

@@ -80,21 +80,36 @@
 #' Chapman and Hall, New York.
 #'
 #' @examples
+#' # Daily PM2.5 at 36 background stations of the Po Valley. The first 180
+#' # days are used to keep the example fast; the covariates are the intercept,
+#' # the station altitude and the daily PM10 concentration.
+#' data(povalley)
+#'
+#' Tn <- 180L
+#' Tfull <- nrow(povalley$z)
+#' d <- ncol(povalley$z)
+#' # rows of the stacked covariate matrix belonging to the first Tn days
+#' keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
+#'
+#' phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+#'             sigma2eps = 18.66,
+#'             sigma2omega = 1e-06,
+#'             theta = 2e-06,
+#'             G = matrix(0.59, 1, 1),
+#'             Sigmaeta = matrix(4.25, 1, 1),
+#'             m0 = as.matrix(0),
+#'             C0 = as.matrix(1))
+#'
+#' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
+#'                   covariates = povalley$covariates[keep, ],
+#'                   coordinates = povalley$coords,
+#'                   phi = phi, K = matrix(1, d, 1))
+#'
 #' \donttest{
-#' data(pm10)
-#'
-#' phi <- list(beta = matrix(c(3.65, 0.046, -0.904), 3, 1),
-#'             sigma2eps = 0.1, sigma2omega = 0.2, theta = 0.01,
-#'             G = matrix(0.77, 1, 1), Sigmaeta = matrix(0.3, 1, 1),
-#'             m0 = as.matrix(0), C0 = as.matrix(1))
-#'
-#' mod1 <- STEM_Model(z = pm10$z, covariates = pm10$covariates,
-#'                    coordinates = pm10$coords * 1000, phi = phi,
-#'                    K = matrix(1, ncol(pm10$z), 1))
-#'
-#' fit <- SCSTEM_Estim(mod1, k = 2, phi_penalty = 0.5, distance = "euclidean")
+#' fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
 #' boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 #' inf <- SCSTEM_BootInference(boot)
+#' inf
 #' inf$summary
 #' }
 #'

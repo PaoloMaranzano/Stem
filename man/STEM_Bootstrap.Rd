@@ -9,7 +9,8 @@ STEM_Bootstrap(
   B,
   distance = "euclidean",
   precision = 0.01,
-  regularization = 0.01
+  regularization = 0.01,
+  verbose = FALSE
 )
 }
 \arguments{

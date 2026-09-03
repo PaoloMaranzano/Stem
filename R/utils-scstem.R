@@ -1,15 +1,15 @@
-#' @keywords internal
-#' @noRd
-#'
-#' Internal helpers shared by the spatially-clustered STEM (SC-STEM) routines.
-#'
-#' The design mirrors the spatially-clustered Fay-Herriot (SC-FH) toolbox of
-#' Maranzano, Mattera and Sugasawa (2026+), so that the two model families share
-#' the same algorithmic conventions: a Potts-penalised objective evaluated on
-#' undirected neighbour pairs, an ICM (Iterated Conditional Modes) label update,
-#' information criteria computed on the final refit, and a
-#' refit-with-clustering parametric bootstrap.
-NULL
+### ---------------------------------------------------------------------------
+### Internal helpers shared by the spatially-clustered STEM (SC-STEM) routines.
+###
+### The design mirrors the spatially-clustered Fay-Herriot (SC-FH) toolbox of
+### Maranzano, Mattera and Sugasawa (2026+), so that the two model families
+### share the same algorithmic conventions: a Potts-penalised objective
+### evaluated on undirected neighbour pairs, an ICM (Iterated Conditional Modes)
+### label update, information criteria computed on the final refit, and a
+### refit-with-clustering parametric bootstrap.
+###
+### None of these functions is exported.
+### ---------------------------------------------------------------------------
 
 
 ### ---------------------------------------------------------------------------
@@ -127,34 +127,26 @@ NULL
 ### leaves spatial contiguity entirely to the Potts penalty, so that phi can be
 ### read as the price of spatial coherence rather than as a constraint built
 ### into the starting point. Intercept-only designs fall back to the
-### coordinates. The "AMKM" method reproduces the pre-2.0.0 behaviour and
-### requires the (non-CRAN) SCDA package.
+### coordinates.
+###
+### Versions of the package before 2.0.0 initialised the partition with
+### SCDA::SC_AMKM(). That dependency has been dropped, because SCDA is not
+### distributed on CRAN and a hard dependency on it would make this package
+### unpublishable. Any external initialisation -- AMKM included -- can still be
+### used by passing it to SCSTEM_Estim() through the `init_partition` argument.
 ###
 ### Arguments
 ###   Xmeans     d x ncov numeric, per-location averages of the covariates
 ###   coords     d x 2 numeric, spatial coordinates
 ###   k          number of clusters
-###   method     "kmeans" (default), "AMKM" or "coordinates"
+###   method     "kmeans" (default) or "coordinates"
 ###   min_size   minimum admissible cluster size
-###   crs        CRS passed to SCDA::SC_AMKM when method = "AMKM"
-`scstem_init` <- function(Xmeans, coords, k, method = c("kmeans", "AMKM", "coordinates"),
-                          min_size = 2L, crs = 4326, nstart_ext = 50L, nstart_int = 25L) {
+`scstem_init` <- function(Xmeans, coords, k, method = c("kmeans", "coordinates"),
+                          min_size = 2L, nstart_ext = 50L, nstart_int = 25L) {
 
   method <- match.arg(method)
   d <- nrow(coords)
   if (k == 1) return(rep(1L, d))
-
-  if (method == "AMKM") {
-    if (!requireNamespace("SCDA", quietly = TRUE)) {
-      stop("init_method = 'AMKM' requires the 'SCDA' package, which is not available on CRAN. ",
-           "Install it from its development repository, or use init_method = 'kmeans'.",
-           call. = FALSE)
-    }
-    dati <- cbind(as.data.frame(coords), as.data.frame(Xmeans))
-    cl <- SCDA::SC_AMKM(Data_sf = sf::st_as_sf(dati, coords = c(1, 2)),
-                        Method = "AMKM", MinNc = k, MaxNc = k, IndexCol = 0, CRS = crs)
-    return(as.integer(cl$df$cluster))
-  }
 
   ### Feature space for the k-means starts
   feat <- try({

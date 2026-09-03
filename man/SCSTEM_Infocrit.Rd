@@ -2,115 +2,141 @@
 % Please edit documentation in R/SCSTEM_Infocrit.R
 \name{SCSTEM_Infocrit}
 \alias{SCSTEM_Infocrit}
-\title{optimal number of cluster selection for the STEM clustered regression}
+\title{Information criteria over a grid of SC-STEM configurations}
 \usage{
 SCSTEM_Infocrit(
   StemModel,
-  mink,
-  maxk,
-  crs = 4326,
-  distance = "geo",
-  knn = 5,
-  init_method = "AMKM",
-  nugget_var = TRUE,
-  precision_full_dataset = 0.01,
-  precision = 0.1,
-  regularization = 0.01,
-  phi_penalty = 1,
-  max_iter = 10,
-  share2conv = 0.05,
-  verbose = FALSE
+  k_grid = 1:3,
+  phi_grid = c(0, 0.25, 0.5, 1),
+  mink = NULL,
+  maxk = NULL,
+  verbose = FALSE,
+  ...
 )
 }
 \arguments{
-\item{StemModel}{an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.}
+\item{StemModel}{an object of class \dQuote{STEM_Model} given as output by
+the \code{\link{STEM_Model}} function.}
 
-\item{mink}{minimum number of cluster}
+\item{k_grid}{integer vector of candidate numbers of clusters. Default is
+\code{1:3}. The pooled model \eqn{k = 1} is always a useful reference.}
 
-\item{maxk}{maximum number of cluster}
+\item{phi_grid}{numeric vector of candidate non-negative spatial penalties.
+Default is \code{c(0, 0.25, 0.5, 1)}.}
 
-\item{crs}{Integer value. Coordinate reference sySTEM_ something suitable as input to st_crs.command from the sf package (see its documentation for details). Default is set to 4326.}
+\item{mink, maxk}{deprecated scalars kept for backward compatibility with
+versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
+missing, the grid is set to \code{mink:maxk}.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{verbose}{logical. If \code{TRUE}, the progress over the grid is
+reported via \code{message()}. Default is \code{FALSE}.}
 
-\item{knn}{Integer value. The number of nearest neighbour to be taken into account for te spatial penalty, Default is set to 5}
-
-\item{init_method}{Character. Must be one of: 'AMKM' or 'K-means'. If init_method='AMKM', the Adjacent Matrix K-Means clustering is performed. If method='K-means', K-means clustering is performed.}
-
-\item{nugget_var}{Logical. If FALSE it returns the Sugasawa clustered regression. If TRUE the STEM spatio temporal clustered regression is performed. Default is set to TRUE}
-
-\item{precision_full_dataset}{a small positive number used for the EM algorithm convergence at the inizialization step of the EM algorithm. Default is equal to 0.1. See \code{DETAILS} below.}
-
-\item{precision}{a small positive number used for the EM algorithm convergence in every step of the clustered regression. Default is equal to 0.1. See \code{DETAILS} below.}
-
-\item{regularization}{a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01}
-
-\item{phi_penalty}{a small positive number. It is the spatial penalty weight for the clustered regression. Default is set to 1.}
-
-\item{max_iter}{maximum number of iterations for the spatio temporal clustered regression algorithm.}
-
-\item{share2conv}{a small positive number. It is the minimum percentage of observations that must change clusters for the algorithm not to converge. Default is set equal to 0.05}
-
-\item{verbose}{Logical. If TRUE, convergence information from SCSTEM_Estim is emitted via message(). Default is FALSE.}
+\item{...}{further arguments passed to \code{\link{SCSTEM_Estim}}, such as
+\code{distance}, \code{knn}, \code{phi_scale}, \code{label_update},
+\code{precision} or \code{min_cluster_size}.}
 }
 \value{
-The function returns a table given by:
+An object of class \dQuote{SCSTEM_Infocrit}: a list with
 \itemize{
-\item \code{BIC} Bayesian IC
-\item \code{AIC} Akaike's IC
-\item \code{HQC} Hannan–Quinn IC
+  \item \code{table}: a data frame with one row per configuration and columns
+    \code{k}, \code{phi}, \code{k_eff}, \code{admissible}, \code{loglik},
+    \code{npar}, \code{AIC}, \code{BIC}, \code{KIC}, \code{min_size},
+    \code{convergence}.
+  \item \code{fits}: the list of \dQuote{SCSTEM_Estim} objects, named
+    \code{"k=<k>, phi=<phi>"}, so that the selected configuration can be used
+    without refitting.
+  \item \code{groups}: matrix of the estimated partitions, one column per
+    configuration, used by the stability step of
+    \code{\link{SCSTEM_Select}}.
+  \item \code{failed}: a data frame listing the configurations whose fit
+    raised an error, with the error message.
 }
 }
 \description{
-The function \code{SCSTEM_Infocrit} computes the likelihood-based information criteria for optimal number of cluster selection
+\code{SCSTEM_Infocrit} fits the spatially-clustered STEM model over a grid of
+numbers of clusters \eqn{k} and spatial penalties \eqn{\phi}, and returns the
+likelihood-based information criteria of every configuration together with
+the diagnostics needed to decide which of them are admissible. It is the
+input of the two-step tuning rule implemented in
+\code{\link{SCSTEM_Select}}.
 }
 \details{
-This function allow an optimal selection for the number k of cluster for the SCSTEM_Estim method.
+For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estim}}
+and records the exact total log-likelihood of the final refit, the number of
+free parameters \eqn{k_{eff}(r + 3 + 3p)}, and
+\deqn{AIC = -2\ell + 2 K, \qquad BIC = -2\ell + \log(dT) K, \qquad
+      KIC = -2\ell + 3 K,}
+where \eqn{d} is the number of locations and \eqn{T} the number of time
+points, so that \eqn{dT} is the number of observations entering the
+likelihood.
+
+\strong{Admissibility.} A configuration is admissible when all its \eqn{k}
+clusters could be re-estimated on the final partition, that is when
+\code{k_eff == k}. A configuration with collapsed clusters has fewer
+effective regimes than its nominal \eqn{k}, its likelihood is not comparable
+with the others, and no parametric bootstrap can be generated from it: the
+\code{admissible} column flags these cases and
+\code{\link{SCSTEM_Select}} discards them.
+
+\strong{Caveats.} Two warnings apply to any likelihood-based comparison in
+this setting. First, the partition is itself optimized on the data, so the
+maximized likelihood retains an optimism bias that a parameter count of the
+form \eqn{k(r + 3 + 3p)} does not fully correct; in-sample criteria therefore
+tend to favour small \eqn{\phi} and large \eqn{k}. Second, the cluster-wise
+variance components shrink as the assignment step pursues within-cluster
+homogeneity, which inflates the likelihood of the configurations with the
+weakest spatial regularization. Both effects are strongest at
+\eqn{\phi \approx 0}, which is why \code{\link{SCSTEM_Select}} restricts the
+criterion to a moderate band of penalties.
 }
 \examples{
+# Daily PM2.5 at 36 background stations of the Po Valley. The first 180
+# days are used to keep the example fast; the covariates are the intercept,
+# the station altitude and the daily PM10 concentration.
+data(povalley)
+
+Tn <- 180L
+Tfull <- nrow(povalley$z)
+d <- ncol(povalley$z)
+# rows of the stacked covariate matrix belonging to the first Tn days
+keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
+
+phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
+            sigma2eps = 18.66,
+            sigma2omega = 1e-06,
+            theta = 2e-06,
+            G = matrix(0.59, 1, 1),
+            Sigmaeta = matrix(4.25, 1, 1),
+            m0 = as.matrix(0),
+            C0 = as.matrix(1))
+
+mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
+                  covariates = povalley$covariates[keep, ],
+                  coordinates = povalley$coords,
+                  phi = phi, K = matrix(1, d, 1))
+
 \donttest{
-#load the data
-data(pm10)
-
-#extract the data
-coordinates <- pm10$coords*1000
-covariates <- pm10$covariates
-z <- pm10$z
-
-#build the parameter list
-#(the phi list is used for the algorithm starting values)
-phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
-            sigma2eps=0.1,
-            sigma2omega=0.2,
-            theta=0.01,
-            G=matrix(0.77,1,1),
-            Sigmaeta=matrix(0.3,1,1),
-            m0=as.matrix(0),
-            C0=as.matrix(1))
-
-K <-matrix(1,ncol(z),1)
-
-mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
-class(mod1)
-
-SCSTEM_Infocrit(mod1,2,3,distance='euclidean',crs=32632)
+ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.5),
+                      distance = 'geo')
+ic
 }
 
 }
 \references{
-Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal dynamic state-space model with the EM algorithm to patch gaps in daily riverflow series}. Hydrology and Earth System Sciences 9, 209--224.
-Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring using heterogeneous networks}. Environmetrics 18, 245--264.
-Fasso', A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
-Fassò, A. and M. Cameletti (2010). "A Unified Statistical Approach for Simulation, Modeling, Analysis and Mapping of Environmental Data." SIMULATION 86(3): 139-153. <doi: 10.1177/0037549709102150>
-Cerqueti, R., Maranzano, P., & Mattera, R. (2025). \emph{Spatially-clustered spatial autoregressive models with application to agricultural market concentration in Europe}. Journal of Agricultural, Biological and Environmental Statistics, 1-35.
-Sugasawa, S., & Murakami, D. (2021). \emph{Spatially clustered regression}. Spatial Statistics, 44, 100525.
+Cerqueti, R., Maranzano, P., Mattera, R. (2025) \emph{Spatially-clustered
+spatial autoregressive models with application to agricultural market
+concentration in Europe}. Journal of Agricultural, Biological and
+Environmental Statistics. \doi{10.1007/s13253-025-00685-7}
+
+Sugasawa, S., Murakami, D. (2021) \emph{Spatially clustered regression}.
+Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 }
 \seealso{
-See Also \code{\link{SCSTEM_Estim}} and \code{\link{pm10}}
+\code{\link{SCSTEM_Estim}} and \code{\link{SCSTEM_Select}}
 }
 \author{
-Francesco Caccia  < francesco.caccia2000@gmail.com >
+Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
+  Francesco Caccia, Michela Cameletti
 }
 \keyword{models}
 \keyword{spatial}
