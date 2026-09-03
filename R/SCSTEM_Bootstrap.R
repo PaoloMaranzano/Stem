@@ -11,8 +11,8 @@
 #' @details
 #' The distinguishing feature of the procedure is that it re-runs the clustering
 #' at every draw, rather than conditioning on the estimated partition. The
-#' algorithm is the SC-STEM counterpart of the refit-with-clustering bootstrap
-#' used for spatially-clustered Fay-Herriot models:
+#' algorithm adapts the refit-with-clustering bootstrap of Maranzano, Mattera
+#' and Sugasawa (2026+) to the spatio-temporal setting:
 #' \enumerate{
 #'   \item Fit the SC-STEM model on the observed data at fixed \eqn{k} and
 #'     \eqn{\phi}, obtaining the partition \eqn{\hat{P}} and the cluster-wise

@@ -43,7 +43,7 @@ function(ss) {
    }
 
 	if (stats::is.ts(ss$z))
-		ss$m <- ts(m,stats::start(ss$z),end=stats::end(ss$z),frequency=stats::frequency(ss$z))
+		ss$m <- stats::ts(m,stats::start(ss$z),end=stats::end(ss$z),frequency=stats::frequency(ss$z))
 	else
 	ss$m <- m
 	ss$C <- C

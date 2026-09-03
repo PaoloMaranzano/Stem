@@ -55,3 +55,25 @@ All the points raised in the previous review have been addressed.
 ## R CMD check results
 
 See below; the check is run with `--as-cran`.
+
+## Note on running the checks locally
+
+The repository lives inside a OneDrive-synced folder. `R CMD check` creates
+thousands of small files, and the sync client stalls the run — the check hangs
+at "checking package dependencies" for as long as it is left there. Run the
+build and the check from a directory that is not synced:
+
+```r
+# from any non-synced working directory
+pkg <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
+tar <- devtools::build(pkg, path = tempdir())
+rcmdcheck::rcmdcheck(tar, args = c("--as-cran", "--no-manual"),
+                     error_on = "warning")
+```
+
+Building the vignettes also needs pandoc on the path. If it is not, point R at
+the copy that ships with RStudio:
+
+```r
+Sys.setenv(RSTUDIO_PANDOC = "C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools")
+```

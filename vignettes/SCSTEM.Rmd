@@ -116,7 +116,8 @@ conditional *pseudo*-likelihood, because the spatial covariance couples the
 locations and the exact marginal likelihood does not factorise across them,
 while the parameter step maximises the exact within-cluster likelihood through
 the EM algorithm. A parameter update can therefore lower $Q$ while raising the
-exact likelihood. To keep the answer well defined, `SCSTEM_Estim()` always
+exact likelihood. This is a property of the spatio-temporal specification, not
+a numerical artefact. To keep the answer well defined, `SCSTEM_Estim()` always
 returns the best partition visited, and reports both objectives
 (`best_objective`, `last_objective`).
 

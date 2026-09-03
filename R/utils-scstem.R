@@ -1,12 +1,15 @@
 ### ---------------------------------------------------------------------------
 ### Internal helpers shared by the spatially-clustered STEM (SC-STEM) routines.
 ###
-### The design mirrors the spatially-clustered Fay-Herriot (SC-FH) toolbox of
-### Maranzano, Mattera and Sugasawa (2026+), so that the two model families
-### share the same algorithmic conventions: a Potts-penalised objective
+### The algorithmic devices implemented here -- a Potts-penalised objective
 ### evaluated on undirected neighbour pairs, an ICM (Iterated Conditional Modes)
 ### label update, information criteria computed on the final refit, and a
-### refit-with-clustering parametric bootstrap.
+### refit-with-clustering parametric bootstrap -- are adapted from the
+### spatially-clustered small area estimation work of Maranzano, Mattera and
+### Sugasawa (2026+). The statistical model they serve here is different: STEM
+### is a hierarchical dynamic model for point-referenced spatio-temporal data
+### with a latent state and a spatially correlated error, so each device had to
+### be reworked for that setting rather than transferred.
 ###
 ### None of these functions is exported.
 ### ---------------------------------------------------------------------------
@@ -84,9 +87,9 @@
 ### which is the exact conditional density of the series of location i given the
 ### latent state, with the marginal error variance
 ### sigma2eps_k + sigma2omega_k = diag(Sigma_e_k) (the exponential correlation
-### function equals 1 at distance zero). This is the direct STEM analogue of
-### FHloglike_i() in the SC-FH toolbox, and it is used ONLY to rank clusters in
-### the label update: all reported quantities -- coefficients, variance
+### function equals 1 at distance zero). It plays the role that the per-unit
+### density plays in clusterwise regression, and it is used ONLY to rank
+### clusters in the label update: all reported quantities -- coefficients, variance
 ### components, information criteria -- come from the exact cluster-wise
 ### likelihoods returned by STEM_Estimation() on the final partition.
 ###
@@ -120,7 +123,7 @@
 ### ---------------------------------------------------------------------------
 ### Initial partition
 ### ---------------------------------------------------------------------------
-### Following the SC-FH strategy, the starting partition comes from k-means on
+### The starting partition comes from k-means on
 ### the location-wise summaries of the COVARIATES only (compressed by PCA at 90%
 ### of cumulative variance), with multiple external restarts and a
 ### minimum-cluster-size admissibility filter. Initialising on the covariates

@@ -11,6 +11,7 @@
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param regularization a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01
+#' @param verbose logical. If TRUE, the progress of the EM and Newton-Raphson iterations is reported through message(). Default is FALSE.
 #'
 #'
 #' @return The function returns an object of class \dQuote{STEM_Model} which is a list given by:

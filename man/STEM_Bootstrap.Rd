@@ -23,6 +23,8 @@ STEM_Bootstrap(
 \item{precision}{a small positive number used for the STEM_Estimation algorithm convergence. Default is equal to 0.01.}
 
 \item{regularization}{a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01}
+
+\item{verbose}{logical. If TRUE, the progress of each bootstrap iteration is reported through message(). Default is FALSE.}
 }
 \value{
 The function returns a list of elements called \dQuote{boot.output}. \bold{Each} element of the list is an object of class \dQuote{STEM_Model} and so
@@ -68,6 +70,7 @@ mod1 <- STEM_Model(z=z,covariates=covariates,
                    coordinates=coordinates,phi=phi,K=K)
 class(mod1)
 
+\donttest{
 #mod1 is given as output by the STEM_Model function
 mod1.est <- STEM_Estimation(mod1)
 
@@ -127,6 +130,7 @@ output2 <- cbind(output1,IC)
 colnames(output2) <- c("Estimate", "SE", "T-stat.", "IC_inf", "IC_sup")
 output2
 
+}
 
 }
 \references{

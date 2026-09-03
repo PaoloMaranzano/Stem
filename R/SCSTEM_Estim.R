@@ -26,9 +26,11 @@
 #' where \eqn{\ell_{ik}} is the log-likelihood contribution of location \eqn{i}
 #' under the parameters of cluster \eqn{k}, \eqn{w_{ij}} is the symmetrised
 #' \code{knn} adjacency indicator and \eqn{c > 0} is the scale factor discussed
-#' below. This is the Potts-type penalty of Sugasawa and Murakami (2021), in the
-#' form used for spatially-clustered Fay-Herriot and spatial autoregressive
-#' models by Cerqueti, Maranzano and Mattera (2025).
+#' below. This is the Potts-type penalty introduced for spatially-clustered
+#' regression by Sugasawa and Murakami (2021) and carried over to
+#' spatially-clustered spatial autoregressive models by Cerqueti, Maranzano and
+#' Mattera (2025); here it is applied to the spatio-temporal likelihood of a
+#' STEM model.
 #'
 #' \strong{Scale of the penalty.} In cross-sectional spatially-clustered models
 #' each unit contributes a single observation to the likelihood, so that
@@ -80,17 +82,16 @@
 #' \strong{On monotonicity.} The label step is monotone at fixed parameters, but
 #' the alternation as a whole is \emph{not} guaranteed to increase \eqn{Q}
 #' monotonically, and \code{obj_trace} may well show a decrease. The reason is
-#' structural rather than numerical: the assignment score \eqn{\ell_{ik}} is a
-#' conditional pseudo-likelihood, because the spatial covariance
-#' \eqn{\Sigma_{e,k}} couples the locations and the exact marginal likelihood
-#' does not factorise across them, whereas the parameter step maximises the
-#' exact within-cluster likelihood through the EM algorithm. The two objectives
-#' agree on what a good partition looks like but are not the same function, so a
-#' parameter update can lower \eqn{Q} while raising the exact likelihood. Under
-#' the spatially-clustered Fay-Herriot model, where the area-level contributions
-#' are exact, the same scheme is monotone. To make the answer well defined in
-#' spite of this, the best partition visited along the iterations is always the
-#' one returned.
+#' structural rather than numerical. In the STEM measurement equation the
+#' spatial covariance \eqn{\Sigma_{e,k}} couples the locations, so the exact
+#' marginal likelihood does not factorise across them and the assignment score
+#' \eqn{\ell_{ik}} has to be a conditional pseudo-likelihood, whereas the
+#' parameter step maximises the exact within-cluster likelihood through the EM
+#' algorithm. The two objectives agree on what a good partition looks like but
+#' are not the same function, so a parameter update can lower \eqn{Q} while
+#' raising the exact likelihood. This is a property of the spatio-temporal
+#' specification, and it is why the best partition visited along the iterations
+#' is always the one returned.
 #'
 #' \strong{Degeneracy and the minimum-size constraint.} Within-cluster
 #' homogeneity is exactly what the assignment step seeks, so the cluster-wise
@@ -98,8 +99,7 @@
 #' as locations are reallocated. Left unconstrained, the cluster with the
 #' smallest residual variance then attracts every location and the partition
 #' collapses -- the clusterwise counterpart of the degenerate-likelihood problem
-#' of Gaussian mixtures, and of the boundary solutions documented for
-#' spatially-clustered Fay-Herriot models. With \code{enforce_min_size = TRUE}
+#' of Gaussian mixtures. With \code{enforce_min_size = TRUE}
 #' (the default) a location may leave its cluster only if that cluster stays at
 #' or above \code{min_cluster_size}, which keeps every visited configuration
 #' admissible while preserving the monotonicity of the ICM sweep within the
@@ -559,7 +559,7 @@ SCSTEM_Estim <- function(StemModel,
       ### constraint the cluster with the smallest residual variance attracts
       ### every location -- the clusterwise analogue of the degenerate-likelihood
       ### problem of Gaussian mixtures, and of the boundary solutions discussed
-      ### for spatially-clustered Fay-Herriot models -- and the partition
+      ### and the partition
       ### collapses. Restricting the moves keeps every configuration admissible
       ### and preserves the monotonicity of the sweep within the feasible set.
       sizes <- tabulate(labels, nbins = k)
@@ -671,9 +671,8 @@ SCSTEM_Estim <- function(StemModel,
   ### within-cluster likelihood through the EM algorithm. The two objectives
   ### agree on what a good partition looks like but are not the same function,
   ### so a parameter update can lower Q even while it raises the exact
-  ### likelihood. (Under the spatially-clustered Fay-Herriot model the per-area
-  ### contributions are exact and the alternation is monotone; here the spatial
-  ### covariance across locations makes an exact decomposition unavailable.)
+  ### likelihood. The spatial covariance across locations is what makes an exact
+  ### per-location decomposition unavailable in the first place.
   ### Keeping the best visited partition makes the returned solution
   ### well defined regardless of the path taken.
   final_obj <- if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else -Inf

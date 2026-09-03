@@ -8,6 +8,7 @@
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param precision  a small positive number used for the STEM_Estimation algorithm convergence. Default is equal to 0.01.
 #' @param regularization a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01
+#' @param verbose logical. If TRUE, the progress of each bootstrap iteration is reported through message(). Default is FALSE.
 #'
 #'
 #' @return The function returns a list of elements called \dQuote{boot.output}. \bold{Each} element of the list is an object of class \dQuote{STEM_Model} and so
@@ -60,6 +61,7 @@
 #'                    coordinates=coordinates,phi=phi,K=K)
 #' class(mod1)
 #'
+#' \donttest{
 #' #mod1 is given as output by the STEM_Model function
 #' mod1.est <- STEM_Estimation(mod1)
 #'
@@ -119,6 +121,7 @@
 #' colnames(output2) <- c("Estimate", "SE", "T-stat.", "IC_inf", "IC_sup")
 #' output2
 #'
+#' }
 #'
 #' @seealso See Also \code{\link{pm10}}, \code{\link{STEM_Model}} and \code{\link{STEM_Estimation}}
 #'
