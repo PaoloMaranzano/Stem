@@ -57,7 +57,7 @@ spatially-clustered Fay--Herriot and spatial autoregressive models.
 ```{r data}
 data(povalley)
 
-Tn <- 365L                       # one year, to keep the vignette quick
+Tn <- 150L                       # a five-month slice, to keep the vignette quick
 Tfull <- nrow(povalley$z)
 d <- ncol(povalley$z)
 keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, "+"))
@@ -107,10 +107,18 @@ in each regime. Given the parameters, the labels are updated by a sequential
 **ICM** sweep (Besag, 1986): locations are visited in turn and each label
 maximises its own penalised contribution given the current labels of all the
 others. Because the penalty is recomputed on the fly, the sweep cannot decrease
-$Q$ and cannot cycle — unlike the simultaneous update, still available through
-`label_update = "simultaneous"`.
+$Q$ *at fixed parameters* and cannot cycle — unlike the simultaneous update,
+still available through `label_update = "simultaneous"`.
 
-The trace shows the objective increasing until the partition stabilises:
+The alternation as a whole, however, is not guaranteed to be monotone, and the
+trace below may well show a dip. The reason is structural: $\ell_{ik}$ is a
+conditional *pseudo*-likelihood, because the spatial covariance couples the
+locations and the exact marginal likelihood does not factorise across them,
+while the parameter step maximises the exact within-cluster likelihood through
+the EM algorithm. A parameter update can therefore lower $Q$ while raising the
+exact likelihood. To keep the answer well defined, `SCSTEM_Estim()` always
+returns the best partition visited, and reports both objectives
+(`best_objective`, `last_objective`).
 
 ```{r trace}
 fit$obj_trace
@@ -156,7 +164,7 @@ c(multiplier = fit$phi_multiplier, effective_phi = fit$phi_effective)
 an admissibility flag.
 
 ```{r grid}
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.25, 0.5, 0.75, 1),
+ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.5, 1),
                       distance = "geo", precision = 0.05)
 ic$table[, c("k", "phi", "k_eff", "admissible", "loglik", "BIC", "min_size")]
 ```
@@ -174,7 +182,7 @@ moderate band* of penalties, then pick the smallest $\phi$ on the stability
 plateau of the Adjusted Rand Index.
 
 ```{r select}
-sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+sel <- SCSTEM_Select(ic, band = c(0.5, 1))
 sel
 ```
 
@@ -190,7 +198,7 @@ procedure — clustering included — on every draw.
 
 ```{r boot}
 best <- sel$fit
-boot <- SCSTEM_Bootstrap(best, B = 25, seed = 1)
+boot <- SCSTEM_Bootstrap(best, B = 12, seed = 1)
 boot
 ```
 
