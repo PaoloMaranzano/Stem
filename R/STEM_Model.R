@@ -1,0 +1,120 @@
+#' Create a Stem Model
+#'
+#' @description
+#' The function \code{STEM_Model} is used to create an object of class \dQuote{STEM_Model}.
+#'
+#' @param ... A list with named elements: \code{phi}, \code{K}, \code{z}, \code{coordinates}, \code{covariates}, and optionally, \code{p} (default is 1). See model details below.
+#'
+#' @return
+#' The function returns a list containing:
+#' \itemize{
+#'   \item{\code{skeleton}} A list with components \code{phi}, \code{p}, and \code{K} as provided in the input.
+#'   \item{\code{data}} A list with components \code{z}, \code{coordinates}, \code{covariates} from the input, as well as \code{r}, \code{n}, and \code{d}.
+#' }
+#'
+#' @details
+#' The hierarchical spatio-temporal model is defined as:
+#' \deqn{z_t = X_t \beta  + K y_t + e_t , e_t \sim N(0, \Sigma_e )}
+#' \deqn{y_t = G y_{t-1} + \eta_t , \eta_t \sim N(0,\Sigma_{\eta})}
+#' for \eqn{t=1,...,n}. The initialization follows:
+#' \eqn{ y_0 \sim N(m0,C0).}
+#'
+#' The observation vector \eqn{z_t} has dimension \eqn{d \times 1}, where \eqn{d} is the number of spatial locations. The latent process \eqn{y_t} has dimension \eqn{p \times 1}. The matrix \eqn{X_t} represents known covariates and has dimension \eqn{d \times r}, where \eqn{r} is the number of covariates.
+#'
+#' The spatial covariance matrix \eqn{\Sigma_e} is defined as:
+#' \deqn{\Sigma_e = \sigma^2_\epsilon I + \sigma^2_\omega C(h,\theta)}
+#' where \eqn{C(h,\theta)} is an exponential covariance function:
+#' \deqn{C(h,\theta) = \exp(-\theta h).}
+#'
+#' The parameter vector \eqn{\phi} consists of \eqn{\beta}, \eqn{\sigma^2_\epsilon}, \eqn{\sigma^2_\omega}, \eqn{\theta}, \eqn{G}, \eqn{\Sigma_\eta}, and \eqn{m0} (assuming \eqn{C0} is fixed).
+#'
+#' The input list must have:
+#' \describe{
+#'   \item{\code{phi}}{A list containing:
+#'     \describe{
+#'       \item{\code{beta}}{ (\eqn{r \times 1}) }
+#'       \item{\code{sigma2eps}}{ (scalar) }
+#'       \item{\code{sigma2omega}}{ (scalar) }
+#'       \item{\code{theta}}{ (scalar) }
+#'       \item{\code{G}}{ (\eqn{p \times p}) }
+#'       \item{\code{Sigmaeta}}{ (\eqn{p \times p}) }
+#'       \item{\code{m0}}{ (\eqn{p \times 1}) }
+#'       \item{\code{C0}}{ (\eqn{p \times p}) }
+#'     }
+#'   }
+#'   \item{\code{K}}{Loading matrix (\eqn{d \times p}).}
+#'   \item{\code{z}}{Observation matrix (\eqn{n \times d}).}
+#'   \item{\code{coordinates}}{Matrix (\eqn{d \times 2}) with spatial coordinates.}
+#'   \item{\code{covariates}}{Matrix (\eqn{(n \times d) \times r}) stacking data by station.}
+#' }
+#'
+#' @note
+#' No missing values are allowed in \code{z}, \code{covariates}, or \code{coordinates}.
+#'
+#' @author
+#' Michela Cameletti \email{michela.cameletti@unibg.it}
+#'
+#' @references
+#' \itemize{
+#'   \item{Fasso', A., Cameletti, M. (2007). \emph{A general spatio-temporal model for environmental data}. Graspa Technical Report 27.}
+#'   \item{McLachlan, G.J., Krishnan, T. (1997). \emph{The EM Algorithm and Extensions}. Wiley.}
+#'   \item{Shumway, R.H., Stoffer, D.S. (2006). \emph{Time Series Analysis and Its Applications: with R Examples}. Springer.}
+#' }
+#'
+#' @examples
+#' # Load data
+#' data(pm10)
+#' names(pm10)
+#'
+#' # Extract data
+#' coordinates <- pm10$coords
+#' covariates <- pm10$covariates
+#' z <- pm10$z
+#'
+#' # Define model parameters
+#' phi <- list(beta = matrix(c(3.65, 0.046, -0.904), 3, 1),
+#'             sigma2eps = 0.1,
+#'             sigma2omega = 0.2,
+#'             theta = 0.01,
+#'             G = matrix(0.77, 1, 1),
+#'             Sigmaeta = matrix(0.3, 1, 1),
+#'             m0 = as.matrix(0),
+#'             C0 = as.matrix(1))
+#'
+#' K <- matrix(1, ncol(z), 1)
+#'
+#' # Create model
+#' mod1 <- STEM_Model(z = z, covariates = covariates,
+#'                    coordinates = coordinates, phi = phi, K = K)
+#'
+#' class(mod1)
+#'
+#' @seealso \code{\link{pm10}}
+#'
+#' @keywords models spatial
+#'
+#' @export
+
+
+
+STEM_Model <-
+  function(...) {
+
+    if (nargs() == 1)
+      x <- as.list(...)
+    else
+      x <- list(...)
+
+    #STEM_Model components : skeleton and data
+    skeleton <- STEM_Skeleton(x) #(phi=phi, p=p, K=K)
+
+    data <- STEM_Data(x) #(z=z, coordinates=coordinates, covariates=covariates)
+
+    if(length(skeleton$phi$beta) != ncol(data$covariates)) stop("The length of Beta must be equal to the number of columns of covariates")
+    if(!(nrow(skeleton$K) == data$d && ncol(skeleton$K) == skeleton$p)) stop("The dimension of matrix K must be d*p")
+
+
+    x=list(skeleton=skeleton,data=data)
+    class(x) <- "STEM_Model"
+    return(x)
+  }

@@ -1,0 +1,38 @@
+Package: Stem
+Type: Package
+Title: Spatio-Temporal Expectation-Maximization Models
+Version: 2.0.0
+Authors@R: 
+    c(
+    person(
+      given = "Michela",
+      family = "Cameletti",
+      role = c("aut", "cph"),
+      email = "michela.cameletti@unibg.it"
+      ),
+    person(
+      given = "Francesco",
+      family = "Caccia",
+      role = c("aut", "cph"),
+      email = "francesco.caccia2000@gmail.com"
+      ),
+    person(
+      given = "Paolo",
+      family = "Maranzano",
+      role = c("aut", "cre", "cph"),
+      email = "pmaranzano.ricercastatistica@gmail.com",
+      comment = c(ORCID = "0000-0002-9228-2759")
+      )
+    )
+Imports: dplyr,MASS,mvtnorm,spdep,SCDA,stats,geodist,sf
+Description: Estimation of hierarchical spatio-temporal models using the Expectation-Maximization (EM) algorithm within a likelihood-based framework.
+    Technical details are available in Fassò, Cameletti and Nicolis (2007) <doi:10.1002/env.837>, Fassò and Cameletti (2010) <doi:10.1177/0037549709102150>, and McLachlan and Krishnan (2008, ISBN:9780470191613).
+    Estimation of the parameters is performed via maximum likelihood (ML).
+    Standard errors and prediction (spatial mapping) uncertainty are computed using a spatio-temporal parametric bootstrap.
+    The package also introduces an extended version of STEM models, namely the spatially-clustered STEM (SC-STEM), which allows regression parameters to be spatially varying according to a cluster-wise structure.
+    SC-STEM models are based on the methodology proposed by Sugasawa and Murakami (2021) <doi:10.1016/j.spasta.2021.100525> and Cerqueti, Maranzano and Mattera (2024) <https://arxiv.org/abs/2407.15874>.
+License: GPL (>=2)
+Encoding: UTF-8
+Language: en-US
+RoxygenNote: 7.3.2
+LazyData: true
