@@ -52,7 +52,7 @@ STEM model, given the grid of fits produced by
 }
 \details{
 In-sample information criteria cannot be used naively here: the partition is
-optimized on the data, so the maximized likelihood keeps an optimism bias
+optimized on the data, so the maximized likelihood keeps an optimizm bias
 that the parameter count does not fully correct, and the cluster-wise
 variance components shrink as the assignment step pursues within-cluster
 homogeneity. Both effects are strongest at \eqn{\phi \approx 0}, where
@@ -65,7 +65,7 @@ proceeds in two steps:
     \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{k} among the
     admissible configurations; select the modal winner \eqn{\hat{k}} across
     the band, resolving ties towards the smaller \eqn{k}. Excluding
-    \eqn{\phi \approx 0} removes the region where the optimism bias is
+    \eqn{\phi \approx 0} removes the region where the optimizm bias is
     largest. Under-selection is the harmful direction, while residual
     over-selection is comparatively benign for prediction, because
     supernumerary clusters are either small or near-duplicates of existing

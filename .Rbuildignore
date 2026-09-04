@@ -12,3 +12,4 @@
 ^dev$
 ^docs$
 ^_pkgdown\.yml$
+^CHANGELOG\.md$

@@ -59,7 +59,7 @@ See below; the check is run with `--as-cran`.
 ## Note on running the checks locally
 
 The repository lives inside a OneDrive-synced folder. `R CMD check` creates
-thousands of small files, and the sync client stalls the run — the check hangs
+thousands of small files, and the sync client stalls the run - the check hangs
 at "checking package dependencies" for as long as it is left there. Run the
 build and the check from a directory that is not synced:
 

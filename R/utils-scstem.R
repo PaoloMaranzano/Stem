@@ -1,8 +1,8 @@
 ### ---------------------------------------------------------------------------
 ### Internal helpers shared by the spatially-clustered STEM (SC-STEM) routines.
 ###
-### The algorithmic devices implemented here -- a Potts-penalised objective
-### evaluated on undirected neighbour pairs, an ICM (Iterated Conditional Modes)
+### The algorithmic devices implemented here -- a Potts-penalized objective
+### evaluated on undirected neighbor pairs, an ICM (Iterated Conditional Modes)
 ### label update, information criteria computed on the final refit, and a
 ### refit-with-clustering parametric bootstrap -- are adapted from the
 ### spatially-clustered small area estimation work of Maranzano, Mattera and
@@ -16,16 +16,16 @@
 
 
 ### ---------------------------------------------------------------------------
-### Neighbourhood structure
+### Neighborhood structure
 ### ---------------------------------------------------------------------------
 ### The Potts penalty is defined on an UNDIRECTED graph, so the
-### k-nearest-neighbour graph produced by spdep::knearneigh() -- which is
-### asymmetric by construction -- is symmetrised before use: j is a neighbour of
+### k-nearest-neighbor graph produced by spdep::knearneigh() -- which is
+### asymmetric by construction -- is symmetrized before use: j is a neighbor of
 ### i whenever i is among the k nearest of j or vice versa. Without this step
 ### the same pair (i,j) would contribute to the assignment score of one unit but
-### not of the other, and the sequential ICM sweep would not be maximising a
+### not of the other, and the sequential ICM sweep would not be maximizing a
 ### well-defined objective.
-`scstem_neighbours` <- function(coordinates, knn = 5) {
+`scstem_neighbors` <- function(coordinates, knn = 5) {
 
   d <- nrow(coordinates)
   if (knn < 1 || knn >= d) {
@@ -45,7 +45,7 @@
 
 
 ### ---------------------------------------------------------------------------
-### Potts term: number of concordant neighbour pairs, each counted once
+### Potts term: number of concordant neighbor pairs, each counted once
 ### ---------------------------------------------------------------------------
 `scstem_potts_pairs` <- function(labels, nb) {
   s <- 0
@@ -76,7 +76,7 @@
 ### ALERT (methodological). Under the STEM measurement equation the observations
 ### of different locations at the same time point are spatially correlated
 ### through Sigma_e = sigma2eps * I + sigma2omega * C(h; theta), so the exact
-### marginal log-likelihood does NOT factorise across locations and no exact
+### marginal log-likelihood does NOT factorize across locations and no exact
 ### per-location contribution exists. The assignment step therefore uses a
 ### PSEUDO-LIKELIHOOD: conditionally on the smoothed latent state path of
 ### cluster k, location i contributes
@@ -126,16 +126,16 @@
 ### The starting partition comes from k-means on
 ### the location-wise summaries of the COVARIATES only (compressed by PCA at 90%
 ### of cumulative variance), with multiple external restarts and a
-### minimum-cluster-size admissibility filter. Initialising on the covariates
+### minimum-cluster-size admissibility filter. Initializing on the covariates
 ### leaves spatial contiguity entirely to the Potts penalty, so that phi can be
 ### read as the price of spatial coherence rather than as a constraint built
 ### into the starting point. Intercept-only designs fall back to the
 ### coordinates.
 ###
-### Versions of the package before 2.0.0 initialised the partition with
+### Versions of the package before 2.0.0 initialized the partition with
 ### SCDA::SC_AMKM(). That dependency has been dropped, because SCDA is not
 ### distributed on CRAN and a hard dependency on it would make this package
-### unpublishable. Any external initialisation -- AMKM included -- can still be
+### unpublishable. Any external initialization -- AMKM included -- can still be
 ### used by passing it to SCSTEM_Estim() through the `init_partition` argument.
 ###
 ### Arguments
@@ -198,7 +198,7 @@
     lab <- scstem_repair_partition(lab, feat = feat, k = k, min_size = min_size)
     lab
   } else {
-    stop("The initialisation step failed: k-means could not produce any partition.",
+    stop("The initialization step failed: k-means could not produce any partition.",
          call. = FALSE)
   }
 }
@@ -231,7 +231,7 @@
 ### ---------------------------------------------------------------------------
 ### The covariate matrix of a STEM_Model stacks the (T x ncov) blocks of the d
 ### locations by row. This helper returns the d x ncov matrix of location-wise
-### time averages used by the initialisation step.
+### time averages used by the initialization step.
 `scstem_covariate_means` <- function(covariates, d, Tobs) {
   X <- as.matrix(covariates)
   out <- matrix(NA_real_, nrow = d, ncol = ncol(X))
@@ -321,7 +321,7 @@
 ### admissibility filter. Rather than falling back on an inadmissible partition
 ### -- which collapses at the very first cluster-wise fit -- the candidate is
 ### repaired: while some cluster is short of min_size, the units closest (in the
-### feature space used for the initialisation) to the centroid of the most
+### feature space used for the initialization) to the centroid of the most
 ### deficient cluster are moved into it, taken from the clusters that can
 ### afford to lose them.
 `scstem_repair_partition` <- function(labels, feat, k, min_size) {
@@ -378,7 +378,7 @@
 ### ---------------------------------------------------------------------------
 ### Penalty contribution of the pairs incident to two locations
 ### ---------------------------------------------------------------------------
-### Counts, once each, the concordant neighbour pairs that involve i or j. Used
+### Counts, once each, the concordant neighbor pairs that involve i or j. Used
 ### to evaluate the exact change of the Potts term produced by swapping the
 ### labels of i and j, without recomputing the whole quadratic form.
 `scstem_pen_local` <- function(labels, i, j, nb) {
@@ -400,7 +400,7 @@
 ### network can stay frozen at the initial partition. A swap exchanges the
 ### labels of two locations in different clusters: it leaves every cluster size
 ### unchanged -- hence feasibility is preserved by construction -- and it is
-### accepted only when it strictly increases the penalised objective, so the
+### accepted only when it strictly increases the penalized objective, so the
 ### monotonicity of the alternating algorithm is preserved as well.
 ###
 ### The pass is greedy: candidate pairs are scanned and every improving swap is
@@ -411,7 +411,7 @@
 ###   labels   current partition
 ###   LL       d x k matrix of log-likelihood contributions
 ###   phi_eff  effective penalty
-###   nb       neighbour list
+###   nb       neighbor list
 ###   tol      minimum improvement required to accept a swap
 ###   max_pass maximum number of full scans
 ###

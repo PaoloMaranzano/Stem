@@ -43,8 +43,8 @@ Default is 1.}
 \code{"per-observation"} or \code{"raw"}, setting the scale factor of the
 spatial penalty. See \code{Details}.}
 
-\item{knn}{integer, the number of nearest neighbours used to build the
-spatial penalty graph. The graph is symmetrised. Default is 5.}
+\item{knn}{integer, the number of nearest neighbors used to build the
+spatial penalty graph. The graph is symmetrized. Default is 5.}
 
 \item{distance}{character, \code{"euclidean"} for Euclidean distance or
 \code{"geo"} for geodesic distance. Use \code{"geo"} only when the
@@ -58,7 +58,7 @@ coordinates instead, which is also the fallback for intercept-only models.}
 
 \item{init_partition}{optional integer vector of length \eqn{d} giving a
 starting partition, overriding \code{init_method}. Use it to supply an
-externally computed initialisation; for instance the AMKM partition used
+externally computed initialization; for instance the AMKM partition used
 by versions of the package before 2.0.0 can be reproduced by passing
 \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
 violates \code{min_cluster_size}.}
@@ -71,7 +71,7 @@ update of all labels.}
 algorithm in each cluster-wise fit. Default is 0.1.}
 
 \item{precision_full_dataset}{small positive number, the convergence
-tolerance of the EM algorithm for the pooled fit used to initialise the
+tolerance of the EM algorithm for the pooled fit used to initialize the
 procedure. Default is 0.01.}
 
 \item{regularization}{small positive number added to the diagonal of the
@@ -81,7 +81,7 @@ matrices that have to be inverted. Default is 0.01.}
 Default is 10.}
 
 \item{abs_tol, rel_tol}{absolute and relative tolerances on the improvement
-of the penalised objective. Defaults are 1e-5 and 1e-6.}
+of the penalized objective. Defaults are 1e-5 and 1e-6.}
 
 \item{min_cluster_size}{integer or \code{NULL}. Minimum number of locations
 required to estimate a cluster-wise model. When \code{NULL} (default) it is
@@ -100,7 +100,7 @@ for backward compatibility: the loop also stops when the share of
 locations changing cluster falls below this value. Set to 0 (default) to
 rely only on the objective-based criteria.}
 
-\item{seed}{integer or \code{NULL}, seed used for the initialisation step so
+\item{seed}{integer or \code{NULL}, seed used for the initialization step so
 that the fit is reproducible. Default is 123456789.}
 
 \item{verbose}{logical. If \code{TRUE}, progress information is emitted via
@@ -122,10 +122,10 @@ An object of class \dQuote{SCSTEM_Estim}, a list with components:
   \item \code{loglik_g}: cluster-wise exact log-likelihoods.
   \item \code{final_refit}: logical vector flagging the clusters that could
     be re-estimated on the final partition.
-  \item \code{obj_trace}: data frame tracing the penalised objective, the
+  \item \code{obj_trace}: data frame tracing the penalized objective, the
     number of label changes and the cluster sizes along the iterations.
   \item \code{convergence}: character describing the exit route.
-  \item \code{penalised_obj}: value of the penalised objective at the exit.
+  \item \code{penalized_obj}: value of the penalized objective at the exit.
   \item \code{input_args}: the arguments used for the fit, needed by
     \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Select}}.
 }
@@ -137,7 +137,7 @@ are partitioned into \eqn{k} latent spatial regimes, and a separate
 \dQuote{STEM_Model} is estimated within each regime, so that regression
 coefficients, variance components and latent temporal dynamics are all
 cluster-specific. The partition and the parameters are estimated jointly by
-alternating optimization of a Potts-penalised log-likelihood.
+alternating optimization of a Potts-penalized log-likelihood.
 }
 \details{
 \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
@@ -150,12 +150,12 @@ and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{k = 1}
 recovers the pooled \code{\link{STEM_Estimation}} fit.
 
 \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
-by maximizing the penalised log-likelihood
+by maximizing the penalized log-likelihood
 \deqn{Q = \sum_{i=1}^{d} \ell_i(k_i) +
           \phi\, c \sum_{(i,j) \in E} I(k_i = k_j),}
 where \eqn{\ell_i(k)} is the log-likelihood contribution of location \eqn{i}
 under the parameters of cluster \eqn{k}, \eqn{E} is the edge set of the
-symmetrised \code{knn} graph with each unordered pair counted once, and
+symmetrized \code{knn} graph with each unordered pair counted once, and
 \eqn{c > 0} is the scale factor discussed
 below. This is the Potts-type penalty introduced for spatially-clustered
 regression by Sugasawa and Murakami (2021) and carried over to
@@ -172,9 +172,9 @@ factor \eqn{c} restores a comparable interpretation:
 \itemize{
   \item \code{phi_scale = "auto"} (default) sets \eqn{c} to the median across
     locations of the spread \eqn{\max_k \ell_{ik} - \min_k \ell_{ik}},
-    divided by the average number of neighbours. With this normalisation
+    divided by the average number of neighbors. With this normalization
     \eqn{\phi = 1} is the point at which full agreement with the
-    neighbourhood is worth about as much as the typical gain from picking the
+    neighborhood is worth about as much as the typical gain from picking the
     best-fitting cluster, so that a grid \eqn{\phi \in [0, 2]} is informative
     on any dataset. The factor is computed once, at the first sweep, and is
     returned in \code{phi_multiplier}.
@@ -182,7 +182,7 @@ factor \eqn{c} restores a comparable interpretation:
     \eqn{\phi} invariant to the length of the series and directly comparable
     with the cross-sectional literature, but leaves it dependent on the scale
     of the response.
-  \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalising on the
+  \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalizing on the
     untransformed likelihood scale.
 }
 The effective penalty actually applied is always reported in
@@ -197,7 +197,7 @@ The effective penalty actually applied is always reported in
     never obtained a valid fit is excluded from the assignment step.
   \item \emph{Label update given parameters.} With
     \code{label_update = "ICM"} (the default) locations are visited
-    sequentially and each label maximizes its own penalised contribution
+    sequentially and each label maximizes its own penalized contribution
     given the current labels of all the others, in the spirit of the
     Iterated Conditional Modes algorithm of Besag (1986). For fixed
     parameters this sweep cannot decrease \eqn{Q}, which rules out the label
@@ -215,9 +215,9 @@ the alternation as a whole is \emph{not} guaranteed to increase \eqn{Q}
 monotonically, and \code{obj_trace} may well show a decrease. The reason is
 structural rather than numerical. In the STEM measurement equation the
 spatial covariance \eqn{\Sigma_{e,k}} couples the locations, so the exact
-marginal likelihood does not factorise across them and the assignment score
+marginal likelihood does not factorize across them and the assignment score
 \eqn{\ell_{ik}} has to be a conditional pseudo-likelihood, whereas the
-parameter step maximises the exact within-cluster likelihood through the EM
+parameter step maximizes the exact within-cluster likelihood through the EM
 algorithm. The two objectives agree on what a good partition looks like but
 are not the same function, so a parameter update can lower \eqn{Q} while
 raising the exact likelihood. This is a property of the spatio-temporal

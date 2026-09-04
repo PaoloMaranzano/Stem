@@ -15,7 +15,7 @@ This vignette is the conceptual map of `Stem`: what each function is for, and
 how they call one another. It is meant to be read once, before diving into the
 manual pages.
 
-```{r diagram, echo = FALSE, out.width = "100%", fig.alt = "Call graph of the Stem package, organised in four layers: data and model object, estimation engine, simulation and prediction, spatially-clustered STEM"}
+```{r diagram, echo = FALSE, out.width = "100%", fig.alt = "Call graph of the Stem package, organized in four layers: data and model object, estimation engine, simulation and prediction, spatially-clustered STEM"}
 knitr::include_graphics("function-map.svg")
 ```
 
@@ -45,17 +45,17 @@ Two datasets ship with the package: `pm10`, the small 22-station example, and
 `STEM_Estimation()` is the entry point and runs the EM loop. Each iteration
 calls `kalman()`, which does the real work:
 
-* `filtering()` / `filterstep()` — the forward Kalman recursions, which also
+* `filtering()` / `filterstep()` - the forward Kalman recursions, which also
   accumulate the log-likelihood through `mvtnorm::dmvnorm()`;
-* `smoothing()` / `smootherstep()` / `smootherstep.uni()` — the backward
+* `smoothing()` / `smootherstep()` / `smootherstep.uni()` - the backward
   recursions producing the smoothed latent states;
-* `Q_function_addendo1/2/3()` — the three pieces of the expected complete-data
+* `Q_function_addendo1/2/3()` - the three pieces of the expected complete-data
   log-likelihood;
-* `d1_Q()`, `d2_Q()`, `d12_Q()` and the `d1/d2_Sigmastar_*()` derivatives — the
+* `d1_Q()`, `d2_Q()`, `d12_Q()` and the `d1/d2_Sigmastar_*()` derivatives - the
   gradient and Hessian of the Newton-Raphson step that updates $\theta$ and
   $\log b = \log(\sigma^2_\varepsilon / \sigma^2_\omega)$;
 * `Sigmastar.exp()`, `B_function()`, `cov_lagone()`, `sumMatrices()` and
-  `changedimension_covariates()` — matrix utilities.
+  `changedimension_covariates()` - matrix utilities.
 
 Closed-form M-steps update $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and
 $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
@@ -75,9 +75,9 @@ This layer sits on top of the previous ones: every cluster-wise fit is an
 ordinary `STEM_Model` estimated by `STEM_Estimation()`.
 
 * `SCSTEM_Estim()` alternates between estimating one STEM model per regime and
-  reallocating locations by an ICM sweep on a Potts-penalised objective. Its
-  helpers are `scstem_neighbours()` (symmetrised k-nearest-neighbour graph),
-  `scstem_init()` and `scstem_repair_partition()` (initialisation),
+  reallocating locations by an ICM sweep on a Potts-penalized objective. Its
+  helpers are `scstem_neighbors()` (symmetrized k-nearest-neighbor graph),
+  `scstem_init()` and `scstem_repair_partition()` (initialization),
   `scstem_loglike_i()` (the per-location contribution),
   `scstem_potts_pairs()` and `scstem_pen_local()` (the penalty),
   `scstem_swap_pass()` (the size-preserving swap step) and `scstem_npar()`
@@ -128,9 +128,9 @@ system.file("extdata", "STEM_function_map.md", package = "Stem")
 ## Is the implementation faithful to the papers?
 
 The estimation code has been checked equation by equation against the three
-companion works of Fassò and Cameletti that define the STEM model — the
+companion works of Fasso and Cameletti that define the STEM model - the
 heterogeneous-network paper of 2007, the technical report that introduced this
-package, and the 2010 synthesis whose Equations (12)–(21) the code implements.
+package, and the 2010 synthesis whose Equations (12)-(21) the code implements.
 The result, including the one defect the check turned up, is documented in:
 
 ```{r verification, eval = FALSE}

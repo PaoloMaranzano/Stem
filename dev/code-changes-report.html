@@ -271,10 +271,10 @@
         <ul>
           <li>Simultaneous label update, without guarantees and able to cycle</li>
           <li>Information criteria counting the <em>number of clusters</em> as the number of parameters</li>
-          <li>No selection of the penalty; <code>k</code> chosen by minimising BIC with no safeguards</li>
+          <li>No selection of the penalty; <code>k</code> chosen by minimizing BIC with no safeguards</li>
           <li>Bootstrap conditional on the partition</li>
-          <li>AMKM initialisation from <code>SCDA</code>, a package not on CRAN</li>
-          <li>Asymmetric k-nearest-neighbour graph used for an undirected penalty</li>
+          <li>AMKM initialization from <code>SCDA</code>, a package not on CRAN</li>
+          <li>Asymmetric k-nearest-neighbor graph used for an undirected penalty</li>
         </ul>
       </div>
       <div class="panel after">
@@ -285,7 +285,7 @@
           <li>Two-step rule: BIC inside a moderate band, then the smallest penalty on the ARI stability plateau</li>
           <li>Refit-with-clustering bootstrap: the partition is re-estimated at every draw</li>
           <li>Internal k-means on PCA-compressed covariate means, with an admissibility filter and a repair step</li>
-          <li>Graph symmetrised</li>
+          <li>Graph symmetrized</li>
         </ul>
       </div>
     </div>
@@ -298,12 +298,12 @@
 
     <div class="callout">
       <span class="tag">A property worth knowing</span>
-      <p>A test written against the cross-sectional intuition failed, and it was right to: <b>the alternation is not globally monotone</b>. In the STEM measurement equation the spatial covariance couples the locations, so the exact marginal likelihood does not factorise and the assignment score must be a pseudo-likelihood, while the parameter step maximises the exact within-cluster likelihood. A parameter update can therefore lower the penalised objective while raising the exact likelihood.</p>
+      <p>A test written against the cross-sectional intuition failed, and it was right to: <b>the alternation is not globally monotone</b>. In the STEM measurement equation the spatial covariance couples the locations, so the exact marginal likelihood does not factorize and the assignment score must be a pseudo-likelihood, while the parameter step maximizes the exact within-cluster likelihood. A parameter update can therefore lower the penalized objective while raising the exact likelihood.</p>
       <p>This is a property of the spatio-temporal specification. The implementation copes by always returning the best partition visited, reporting both <code>best_objective</code> and <code>last_objective</code>; it is documented in <code>?SCSTEM_Estim</code> and in the SC-STEM vignette.</p>
     </div>
 
     <h3>The scale of the penalty</h3>
-    <p>Transferring the penalty from the cross-sectional literature does not work: there each unit contributes one observation, here it contributes <code>T</code>, and the log-likelihood differences between clusters grow with <code>T</code> and with the scale of the response. The default <code>phi_scale = "auto"</code> normalises by the median spread of the per-location contributions divided by the average number of neighbours, so that <code>phi</code> around one is the point where agreeing with the neighbourhood is worth about as much as picking the best-fitting cluster, and a grid on <code>[0, 2]</code> is informative on any dataset. <code>"per-observation"</code> and <code>"raw"</code> remain available.</p>
+    <p>Transferring the penalty from the cross-sectional literature does not work: there each unit contributes one observation, here it contributes <code>T</code>, and the log-likelihood differences between clusters grow with <code>T</code> and with the scale of the response. The default <code>phi_scale = "auto"</code> normalizes by the median spread of the per-location contributions divided by the average number of neighbors, so that <code>phi</code> around one is the point where agreeing with the neighborhood is worth about as much as picking the best-fitting cluster, and a grid on <code>[0, 2]</code> is informative on any dataset. <code>"per-observation"</code> and <code>"raw"</code> remain available.</p>
   </section>
 
   <section>
@@ -326,7 +326,7 @@
     <h3>Issues the check raised on its own</h3>
     <ul>
       <li><b><code>pm10</code> was source code, not data</b>: the same 250 KB file was duplicated in <code>R/</code> and <code>data/</code>. It is now <code>data/pm10.rda</code>, 25 KB.</li>
-      <li><b><code>SCDA</code> is not on CRAN</b>: an unreachable dependency in <code>Imports</code> is an automatic rejection. Removed; the initialisation is internal and any external partition can be supplied through the new <code>init_partition</code> argument.</li>
+      <li><b><code>SCDA</code> is not on CRAN</b>: an unreachable dependency in <code>Imports</code> is an automatic rejection. Removed; the initialization is internal and any external partition can be supplied through the new <code>init_partition</code> argument.</li>
       <li><b><code>dplyr</code> and <code>sf</code> were unused</b>: removed. Every external call is written <code>package::function()</code> and <code>NAMESPACE</code> carries no <code>importFrom</code>.</li>
       <li><code>ts()</code> unqualified in <code>filtering()</code> and <code>smoothing()</code> (NOTE); <code>verbose</code> undocumented in two manual pages (WARNING); the <code>STEM_Bootstrap</code> example running over five seconds (NOTE).</li>
     </ul>
@@ -348,7 +348,7 @@
       <li>the pooled SC-STEM fit at <code>k = 1</code> reproduces <code>STEM_Estimation</code> exactly;</li>
       <li>the returned partition is admissible and attains the best visited objective;</li>
       <li>the parameter count behind the information criteria is <code>k_eff * (ncov + 3 + 3p)</code> and the sample size is <code>d * T</code>;</li>
-      <li>the neighbour graph is symmetric with a zero diagonal;</li>
+      <li>the neighbor graph is symmetric with a zero diagonal;</li>
       <li>the ICM sweep is monotone at fixed parameters, and the swap pass preserves cluster sizes;</li>
       <li>estimation leaves the caller's RNG state untouched;</li>
       <li>the bootstrap is reproducible under a fixed seed, produces usable draws, and forwards only arguments that <code>SCSTEM_Estim</code> accepts.</li>

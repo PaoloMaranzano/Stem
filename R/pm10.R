@@ -18,7 +18,7 @@
 #' }
 #'
 #' @references
-#' Fassò, A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
+#' Fasso, A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
 #'
 #' @author Michela Cameletti \email{michela.cameletti@unibg.it}
 #'

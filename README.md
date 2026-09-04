@@ -43,13 +43,13 @@ white over time.
 | Symbol | Role | How to read it |
 |---|---|---|
 | $\beta$ | Regression coefficients on the covariates $X_t$ | The part of the concentration explained by observable drivers: altitude, emissions, a co-pollutant. Constant over space and time. |
-| $y_t$ | Latent temporal process, dimension $p$ | The unobserved "regional level" that moves the whole network together day by day — weather, seasonality, anything not in $X_t$. |
+| $y_t$ | Latent temporal process, dimension $p$ | The unobserved "regional level" that moves the whole network together day by day - weather, seasonality, anything not in $X_t$. |
 | $K$ | $d \times p$ loading matrix | How strongly each location feels the shared process. Usually $K = 1$, meaning one common level; it can also carry EOF loadings. |
 | $G$ | Transition matrix of the state equation | The **persistence** of the latent process. With $p = 1$ it is a scalar autoregressive coefficient: near 1 means long memory, near 0 means the level is renewed each day. |
 | $\Sigma_\eta$ | Innovation variance of the state equation | How much genuinely new information enters the latent process at each step. |
 | $\sigma^2_\varepsilon$ | Measurement error variance | Instrumental noise, independent across locations. Geostatistically it is the **nugget**: the discontinuity of the covariance at distance zero. |
 | $\sigma^2_\omega$ | Variance of the small-scale spatial component | The **partial sill**: local spatial structure that the regression and the latent process do not capture. |
-| $\theta$ | Range parameter of the exponential covariance | How fast spatial correlation decays with distance $h$. Its reciprocal $1/\theta$ is the characteristic length beyond which two locations are effectively uncorrelated. |
+| $\theta$ | Range parameter of the exponential covariance | How fast spatial correlation decays with distance $h$. Its reciprocal $1/\theta$ is the characteriztic length beyond which two locations are effectively uncorrelated. |
 | $\Sigma_e$ | Observation covariance | Nugget plus spatially correlated component. Its diagonal is $\sigma^2_\varepsilon + \sigma^2_\omega$, the total variance of a single observation. |
 | $m_0, C_0$ | Initial state distribution | Starting values for the Kalman recursions; $C_0$ is held fixed. |
 
@@ -63,7 +63,7 @@ Newton-Raphson step.
 The STEM model imposes **one** $\beta$, **one** $G$, **one** covariance on the
 entire domain. That is a strong assumption. Tobler's first law of geography says
 near things are more related than distant ones, and $\Sigma_e$ encodes exactly
-that. But geography also obeys a **second law — spatial heterogeneity**
+that. But geography also obeys a **second law - spatial heterogeneity**
 (Goodchild 2004): geographic variation is not uniform, and it is not only the
 *values* that change across space, it is the *relationships* themselves. The
 response of PM2.5 to altitude in the middle of an alluvial plain need not be the
@@ -97,20 +97,20 @@ the persistence of the latent dynamics, so a regime can differ from another in
 *how* it behaves in time and space, not merely in level.
 
 The partition is not imposed. Labels $k_1, \ldots, k_d$ and parameters are
-estimated jointly by maximising a Potts-penalised log-likelihood,
+estimated jointly by maximizing a Potts-penalized log-likelihood,
 
 ```math
 Q = \sum_{i=1}^{d} \ell_i(k_i) + \phi \, c \sum_{(i,j) \in E} I(k_i = k_j)
 ```
 
 where $\ell_i(k)$ is the log-likelihood contribution of location $i$ under the
-parameters of regime $k$, $E$ is the edge set of the symmetrised
-$k$-nearest-neighbour graph with each unordered pair counted once,
+parameters of regime $k$, $E$ is the edge set of the symmetrized
+$k$-nearest-neighbor graph with each unordered pair counted once,
 $I(\cdot)$ the indicator function, and $c$ a scale factor documented in
 `?SCSTEM_Estim`.
 
 The penalty is what makes the regimes *spatial*. The first term rewards fit and
-would happily scatter the labels; the second rewards neighbouring locations
+would happily scatter the labels; the second rewards neighboring locations
 sharing a label. The hyperparameter $\phi \ge 0$ arbitrates between them:
 $\phi = 0$ gives ordinary clusterwise regression with no spatial structure,
 large $\phi$ gives contiguous and rigid regimes. Setting $k = 1$ returns the
@@ -179,9 +179,9 @@ SCSTEM_BootInference(boot)
 Three points make SC-STEM behave sensibly in practice, and are documented in
 detail in `?SCSTEM_Estim`.
 
-**Labels are updated sequentially (ICM).** Each location maximises its own
-penalised contribution given the current labels of all the others, so a sweep
-cannot decrease the objective at fixed parameters and cannot cycle — unlike a
+**Labels are updated sequentially (ICM).** Each location maximizes its own
+penalized contribution given the current labels of all the others, so a sweep
+cannot decrease the objective at fixed parameters and cannot cycle - unlike a
 simultaneous update, which remains available as an option.
 
 **Degeneracy is controlled.** Within-cluster homogeneity is exactly what the
@@ -209,28 +209,29 @@ implements it ships with the package as a standalone document:
 browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))
 ```
 
-The development record — the defects fixed in this release and the reasoning
-behind the algorithmic changes — is kept in the repository, outside the built
+The development record - the defects fixed in this release and the reasoning
+behind the algorithmic changes - is kept in the repository, outside the built
 package, at [`dev/code-changes-report.html`](dev/code-changes-report.html). The
-user-facing summary is [`NEWS.md`](NEWS.md).
+user-facing summary is [`NEWS.md`](NEWS.md), and the dated development log is
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Theoretical references
 
-The STEM model implemented here comes from three companion works by Fassò and
+The STEM model implemented here comes from three companion works by Fasso and
 Cameletti, which play different roles.
 
-**Fassò, A., Cameletti, M. and Nicolis, O. (2007).** Air quality monitoring
-using heterogeneous networks. *Environmetrics*, 18, 245–264.
+**Fasso, A., Cameletti, M. and Nicolis, O. (2007).** Air quality monitoring
+using heterogeneous networks. *Environmetrics*, 18, 245-264.
 <https://doi.org/10.1002/env.837>
 > Introduces the *geostatistical dynamical calibration* (GDC) model, the most
-> general of the three: it adds instrument calibration components — an additive
-> bias `A(t)` and a multiplicative bias `B(t)` — so that a network of
-> heterogeneous instruments (gravimetric and TEOM monitors) can be modelled
+> general of the three: it adds instrument calibration components - an additive
+> bias `A(t)` and a multiplicative bias `B(t)` - so that a network of
+> heterogeneous instruments (gravimetric and TEOM monitors) can be modeled
 > jointly, with the loading matrix obtained by empirical orthogonal functions.
 > The model estimated by this package is the special case with no calibration
 > bias.
 
-**Fassò, A. and Cameletti, M. (2007).** A general spatio-temporal model for
+**Fasso, A. and Cameletti, M. (2007).** A general spatio-temporal model for
 environmental data. *GRASPA Technical Report* n. 27.
 > The direct theoretical reference for this package, which it announces by name.
 > It states the three-stage hierarchy, the scaled spatial covariance
@@ -241,26 +242,26 @@ environmental data. *GRASPA Technical Report* n. 27.
 > Newton-Raphson for the spatial covariance parameters, and the spatio-temporal
 > parametric bootstrap.
 
-**Fassò, A. and Cameletti, M. (2010).** A unified statistical approach for
+**Fasso, A. and Cameletti, M. (2010).** A unified statistical approach for
 simulation, modeling, analysis and mapping of environmental data. *Simulation*,
-86, 139–153. <https://doi.org/10.1177/0037549709102150>
+86, 139-153. <https://doi.org/10.1177/0037549709102150>
 > The most complete published statement: the same model and EM algorithm, plus
 > the kriging predictor used by `STEM_Kriging()`, the bootstrap of
 > `STEM_Bootstrap()`, and a sensitivity analysis of the model components. Its
-> Equations (12)–(18) are what the estimation code implements.
+> Equations (12)-(18) are what the estimation code implements.
 
 ### Spatial heterogeneity
 
 **Goodchild, M. F. (2004).** The validity and usefulness of laws in geographic
 information science and geography. *Annals of the Association of American
-Geographers*, 94(2), 300–303.
+Geographers*, 94(2), 300-303.
 <https://doi.org/10.1111/j.1467-8306.2004.09402008.x>
 > Articulates spatial heterogeneity as a second law of geography, alongside
 > Tobler's first law on spatial dependence. The motivation for letting the
 > regression relationship itself vary across space.
 
 **Zhu, A.-X. and Turner, M. (2022).** How is the Third Law of Geography
-different? *Annals of GIS*, 28(1), 57–67.
+different? *Annals of GIS*, 28(1), 57-67.
 <https://doi.org/10.1080/19475683.2022.2026467>
 > Situates spatial dependence, spatial heterogeneity and geographic similarity
 > with respect to one another, and clarifies what each principle does and does
@@ -272,7 +273,7 @@ These works supply the algorithmic devices that SC-STEM adapts; the statistical
 model remains the STEM one above.
 
 **Besag, J. (1986).** On the statistical analysis of dirty pictures.
-*JRSS-B*, 48, 259–302.
+*JRSS-B*, 48, 259-302.
 > The Iterated Conditional Modes algorithm used for the label update.
 
 **Sugasawa, S. and Murakami, D. (2021).** Spatially clustered regression.
@@ -288,10 +289,10 @@ concentration in Europe. *JABES*.
 > hyperparameter-selection practice this package follows.
 
 **Maranzano, P., Mattera, R. and Sugasawa, S. (2026).** Small area estimation
-under spatial regimes: spatially clustered Fay–Herriot models for agricultural
+under spatial regimes: spatially clustered Fay-Herriot models for agricultural
 indicators. *arXiv:2608.13638*. <https://arxiv.org/abs/2608.13638>
-> A different class of model — area-level small area estimation with known
-> sampling variances — in which the same apparatus is developed: the ICM label
+> A different class of model - area-level small area estimation with known
+> sampling variances - in which the same apparatus is developed: the ICM label
 > update, the information criteria on the final refit, the two-step rule for the
 > number of regimes and the penalty, and the refit-with-clustering parametric
 > bootstrap. SC-STEM adapts those devices to the point-referenced

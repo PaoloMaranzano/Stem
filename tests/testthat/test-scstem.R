@@ -23,7 +23,7 @@ test_that("SCSTEM_Estim returns an admissible partition and a monotone objective
   expect_false(anyNA(fit$phi_hat))
 
   ### The alternation is NOT globally monotone: the assignment score is a
-  ### pseudo-likelihood while the parameter step maximises the exact
+  ### pseudo-likelihood while the parameter step maximizes the exact
   ### within-cluster likelihood, so a parameter update can lower Q. What must
   ### hold is that the partition returned is the best one visited.
   obj <- fit$obj_trace$objective
@@ -87,7 +87,7 @@ test_that("the information criteria use the exact parameter count", {
 
 test_that("a stronger spatial penalty does not reduce spatial cohesion", {
   mod <- po_model(Tn = 90L)
-  nb <- Stem:::scstem_neighbours(mod$data$coordinates, knn = 5)
+  nb <- Stem:::scstem_neighbors(mod$data$coordinates, knn = 5)
 
   f0 <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0, distance = "geo",
                      precision = 0.05)
@@ -99,9 +99,9 @@ test_that("a stronger spatial penalty does not reduce spatial cohesion", {
 })
 
 
-test_that("the neighbour graph is symmetric", {
+test_that("the neighbor graph is symmetric", {
   mod <- po_model(Tn = 30L)
-  nb <- Stem:::scstem_neighbours(mod$data$coordinates, knn = 5)
+  nb <- Stem:::scstem_neighbors(mod$data$coordinates, knn = 5)
   expect_equal(nb$W, t(nb$W))
   expect_true(all(diag(nb$W) == 0))
 })
@@ -138,6 +138,6 @@ test_that("the estimation does not modify the RNG state of the caller", {
 test_that("the Adjusted Rand Index behaves at its boundaries", {
   a <- c(1, 1, 2, 2, 3, 3)
   expect_equal(Stem:::scstem_ari(a, a), 1)
-  ### relabelling must not change the index
+  ### relabeling must not change the index
   expect_equal(Stem:::scstem_ari(a, c(3, 3, 1, 1, 2, 2)), 1)
 })

@@ -7,7 +7,7 @@
 #' \dQuote{STEM_Model} is estimated within each regime, so that regression
 #' coefficients, variance components and latent temporal dynamics are all
 #' cluster-specific. The partition and the parameters are estimated jointly by
-#' alternating optimization of a Potts-penalised log-likelihood.
+#' alternating optimization of a Potts-penalized log-likelihood.
 #'
 #' @details
 #' \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
@@ -20,12 +20,12 @@
 #' recovers the pooled \code{\link{STEM_Estimation}} fit.
 #'
 #' \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
-#' by maximizing the penalised log-likelihood
+#' by maximizing the penalized log-likelihood
 #' \deqn{Q = \sum_{i=1}^{d} \ell_i(k_i) +
 #'           \phi\, c \sum_{(i,j) \in E} I(k_i = k_j),}
 #' where \eqn{\ell_i(k)} is the log-likelihood contribution of location \eqn{i}
 #' under the parameters of cluster \eqn{k}, \eqn{E} is the edge set of the
-#' symmetrised \code{knn} graph with each unordered pair counted once, and
+#' symmetrized \code{knn} graph with each unordered pair counted once, and
 #' \eqn{c > 0} is the scale factor discussed
 #' below. This is the Potts-type penalty introduced for spatially-clustered
 #' regression by Sugasawa and Murakami (2021) and carried over to
@@ -42,9 +42,9 @@
 #' \itemize{
 #'   \item \code{phi_scale = "auto"} (default) sets \eqn{c} to the median across
 #'     locations of the spread \eqn{\max_k \ell_{ik} - \min_k \ell_{ik}},
-#'     divided by the average number of neighbours. With this normalisation
+#'     divided by the average number of neighbors. With this normalization
 #'     \eqn{\phi = 1} is the point at which full agreement with the
-#'     neighbourhood is worth about as much as the typical gain from picking the
+#'     neighborhood is worth about as much as the typical gain from picking the
 #'     best-fitting cluster, so that a grid \eqn{\phi \in [0, 2]} is informative
 #'     on any dataset. The factor is computed once, at the first sweep, and is
 #'     returned in \code{phi_multiplier}.
@@ -52,7 +52,7 @@
 #'     \eqn{\phi} invariant to the length of the series and directly comparable
 #'     with the cross-sectional literature, but leaves it dependent on the scale
 #'     of the response.
-#'   \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalising on the
+#'   \item \code{phi_scale = "raw"} sets \eqn{c = 1}, penalizing on the
 #'     untransformed likelihood scale.
 #' }
 #' The effective penalty actually applied is always reported in
@@ -67,7 +67,7 @@
 #'     never obtained a valid fit is excluded from the assignment step.
 #'   \item \emph{Label update given parameters.} With
 #'     \code{label_update = "ICM"} (the default) locations are visited
-#'     sequentially and each label maximizes its own penalised contribution
+#'     sequentially and each label maximizes its own penalized contribution
 #'     given the current labels of all the others, in the spirit of the
 #'     Iterated Conditional Modes algorithm of Besag (1986). For fixed
 #'     parameters this sweep cannot decrease \eqn{Q}, which rules out the label
@@ -85,9 +85,9 @@
 #' monotonically, and \code{obj_trace} may well show a decrease. The reason is
 #' structural rather than numerical. In the STEM measurement equation the
 #' spatial covariance \eqn{\Sigma_{e,k}} couples the locations, so the exact
-#' marginal likelihood does not factorise across them and the assignment score
+#' marginal likelihood does not factorize across them and the assignment score
 #' \eqn{\ell_{ik}} has to be a conditional pseudo-likelihood, whereas the
-#' parameter step maximises the exact within-cluster likelihood through the EM
+#' parameter step maximizes the exact within-cluster likelihood through the EM
 #' algorithm. The two objectives agree on what a good partition looks like but
 #' are not the same function, so a parameter update can lower \eqn{Q} while
 #' raising the exact likelihood. This is a property of the spatio-temporal
@@ -139,8 +139,8 @@
 #' @param phi_scale character, one of \code{"auto"} (default),
 #'   \code{"per-observation"} or \code{"raw"}, setting the scale factor of the
 #'   spatial penalty. See \code{Details}.
-#' @param knn integer, the number of nearest neighbours used to build the
-#'   spatial penalty graph. The graph is symmetrised. Default is 5.
+#' @param knn integer, the number of nearest neighbors used to build the
+#'   spatial penalty graph. The graph is symmetrized. Default is 5.
 #' @param distance character, \code{"euclidean"} for Euclidean distance or
 #'   \code{"geo"} for geodesic distance. Use \code{"geo"} only when the
 #'   coordinates are longitude/latitude. Default is \code{"geo"}.
@@ -151,7 +151,7 @@
 #'   coordinates instead, which is also the fallback for intercept-only models.
 #' @param init_partition optional integer vector of length \eqn{d} giving a
 #'   starting partition, overriding \code{init_method}. Use it to supply an
-#'   externally computed initialisation; for instance the AMKM partition used
+#'   externally computed initialization; for instance the AMKM partition used
 #'   by versions of the package before 2.0.0 can be reproduced by passing
 #'   \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
 #'   violates \code{min_cluster_size}.
@@ -161,14 +161,14 @@
 #' @param precision small positive number, the convergence tolerance of the EM
 #'   algorithm in each cluster-wise fit. Default is 0.1.
 #' @param precision_full_dataset small positive number, the convergence
-#'   tolerance of the EM algorithm for the pooled fit used to initialise the
+#'   tolerance of the EM algorithm for the pooled fit used to initialize the
 #'   procedure. Default is 0.01.
 #' @param regularization small positive number added to the diagonal of the
 #'   matrices that have to be inverted. Default is 0.01.
 #' @param max_iter integer, the maximum number of alternating iterations.
 #'   Default is 10.
 #' @param abs_tol,rel_tol absolute and relative tolerances on the improvement
-#'   of the penalised objective. Defaults are 1e-5 and 1e-6.
+#'   of the penalized objective. Defaults are 1e-5 and 1e-6.
 #' @param min_cluster_size integer or \code{NULL}. Minimum number of locations
 #'   required to estimate a cluster-wise model. When \code{NULL} (default) it is
 #'   set to \code{ncov + 2}.
@@ -182,7 +182,7 @@
 #'   for backward compatibility: the loop also stops when the share of
 #'   locations changing cluster falls below this value. Set to 0 (default) to
 #'   rely only on the objective-based criteria.
-#' @param seed integer or \code{NULL}, seed used for the initialisation step so
+#' @param seed integer or \code{NULL}, seed used for the initialization step so
 #'   that the fit is reproducible. Default is 123456789.
 #' @param verbose logical. If \code{TRUE}, progress information is emitted via
 #'   \code{message()}. Default is \code{FALSE}.
@@ -202,10 +202,10 @@
 #'   \item \code{loglik_g}: cluster-wise exact log-likelihoods.
 #'   \item \code{final_refit}: logical vector flagging the clusters that could
 #'     be re-estimated on the final partition.
-#'   \item \code{obj_trace}: data frame tracing the penalised objective, the
+#'   \item \code{obj_trace}: data frame tracing the penalized objective, the
 #'     number of label changes and the cluster sizes along the iterations.
 #'   \item \code{convergence}: character describing the exit route.
-#'   \item \code{penalised_obj}: value of the penalised objective at the exit.
+#'   \item \code{penalized_obj}: value of the penalized objective at the exit.
 #'   \item \code{input_args}: the arguments used for the fit, needed by
 #'     \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Select}}.
 #' }
@@ -382,7 +382,7 @@ SCSTEM_Estim <- function(StemModel,
       obj_trace = data.frame(iter = integer(0), objective = numeric(0),
                              label_changes = integer(0)),
       convergence = "Pooled model (k = 1): no clustering performed",
-      penalised_obj = NA_real_,
+      penalized_obj = NA_real_,
       input_args = list(StemModel = StemModel, k = 1L, phi_penalty = phi_penalty,
                         phi_scale = phi_scale, knn = knn, distance = distance,
                         init_method = init_method, label_update = label_update,
@@ -401,8 +401,8 @@ SCSTEM_Estim <- function(StemModel,
     return(out)
   }
 
-  ### Spatial penalty graph (symmetrised knn)
-  nbinfo <- scstem_neighbours(coordinates, knn = knn)
+  ### Spatial penalty graph (symmetrized knn)
+  nbinfo <- scstem_neighbors(coordinates, knn = knn)
   nb <- nbinfo$nb
   W <- nbinfo$W
 
@@ -436,7 +436,7 @@ SCSTEM_Estim <- function(StemModel,
     )
   }
   if (length(unique(labels)) < k) {
-    stop("The initialisation returned fewer than k = ", k,
+    stop("The initialization returned fewer than k = ", k,
          " non-empty clusters. Try a smaller k or a different init_method.",
          call. = FALSE)
   }
@@ -529,8 +529,8 @@ SCSTEM_Estim <- function(StemModel,
     ### objective stays comparable along the iterations. The multiplier is the
     ### median across locations of the spread of the log-likelihood
     ### contributions across clusters, divided by the average number of
-    ### neighbours: phi_penalty = 1 is then the point at which full agreement
-    ### with the neighbourhood is worth as much as the typical gain from
+    ### neighbors: phi_penalty = 1 is then the point at which full agreement
+    ### with the neighborhood is worth as much as the typical gain from
     ### picking the best-fitting cluster.
     if (phi_scale == "auto" && !is.finite(phi_eff)) {
       rng <- apply(LL, 1, function(r) {
@@ -552,8 +552,8 @@ SCSTEM_Estim <- function(StemModel,
 
     if (label_update == "ICM") {
       ### Sequential (Gauss-Seidel) sweep: each label maximizes its own
-      ### penalised contribution given the CURRENT labels of all the others,
-      ### already-updated neighbours included.
+      ### penalized contribution given the CURRENT labels of all the others,
+      ### already-updated neighbors included.
       ###
       ### The sweep is constrained: a location may leave its cluster only if
       ### that cluster would stay at or above min_cluster_size. Without this
@@ -582,7 +582,7 @@ SCSTEM_Estim <- function(StemModel,
       }
     } else {
       ### Joint update of all labels, with the penalty evaluated at the labels
-      ### of the previous iteration (pre-2.0.0 behaviour). The joint update
+      ### of the previous iteration (pre-2.0.0 behavior). The joint update
       ### offers no way to impose the size constraint move by move, so an
       ### inadmissible configuration is repaired afterwards.
       Ind <- matrix(0, nrow = d, ncol = k)
@@ -603,7 +603,7 @@ SCSTEM_Estim <- function(StemModel,
     ### large share of the partition at its initial value. Exchanging the
     ### labels of two locations leaves all cluster sizes unchanged, so it is
     ### always feasible, and it is accepted only when it strictly increases
-    ### the penalised objective.
+    ### the penalized objective.
     n_swap <- 0L
     if (isTRUE(swap_pass) && isTRUE(enforce_min_size)) {
       sw <- scstem_swap_pass(labels, LL, phi_eff, nb)
@@ -612,7 +612,7 @@ SCSTEM_Estim <- function(StemModel,
     }
 
     ### ---------------------------------------------------------------
-    ### Penalised objective at the current (parameters, labels)
+    ### Penalized objective at the current (parameters, labels)
     ### ---------------------------------------------------------------
     obj <- sum(LL[cbind(seq_len(d), labels)]) +
       phi_eff * scstem_potts_pairs(labels, nb)
@@ -628,7 +628,7 @@ SCSTEM_Estim <- function(StemModel,
     }
 
     if (isTRUE(verbose)) {
-      message("* Iteration ", it, ": penalised objective = ", round(obj, 4),
+      message("* Iteration ", it, ": penalized objective = ", round(obj, 4),
               " ; label changes = ", n_changes,
               " ; smallest cluster = ", min(tabulate(labels, nbins = k)))
     }
@@ -668,7 +668,7 @@ SCSTEM_Estim <- function(StemModel,
   ### The ICM sweep is monotone for FIXED parameters, but the alternation as a
   ### whole is not guaranteed to increase Q. The reason is structural: the
   ### assignment score is the conditional pseudo-likelihood of
-  ### scstem_loglike_i(), whereas the parameter step maximises the EXACT
+  ### scstem_loglike_i(), whereas the parameter step maximizes the EXACT
   ### within-cluster likelihood through the EM algorithm. The two objectives
   ### agree on what a good partition looks like but are not the same function,
   ### so a parameter update can lower Q even while it raises the exact
@@ -758,7 +758,7 @@ SCSTEM_Estim <- function(StemModel,
     final_refit = final_refit,
     obj_trace = obj_trace,
     convergence = convergence,
-    penalised_obj = if (is.finite(best_obj)) best_obj else NA_real_,
+    penalized_obj = if (is.finite(best_obj)) best_obj else NA_real_,
     best_objective = if (is.finite(best_obj)) best_obj else NA_real_,
     last_objective = if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else NA_real_,
     phi_effective = phi_eff,

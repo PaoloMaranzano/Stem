@@ -12,14 +12,14 @@ A list with five components, following the same conventions as
     stations, in decimal degrees (EPSG:4326). Distances must therefore be
     computed with \code{distance = "geo"}.}
   \item{covariates}{A 65736 by 3 matrix with the \emph{intercept}, the
-    \emph{station altitude} (metres above sea level) and the daily
-    \emph{PM10} concentration (micrograms per cubic metre). Rows are stacked
+    \emph{station altitude} (meters above sea level) and the daily
+    \emph{PM10} concentration (micrograms per cubic meter). Rows are stacked
     by station: the first 1826 rows refer to the first station, the rows from
     1827 to 3652 to the second one, and so on.}
   \item{z}{A 1826 by 36 matrix of daily \emph{PM2.5} concentrations
-    (micrograms per cubic metre), the response variable.}
+    (micrograms per cubic meter), the response variable.}
   \item{dates}{The 1826 dates, from 2019-01-01 to 2023-12-31.}
-  \item{altitude}{The altitude of the 36 stations, in metres.}
+  \item{altitude}{The altitude of the 36 stations, in meters.}
 }
 }
 \source{
@@ -44,7 +44,7 @@ The stations were selected from the European Environment Agency air quality
 database, restricted to the five regions of the Po basin (Lombardia,
 Piemonte, Veneto, Emilia-Romagna and Friuli-Venezia Giulia), and retained
 only when they covered the whole 2019-2023 window with at most 366 missing
-days on each pollutant and an altitude not exceeding 250 metres, so that the
+days on each pollutant and an altitude not exceeding 250 meters, so that the
 network describes the plain rather than the surrounding reliefs. Residual
 gaps and outliers were interpolated series by series, and the concentrations
 were rounded to the nearest integer and truncated at zero.

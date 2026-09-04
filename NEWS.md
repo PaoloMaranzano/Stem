@@ -13,17 +13,17 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   partitioned into `k` latent spatial regimes and a separate STEM model is
   estimated within each of them, so that regression coefficients, variance
   components and latent temporal dynamics are all cluster-specific. Labels and
-  parameters are estimated jointly by maximising a Potts-penalised
+  parameters are estimated jointly by maximizing a Potts-penalized
   log-likelihood.
 * `SCSTEM_Infocrit()` now fits a full `(k, phi)` grid and returns exact
   log-likelihoods, AIC, BIC and KIC, an admissibility flag, the cluster sizes
   and the estimated partitions. The pre-2.0.0 `mink`/`maxk` calling convention
   still works.
 * `SCSTEM_Select()` implements a two-step rule for choosing the
-  hyperparameters: **(S1)** the modal BIC-minimising `k` inside a
+  hyperparameters: **(S1)** the modal BIC-minimizing `k` inside a
   moderate-penalty band, ties resolved towards the smaller `k`; **(S2)** the
   smallest `phi` on the stability plateau of the Adjusted Rand Index between
-  neighbouring grid partitions. Only admissible configurations enter the rule,
+  neighboring grid partitions. Only admissible configurations enter the rule,
   and the pooled `k = 1` model is always retained as the reference.
 * `SCSTEM_Bootstrap()` is now a **refit-with-clustering** parametric bootstrap:
   data are generated cluster by cluster from the fitted model and the *entire*
@@ -46,8 +46,8 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   recomputed on the fly, so the sweep cannot decrease the objective and cannot
   cycle. The previous simultaneous update is still available via
   `label_update = "simultaneous"`.
-* The penalised objective
-  `Q = sum_i l_{i,k_i} + phi * c * #{concordant neighbour pairs}` is now
+* The penalized objective
+  `Q = sum_i l_{i,k_i} + phi * c * #{concordant neighbor pairs}` is now
   computed explicitly and traced along the iterations (`obj_trace`).
   Convergence is declared on label stability, on the improvement of `Q`, on
   cycle detection (the best visited partition is returned) or at `max_iter`.
@@ -63,11 +63,11 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   by a pass that exchanges the labels of two locations whenever this strictly
   increases `Q`. Swaps leave cluster sizes unchanged, so feasibility and
   monotonicity both hold. An exact pruning bound keeps the scan affordable.
-* The `knn` graph is **symmetrised**: the Potts penalty is defined on an
+* The `knn` graph is **symmetrized**: the Potts penalty is defined on an
   undirected graph, whereas `spdep::knearneigh()` returns an asymmetric one.
 * New `phi_scale` argument. Each location contributes `T` observations to the
   likelihood, so a penalty calibrated for cross-sectional models is not
-  transferable. The default `"auto"` normalises the penalty by the median spread
+  transferable. The default `"auto"` normalizes the penalty by the median spread
   of the location-wise log-likelihood contributions, making a grid
   `phi` in `[0, 2]` informative on any dataset; `"per-observation"` and `"raw"`
   are also available. The penalty actually applied is reported in
@@ -145,10 +145,10 @@ Further packaging work required before submission:
 * `pm10` moved from a 250 KB source file duplicated in `R/` and `data/` to a
   proper `data/pm10.rda` (25 KB), with `R/pm10.R` reduced to documentation;
 * the dependency on **SCDA**, which is not distributed on CRAN, has been
-  removed. The AMKM initialisation it provided is replaced by an internal
-  k-means initialisation on the PCA-compressed covariate means, with multiple
+  removed. The AMKM initialization it provided is replaced by an internal
+  k-means initialization on the PCA-compressed covariate means, with multiple
   restarts, a minimum-cluster-size filter and a repair step. Any external
-  initialisation, AMKM included, can still be supplied through the new
+  initialization, AMKM included, can still be supplied through the new
   `init_partition` argument;
 * `dplyr` and `sf` were likewise dropped, as nothing in the package needs them
   any more; every external call is written as `package::function()` and

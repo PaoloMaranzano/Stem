@@ -199,7 +199,7 @@ Gamma(h) = |                              gamma = sigma2eps / sigma2omega
 
     <p>Two things follow, and both are visible in the code.</p>
 
-    <p>First, <code>sigma2eps</code> is the <b>nugget</b> of the spatial process in the geostatistical sense. Second, the technical report notes that <em>&ldquo;for positive definiteness reasons, it is preferable to estimate <code>log(gamma)</code> instead of <code>sigma2eps</code>&rdquo;</em>, which is why the internal parametrisation carries <code>logb = log(gamma)</code> rather than the variance itself. The package applies the same reasoning to the range parameter and works with <code>logtheta = log(theta)</code>.</p>
+    <p>First, <code>sigma2eps</code> is the <b>nugget</b> of the spatial process in the geostatistical sense. Second, the technical report notes that <em>&ldquo;for positive definiteness reasons, it is preferable to estimate <code>log(gamma)</code> instead of <code>sigma2eps</code>&rdquo;</em>, which is why the internal parameterization carries <code>logb = log(gamma)</code> rather than the variance itself. The package applies the same reasoning to the range parameter and works with <code>logtheta = log(theta)</code>.</p>
 
     <div class="callout">
       <span class="tag">In the code</span>
@@ -232,7 +232,7 @@ Omega_t = K P_t^{t-1} K' + Sigma_e</div>
     <h2>The EM algorithm</h2>
     <p class="kicker">Equations (11)&ndash;(19)</p>
 
-    <p>Direct maximisation of (9) is awkward, so estimation goes through EM on the complete-data likelihood, treating the latent process as the missing data. The E-step assembles the objective from the Kalman smoother output <code>y_t^T</code>, <code>P_t^T</code> and <code>P_{t,t-1}^T</code>; the M-step maximises it in two blocks. Most parameters have closed forms; only the two spatial-covariance parameters need a numerical step.</p>
+    <p>Direct maximization of (9) is awkward, so estimation goes through EM on the complete-data likelihood, treating the latent process as the missing data. The E-step assembles the objective from the Kalman smoother output <code>y_t^T</code>, <code>P_t^T</code> and <code>P_{t,t-1}^T</code>; the M-step maximizes it in two blocks. Most parameters have closed forms; only the two spatial-covariance parameters need a numerical step.</p>
 
     <h3>Building blocks</h3>
 
@@ -253,7 +253,7 @@ S11 = SUM_t (y_t^T y_t^T'         + P_t^T)</div>
         <tbody>
           <tr>
             <td class="eqcol">(14)</td>
-            <td><code>beta = [SUM_t X_t' Sigma_e^-1 X_t]^-1 {SUM_t X_t' Sigma_e^-1 (Z_t - K y_t^T)}</code> &mdash; a generalised least squares step on the data net of the latent process.</td>
+            <td><code>beta = [SUM_t X_t' Sigma_e^-1 X_t]^-1 {SUM_t X_t' Sigma_e^-1 (Z_t - K y_t^T)}</code> &mdash; a generalized least squares step on the data net of the latent process.</td>
             <td><code>kalman</code>: <code>MM</code> is the left factor, <code>v</code> the right one, <code>beta_j</code> the solution.</td>
           </tr>
           <tr>
@@ -269,7 +269,7 @@ S11 = SUM_t (y_t^T y_t^T'         + P_t^T)</div>
           <tr>
             <td class="eqcol">(17)</td>
             <td><code>Sigma_eta = S11 - S10 S00^-1 S10'</code></td>
-            <td><code>Sigmaeta_j</code>. The <code>S</code> matrices in the code are unnormalised sums, and the division by the number of time points restores the identity.</td>
+            <td><code>Sigmaeta_j</code>. The <code>S</code> matrices in the code are unnormalized sums, and the division by the number of time points restores the identity.</td>
           </tr>
           <tr>
             <td class="eqcol">(18)</td>
@@ -282,7 +282,7 @@ S11 = SUM_t (y_t^T y_t^T'         + P_t^T)</div>
 
     <h3>The Newton-Raphson step</h3>
 
-    <p>No closed form exists for <code>{theta, sigma2eps}</code>, so they are obtained by minimising <code>Qtilde</code> numerically, holding the other parameters at their updated values:</p>
+    <p>No closed form exists for <code>{theta, sigma2eps}</code>, so they are obtained by minimizing <code>Qtilde</code> numerically, holding the other parameters at their updated values:</p>
 
     <div class="eq">Psi_(i+1) = Psi_(i) - H^-1 * Delta                               (19)</div>
 

@@ -175,7 +175,7 @@
     BB = sumMatrices(BB_list)
 
     D = solve(diag(regularization,nrow(cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)) %*% BB
-    #sigma2omega_j=tr(sigmaeinersa*W) in Fassò Cameletti 12
+    #sigma2omega_j=tr(sigmaeinersa*W) in Fasso Cameletti 12
     sigma2omega_j = sum(diag(D))/(n*d)
 
     #############################

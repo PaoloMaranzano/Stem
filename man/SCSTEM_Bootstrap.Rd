@@ -63,7 +63,7 @@ and Sugasawa (2026+) to the spatio-temporal setting:
     fitted model are both reproduced.
   \item Restore the original ordering of the locations, so that the simulated
     data are aligned with the rows of the spatial penalty graph and every
-    location keeps its own neighbours.
+    location keeps its own neighbors.
   \item Re-run \code{\link{SCSTEM_Estim}} on \eqn{z^{*(b)}} with the same
     \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
     estimates, the refit partition and the convergence diagnostics.
@@ -72,7 +72,7 @@ Because each bootstrap sample is generated cluster by cluster from the
 observed covariates and coordinates, the spatial structure of the original
 data is preserved: the fixed-effects surface inherits the contiguity of the
 estimated regimes while every location retains its position in the
-neighbourhood graph.
+neighborhood graph.
 
 \strong{Failed refits.} A bootstrap sample whose refit raises an error, or
 whose refit collapses a cluster, is recorded but excluded from the

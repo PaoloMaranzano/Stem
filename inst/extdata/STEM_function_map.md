@@ -61,7 +61,7 @@ STEM_Bootstrap.fn        -> STEM_Estimation
 
 SCSTEM_Estim             -> STEM_Model
 SCSTEM_Estim             -> STEM_Estimation
-SCSTEM_Estim             -> scstem_neighbours
+SCSTEM_Estim             -> scstem_neighbors
 SCSTEM_Estim             -> scstem_covariate_means
 SCSTEM_Estim             -> scstem_init
 SCSTEM_Estim             -> scstem_repair_partition
@@ -91,7 +91,7 @@ Three things are worth noticing.
 1. **The SC-STEM layer is a client of the STEM layer.** `SCSTEM_Estim()` does
    not reimplement the estimation: it builds one `STEM_Model` per regime and
    calls `STEM_Estimation()` on it. Anything that improves the engine improves
-   the clustered models for free — and, conversely, any fragility of the engine
+   the clustered models for free - and, conversely, any fragility of the engine
    is amplified, because the clustered algorithm fits the model on hundreds of
    different subsets of locations.
 

@@ -50,7 +50,7 @@ inside an EM algorithm, with $C_0$ held fixed.
 
 ## Data
 
-The package ships two datasets. `pm10` is the small example of Fassò and
+The package ships two datasets. `pm10` is the small example of Fasso and
 Cameletti: 22 stations and 366 days of log PM10, with emissions and altitude as
 covariates. `povalley` is a larger, real network of 36 background stations in
 the Po Valley observed daily over 2019--2023.
@@ -60,7 +60,7 @@ data(pm10)
 
 str(pm10, max.level = 1)
 
-coordinates <- pm10$coords * 1000   # from km to metres
+coordinates <- pm10$coords * 1000   # from km to meters
 covariates <- pm10$covariates
 z <- pm10$z
 
@@ -171,9 +171,9 @@ vignette("function-map", package = "Stem")
 
 ## References
 
-Fassò, A., Cameletti, M. and Nicolis, O. (2007). Air quality monitoring using
+Fasso, A., Cameletti, M. and Nicolis, O. (2007). Air quality monitoring using
 heterogeneous networks. *Environmetrics*, 18, 245--264.
 
-Fassò, A. and Cameletti, M. (2010). A unified statistical approach for
+Fasso, A. and Cameletti, M. (2010). A unified statistical approach for
 simulation, modeling, analysis and mapping of environmental data. *Simulation*,
 86, 139--153.

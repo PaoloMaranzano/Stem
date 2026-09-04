@@ -37,7 +37,7 @@ Description: Estimation of hierarchical spatio-temporal models through the
     bootstrap. The package also provides the spatially-clustered STEM (SC-STEM)
     models, an extension in which regression coefficients, variance components
     and latent dynamics vary across spatial regimes estimated from the data by
-    maximising a Potts-penalised likelihood, in the spirit of the
+    maximizing a Potts-penalized likelihood, in the spirit of the
     spatially-clustered regression of Sugasawa and Murakami (2021)
     <doi:10.1016/j.spasta.2021.100525> and of the spatially-clustered spatial
     autoregressive models of Cerqueti, Maranzano and Mattera (2025)
