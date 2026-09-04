@@ -1,0 +1,418 @@
+## Generates the conceptual map of the package, in both formats:
+##
+##   inst/extdata/STEM_function_map.svg   for the README and the vignette
+##   inst/extdata/STEM_function_map.pdf   for print and for slides
+##
+## Both come from the tables below, so the two files cannot drift apart. The
+## layout is deliberately explicit rather than computed by a graph-drawing
+## algorithm: the point of the map is the reading imposed on the package -- four
+## horizontal bands, from the data upwards to the spatially-clustered layer --
+## and an automatic layout would not reproduce it.
+##
+## The coordinate system is the SVG one throughout: 960 by 892 user units, y
+## growing downwards. The PDF device is opened so that one user unit is one
+## point, and the font sizes below are converted to cex, so that text has the
+## same size in both outputs.
+##
+## Run it from the root of the package:
+##
+##   Rscript inst/scripts/make-function-map.R
+##
+## The edge list is documented, function by function, in
+## inst/extdata/STEM_function_map.md, which is the place to look when adding a
+## function: update that file, then the tables here, then rerun the script.
+
+W   <- 960
+H   <- 892
+out <- file.path("inst", "extdata")
+
+## ---------------------------------------------------------------------------
+## Palette, shared by the two emitters
+## ---------------------------------------------------------------------------
+pal <- list(
+  paper     = "#ffffff",
+  band_fill = "#f4f6f8", band_line = "#dfe4ea", band_lab = "#8a939f",
+  exp_fill  = "#e8f2f6", exp_line  = "#1f6f8b",
+  int_fill  = "#ffffff", int_line  = "#b9c1cb",
+  dat_fill  = "#f5efe4", dat_line  = "#b08d47",
+  ink       = "#1b2430", ink_soft  = "#3d4753", note = "#6b7480",
+  edge      = "#5b6472", accent    = "#1f6f8b"
+)
+
+## ---------------------------------------------------------------------------
+## Bands: the four layers of the package
+## ---------------------------------------------------------------------------
+bands <- data.frame(
+  x     = c(24, 24, 24, 24),
+  y     = c(70, 180, 438, 574),
+  w     = rep(912, 4),
+  h     = c(92, 240, 118, 262),
+  label = c("DATA AND MODEL OBJECT",
+            "ESTIMATION ENGINE (EM + KALMAN)",
+            "SIMULATION, PREDICTION AND UNCERTAINTY",
+            "SPATIALLY-CLUSTERED STEM (SC-STEM)"),
+  stringsAsFactors = FALSE
+)
+
+## ---------------------------------------------------------------------------
+## Boxes: one row per node. `kind` drives the styling and says what the node is:
+## "exported" for the user-facing API, "internal" for the machinery, "dataset"
+## for the two shipped datasets.
+## ---------------------------------------------------------------------------
+box <- function(x, y, w, h, label, kind, size = NA) {
+  data.frame(x = x, y = y, w = w, h = h, label = label, kind = kind,
+             size = size, stringsAsFactors = FALSE)
+}
+
+boxes <- rbind(
+  ## band 1
+  box( 44, 100,  96, 34, "pm10",                          "dataset"),
+  box(152, 100, 104, 34, "povalley",                      "dataset"),
+  box(330, 100, 140, 34, "STEM_Model",                    "exported"),
+  box(530, 100, 130, 34, "STEM_Skeleton",                 "internal"),
+  box(686, 100, 130, 34, "STEM_Data",                     "internal"),
+  ## band 2
+  box( 44, 215, 150, 36, "STEM_Estimation",               "exported"),
+  box(250, 215, 110, 36, "kalman",                        "internal"),
+  box(420, 196, 112, 30, "filtering",                     "internal"),
+  box(570, 196, 112, 30, "filterstep",                    "internal"),
+  box(420, 238, 112, 30, "smoothing",                     "internal"),
+  box(570, 238, 150, 30, "smootherstep(.uni)",            "internal"),
+  box(250, 290, 200, 30, "Q_function_addendo1/2/3",       "internal"),
+  box(250, 330, 200, 30, "d1_Q, d2_Q, d12_Q",             "internal"),
+  box(250, 370, 200, 30, "B_function, cov_lagone",        "internal"),
+  box(480, 330, 250, 30, "d1/d2_Sigmastar_logb.exp",      "internal"),
+  box(480, 370, 250, 30, "d1/d2_Sigmastar_logtheta.exp",  "internal"),
+  box(760, 290, 160, 30, "Sigmastar.exp",                 "internal"),
+  box(760, 330, 160, 30, "sumMatrices",                   "internal"),
+  box(760, 370, 160, 30, "changedimension_covariates",    "internal", 9.5),
+  ## band 3
+  box( 44, 472, 150, 34, "STEM_Simulation",               "exported"),
+  box(230, 472, 140, 34, "STEM_Kriging",                  "exported"),
+  box(230, 515, 140, 30, "spatial.pred",                  "internal"),
+  box(420, 472, 150, 34, "STEM_Bootstrap",                "exported"),
+  box(420, 515, 150, 30, "STEM_Bootstrap.fn",             "internal"),
+  ## band 4
+  box( 44, 612, 160, 38, "SCSTEM_Estim",                  "exported"),
+  box( 44, 676, 160, 34, "SCSTEM_Infocrit",               "exported"),
+  box( 44, 732, 160, 34, "SCSTEM_Select",                 "exported"),
+  box( 44, 788, 160, 34, "SCSTEM_Bootstrap",              "exported", 11.5),
+  box(250, 788, 185, 34, "SCSTEM_BootInference",          "exported", 11.5),
+  box(250, 606, 200, 28, "scstem_neighbors",              "internal"),
+  box(250, 640, 200, 28, "scstem_init / _repair_partition",   "internal", 10.5),
+  box(470, 606, 200, 28, "scstem_loglike_i",              "internal"),
+  box(470, 640, 200, 28, "scstem_swap_pass",              "internal"),
+  box(690, 606, 200, 28, "scstem_potts_pairs / _pen_local",   "internal", 10.5),
+  box(690, 640, 200, 28, "scstem_npar / _covariate_means",    "internal", 10.5),
+  box(470, 700, 200, 28, "scstem_ari",                    "internal"),
+  box(690, 700, 200, 28, "scstem_align_labels",           "internal")
+)
+
+## ---------------------------------------------------------------------------
+## Edges. A straight edge is given by its two endpoints; a curved one by the
+## four control points of a cubic Bezier, in the order start, c1, c2, end.
+## `accent` marks the spine of the package -- the calls that carry the actual
+## estimation -- and `dashed` the two indirect calls, which a static scan of the
+## sources cannot see because they go through lapply() and do.call().
+## ---------------------------------------------------------------------------
+seg <- function(x1, y1, x2, y2, accent = FALSE, dashed = FALSE) {
+  list(type = "L", pts = c(x1, y1, x2, y2), accent = accent, dashed = dashed)
+}
+cur <- function(x1, y1, cx1, cy1, cx2, cy2, x2, y2,
+                accent = FALSE, dashed = FALSE) {
+  list(type = "C", pts = c(x1, y1, cx1, cy1, cx2, cy2, x2, y2),
+       accent = accent, dashed = dashed)
+}
+
+edges <- list(
+  ## band 1
+  seg(256, 117, 324, 117),
+  seg(470, 117, 524, 117),
+  seg(660, 117, 680, 117),
+  ## band 2
+  seg(194, 233, 244, 233, accent = TRUE),
+  seg(360, 226, 414, 213),
+  seg(532, 211, 564, 211),
+  seg(360, 240, 414, 253),
+  seg(532, 253, 564, 253),
+  seg(305, 251, 305, 284),
+  seg(305, 320, 305, 324),
+  seg(305, 360, 305, 364),
+  seg(450, 345, 474, 345),
+  seg(450, 385, 474, 385),
+  seg(730, 345, 754, 345),
+  ## band 3
+  seg(300, 506, 300, 509),
+  seg(495, 506, 495, 509),
+  seg(419, 530, 200, 500, dashed = TRUE),
+  seg(445, 515, 160, 258, dashed = TRUE),
+  ## band 4: the pipeline
+  seg(124, 710, 124, 726, accent = TRUE),
+  seg(124, 766, 124, 782, accent = TRUE),
+  seg(204, 805, 244, 805, accent = TRUE),
+  seg(124, 676, 124, 656, accent = TRUE),
+  cur( 30, 693,  14, 693,  14, 631,  38, 631, accent = TRUE),
+  ## band 4: the helpers
+  seg(204, 626, 244, 620),
+  seg(204, 636, 244, 650),
+  cur(204, 748, 380, 748, 400, 726, 464, 716),
+  cur(435, 800, 560, 800, 640, 746, 700, 728),
+  ## across the bands
+  cur( 60, 612,  40, 560,  40, 300, 110, 254, accent = TRUE),
+  cur(124, 788, 124, 770, 130, 560, 119, 512, dashed = TRUE)
+)
+
+## ---------------------------------------------------------------------------
+## Free text
+## ---------------------------------------------------------------------------
+titles <- list(
+  list(x = 24, y = 30, size = 17, bold = TRUE,  col = pal$ink,
+       text = "Stem: how the functions fit together"),
+  list(x = 24, y = 50, size = 11, bold = FALSE, col = pal$note,
+       text = "Blue boxes are exported; white boxes are internal. Arrows point from caller to callee.")
+)
+
+footnotes <- list(
+  list(x = 24, y = 856, text = "SCSTEM_Bootstrap regenerates the data regime by regime and re-runs"),
+  list(x = 24, y = 872, text = "the whole SC-STEM procedure, clustering included, on every draw.")
+)
+
+## Labels set along a vertical edge, rotated a quarter turn counterclockwise.
+rotated <- list(
+  list(x =  8, y = 662, text = "grid"),
+  list(x = 26, y = 470, text = "one STEM fit per regime")
+)
+
+style_of <- function(kind) {
+  switch(kind,
+         exported = list(fill = pal$exp_fill, line = pal$exp_line, lwd = 1.6,
+                         col = pal$ink,      size = 12.5, bold = TRUE),
+         dataset  = list(fill = pal$dat_fill, line = pal$dat_line, lwd = 1.4,
+                         col = pal$ink,      size = 12.5, bold = TRUE),
+         list(fill = pal$int_fill, line = pal$int_line, lwd = 1.1,
+              col = pal$ink_soft, size = 11.5, bold = FALSE))
+}
+
+## ---------------------------------------------------------------------------
+## Bezier sampling, shared by the two emitters: the PDF device draws polylines,
+## and the arrowhead needs the direction of the final segment in both formats.
+## ---------------------------------------------------------------------------
+bezier_pts <- function(p, n = 60) {
+  tt <- seq(0, 1, length.out = n)
+  b0 <- (1 - tt)^3; b1 <- 3 * (1 - tt)^2 * tt
+  b2 <- 3 * (1 - tt) * tt^2; b3 <- tt^3
+  cbind(x = b0 * p[1] + b1 * p[3] + b2 * p[5] + b3 * p[7],
+        y = b0 * p[2] + b1 * p[4] + b2 * p[6] + b3 * p[8])
+}
+
+edge_path <- function(e, n = 60) {
+  if (e$type == "L") {
+    cbind(x = e$pts[c(1, 3)], y = e$pts[c(2, 4)])
+  } else {
+    bezier_pts(e$pts, n)
+  }
+}
+
+## ---------------------------------------------------------------------------
+## SVG emitter
+## ---------------------------------------------------------------------------
+emit_svg <- function(path) {
+  esc <- function(s) {
+    s <- gsub("&", "&amp;", s, fixed = TRUE)
+    s <- gsub("<", "&lt;",  s, fixed = TRUE)
+    gsub(">", "&gt;", s, fixed = TRUE)
+  }
+  L <- character(0)
+  add <- function(...) L <<- c(L, paste0(...))
+
+  add('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ', W, ' ', H,
+      '" font-family="ui-sans-serif, system-ui, -apple-system, ',
+      "'Segoe UI', Helvetica, Arial, sans-serif\">")
+  add('  <!-- Generated by inst/scripts/make-function-map.R. Do not edit by hand. -->')
+  add('  <defs>')
+  for (m in c("arrow", "arrowAccent")) {
+    fill <- if (m == "arrow") pal$edge else pal$accent
+    add('    <marker id="', m, '" viewBox="0 0 10 10" refX="9.5" refY="5" ',
+        'markerWidth="7" markerHeight="7" orient="auto-start-reverse">')
+    add('      <path d="M 0 0 L 10 5 L 0 10 z" fill="', fill, '"/>')
+    add('    </marker>')
+  }
+  add('    <style>')
+  add('      .band     { fill:', pal$band_fill, '; stroke:', pal$band_line, '; stroke-width:1; rx:10; }')
+  add('      .bandlab  { font-size:12px; font-weight:600; fill:', pal$band_lab, '; letter-spacing:.08em; }')
+  add('      .exported { fill:', pal$exp_fill, '; stroke:', pal$exp_line, '; stroke-width:1.6; rx:7; }')
+  add('      .internal { fill:', pal$int_fill, '; stroke:', pal$int_line, '; stroke-width:1.1; rx:6; }')
+  add('      .dataset  { fill:', pal$dat_fill, '; stroke:', pal$dat_line, '; stroke-width:1.4; rx:7; }')
+  add('      .edge     { stroke:', pal$edge, '; stroke-width:1.3; fill:none; marker-end:url(#arrow); }')
+  add('      .edgeA    { stroke:', pal$accent, '; stroke-width:1.8; fill:none; marker-end:url(#arrowAccent); }')
+  add('      .note     { font-size:11px; fill:', pal$note, '; }')
+  add('    </style>')
+  add('  </defs>')
+  add('')
+  add('  <rect width="', W, '" height="', H, '" fill="', pal$paper, '"/>')
+  add('')
+
+  for (t in titles) {
+    add('  <text x="', t$x, '" y="', t$y, '" font-size="', t$size, '"',
+        if (t$bold) ' font-weight="700"' else '',
+        ' fill="', t$col, '">', esc(t$text), '</text>')
+  }
+  add('')
+
+  for (i in seq_len(nrow(bands))) {
+    b <- bands[i, ]
+    add('  <rect class="band" x="', b$x, '" y="', b$y, '" width="', b$w,
+        '" height="', b$h, '"/>')
+    add('  <text x="', b$x + 12, '" y="', b$y + 20, '" class="bandlab">',
+        esc(b$label), '</text>')
+  }
+  add('')
+
+  for (i in seq_len(nrow(boxes))) {
+    b  <- boxes[i, ]
+    st <- style_of(b$kind)
+    sz <- if (is.na(b$size)) st$size else b$size
+    add('  <rect class="', b$kind, '" x="', b$x, '" y="', b$y, '" width="',
+        b$w, '" height="', b$h, '"/>')
+    add('  <text x="', round(b$x + b$w / 2, 2), '" y="',
+        round(b$y + b$h / 2 + sz / 3, 2),
+        '" text-anchor="middle" font-size="', sz, '"',
+        if (st$bold) ' font-weight="600"' else '',
+        ' fill="', st$col, '">', esc(b$label), '</text>')
+  }
+  add('')
+
+  for (e in edges) {
+    cls <- if (e$accent) "edgeA" else "edge"
+    d <- if (e$type == "L") {
+      paste("M", e$pts[1], e$pts[2], "L", e$pts[3], e$pts[4])
+    } else {
+      paste("M", e$pts[1], e$pts[2], "C", e$pts[3], e$pts[4],
+            e$pts[5], e$pts[6], e$pts[7], e$pts[8])
+    }
+    add('  <path class="', cls, '" d="', d, '"',
+        if (e$dashed) ' stroke-dasharray="4 3"' else '', '/>')
+  }
+  add('')
+
+  for (r in rotated) {
+    add('  <text x="', r$x, '" y="', r$y, '" class="note" transform="rotate(-90 ',
+        r$x, ' ', r$y, ')">', esc(r$text), '</text>')
+  }
+  for (f in footnotes) {
+    add('  <text x="', f$x, '" y="', f$y, '" class="note">', esc(f$text), '</text>')
+  }
+  add('</svg>')
+
+  writeLines(L, path, useBytes = TRUE)
+  path
+}
+
+## ---------------------------------------------------------------------------
+## PDF emitter. The device is opened at 1 user unit = 1 point, so the font
+## sizes and stroke widths carry over from the SVG unchanged.
+## ---------------------------------------------------------------------------
+roundrect <- function(x, y, w, h, r, fill, line, lwd) {
+  r <- min(r, w / 2, h / 2)
+  ## The outline is built corner by corner. Because y grows downwards, an
+  ## increasing angle runs clockwise on screen -- right, then down, then left,
+  ## then up -- so each corner sweeps a quarter turn forwards from `from`.
+  co <- function(cx, cy, from) {
+    a <- seq(from, from + pi / 2, length.out = 12)
+    cbind(cx + r * cos(a), cy + r * sin(a))
+  }
+  p <- rbind(co(x + w - r, y + r,     -pi / 2),     # top-right corner
+             co(x + w - r, y + h - r,  0),          # bottom-right
+             co(x + r,     y + h - r,  pi / 2),     # bottom-left
+             co(x + r,     y + r,      pi))         # top-left
+  graphics::polygon(p[, 1], p[, 2], col = fill, border = line, lwd = lwd)
+}
+
+arrowhead <- function(x1, y1, x2, y2, col, size = 7) {
+  ang <- atan2(y2 - y1, x2 - x1)
+  wing <- 0.42
+  px <- c(x2,
+          x2 - size * cos(ang - wing),
+          x2 - size * cos(ang + wing))
+  py <- c(y2,
+          y2 - size * sin(ang - wing),
+          y2 - size * sin(ang + wing))
+  graphics::polygon(px, py, col = col, border = NA)
+}
+
+emit_pdf <- function(path) {
+  grDevices::pdf(path, width = W / 72, height = H / 72, pointsize = 12,
+                 bg = pal$paper)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i", family = "sans")
+  graphics::plot.new()
+  graphics::plot.window(xlim = c(0, W), ylim = c(H, 0))
+
+  ## The device is opened at its default 12 point size, so a font size given in
+  ## SVG user units becomes the cex that reproduces it; and lwd is measured in
+  ## 1/96 inch against the device's 1/72, hence the 96/72 factor.
+  cx0 <- function(size) size / 12
+  lw  <- function(x) x * 96 / 72
+
+  for (t in titles) {
+    graphics::text(t$x, t$y, t$text, adj = c(0, 0.5), cex = cx0(t$size),
+                   col = t$col, font = if (t$bold) 2 else 1)
+  }
+
+  for (i in seq_len(nrow(bands))) {
+    b <- bands[i, ]
+    roundrect(b$x, b$y, b$w, b$h, 10, pal$band_fill, pal$band_line, lw(1))
+    graphics::text(b$x + 12, b$y + 20, b$label, adj = c(0, 0.5),
+                   cex = cx0(12), col = pal$band_lab, font = 2)
+  }
+
+  for (i in seq_len(nrow(boxes))) {
+    b  <- boxes[i, ]
+    st <- style_of(b$kind)
+    sz <- if (is.na(b$size)) st$size else b$size
+    roundrect(b$x, b$y, b$w, b$h, 7, st$fill, st$line, lw(st$lwd))
+    ## shrink the label if the box is too narrow for it, which keeps the PDF
+    ## faithful to the SVG, where the browser would simply let it overflow
+    cx <- cx0(sz)
+    repeat {
+      tw <- graphics::strwidth(b$label, cex = cx, font = if (st$bold) 2 else 1)
+      if (tw <= b$w - 10 || cx < cx0(5)) break
+      cx <- cx * 0.96
+    }
+    graphics::text(b$x + b$w / 2, b$y + b$h / 2, b$label, adj = c(0.5, 0.5),
+                   cex = cx, col = st$col, font = if (st$bold) 2 else 1)
+  }
+
+  for (e in edges) {
+    col <- if (e$accent) pal$accent else pal$edge
+    wd  <- if (e$accent) lw(1.8) else lw(1.3)
+    p   <- edge_path(e)
+    n   <- nrow(p)
+    graphics::lines(p[, 1], p[, 2], col = col, lwd = wd,
+                    lty = if (e$dashed) "42" else "solid")
+    arrowhead(p[n - 1, 1], p[n - 1, 2], p[n, 1], p[n, 2], col)
+  }
+
+  for (r in rotated) {
+    graphics::text(r$x, r$y, r$text, adj = c(0, 0.5), srt = 90,
+                   cex = cx0(11), col = pal$note)
+  }
+  for (f in footnotes) {
+    graphics::text(f$x, f$y, f$text, adj = c(0, 0.5), cex = cx0(11), col = pal$note)
+  }
+  invisible(path)
+}
+
+## ---------------------------------------------------------------------------
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+svg_path <- emit_svg(file.path(out, "STEM_function_map.svg"))
+pdf_path <- emit_pdf(file.path(out, "STEM_function_map.pdf"))
+
+## The vignette carries its own copy of the SVG, so that it renders on a
+## machine where the package is not installed.
+if (dir.exists("vignettes")) {
+  invisible(file.copy(svg_path, file.path("vignettes", "function-map.svg"), overwrite = TRUE))
+}
+
+cat("wrote ", svg_path, "\n", "wrote ", pdf_path, "\n",
+    nrow(boxes), " boxes, ", length(edges), " edges\n", sep = "")

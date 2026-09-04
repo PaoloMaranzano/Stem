@@ -258,6 +258,31 @@ pseudo-likelihood used to rank clusters during the assignment step. The
 number of free parameters is \eqn{k_{eff} (r + 3 + 3p)} for a diagonal
 specification with \eqn{r} covariates and latent dimension \eqn{p}, where
 \eqn{k_{eff}} counts the clusters that could actually be re-estimated.
+
+\strong{Statistical features and scope.} The assumptions are inherited from
+the STEM model and determine which datasets the family applies to. The
+response is \emph{Gaussian} and \emph{univariate}: \code{z} is a \eqn{T} by
+\eqn{d} matrix of one variable measured at \eqn{d} sites, so several
+pollutants modeled jointly is a different specification. What is multivariate
+is the \emph{latent state}, of dimension \eqn{p \ge 1}, loaded onto the
+locations by the known matrix \eqn{K}, which is not estimated and is common
+across regimes. The latent dynamics is a VAR(1), with \eqn{G} and
+\eqn{\Sigma_\eta} diagonal by default; \eqn{m_0} is estimated and \eqn{C_0}
+is held fixed. The spatial correlation function is exponential, hence
+isotropic and stationary \emph{within} a regime, the partition itself being
+the only source of non-stationarity across the domain. Locations are
+point-referenced and fixed over time, and the time index is discrete and
+regularly spaced.
+
+\strong{Missing values are not supported}, neither in the response nor in
+the covariates or the coordinates: \code{\link{STEM_Model}} rejects them, so
+the panel must be balanced and complete. This is a restriction of the
+implementation rather than of the model. For the response the standard
+state-space treatment would apply directly -- at a time point where only some
+locations are observed, the Kalman update runs on the corresponding rows of
+the measurement equation -- whereas gaps in the covariates would require a
+stochastic E-step, since the design matrix enters the closed-form M-step
+updates. Until then, impute before fitting.
 }
 \examples{
 # Daily PM2.5 at 36 background stations of the Po Valley. The first 180

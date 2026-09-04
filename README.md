@@ -117,6 +117,39 @@ large $\phi$ gives contiguous and rigid regimes. Setting $k = 1$ returns the
 pooled model, which stays available as the reference against which any clustered
 fit must justify itself.
 
+### Statistical features and scope
+
+What the model class covers, and what it does not. Every entry below reflects
+the current implementation, not the model on paper.
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Distribution of the response | Gaussian only | The EM closed forms and the Kalman recursions both rely on normality. Non-Gaussian responses have to be transformed first. |
+| Response dimension | univariate | `z` is a $T \times d$ matrix of **one** variable measured at $d$ sites. Several pollutants modeled jointly is a different specification. |
+| Latent state | multivariate | $p \ge 1$ latent processes, default $p = 1$. This is what is multivariate in the model. |
+| Loading matrix `K` | known, user-supplied | $d \times p$, not estimated, and common across regimes in SC-STEM. |
+| Latent dynamics | VAR(1) | `G` and `Sigmaeta` are diagonal by default; both can be made full via `flag.Gdiag` and `flag.Sigmaetadiag`. |
+| Initial condition | `m0` estimated, `C0` fixed | |
+| Spatial covariance | exponential only | $\sigma^2_\epsilon I + \sigma^2_\omega \exp(-\theta h)$: isotropic and stationary *within* a regime. Only this function has the analytical derivatives the Newton-Raphson step needs. |
+| Non-stationarity in space | across regimes only | Each regime carries its own $\theta_k$, $\sigma^2_{\epsilon k}$, $\sigma^2_{\omega k}$, so the partition is itself a coarse form of non-stationarity. |
+| Spatial support | point-referenced | Distances `"euclidean"` or `"geo"`. Areal data only through centroids, and only when the units are small relative to the distances between them. |
+| Time | discrete, regularly spaced | The state equation links consecutive time points; irregular spacing would need a continuous-time formulation. |
+| Panel | balanced and complete | Every location observed at every time point. |
+| **Missing values in `z`** | **not supported** | `STEM_Model()` rejects them. See the note below. |
+| **Missing values in covariates or coordinates** | **not supported** | Same. Impute before fitting. |
+| Network composition | fixed over time | Stations entering or leaving the window have to be dropped. |
+| Regime sizes (SC-STEM only) | bounded below | Each regime needs enough locations for its own fit, which caps the number of regimes that can be entertained on a given network. |
+
+> **On missing values.** This is a restriction of the implementation, not of the
+> model, and the two cases are not equally hard. For the *response* the standard
+> state-space treatment applies directly: at a time point where only some
+> locations are observed, the Kalman update runs on the corresponding rows of
+> the measurement equation and the smoother returns the conditional moments
+> given whatever was observed. For the *covariates* the design matrix enters the
+> closed-form M-step updates, so gaps there would require a genuinely stochastic
+> E-step. Supporting missing responses is the most useful extension we can
+> identify, and it is on the roadmap.
+
 ## Installation
 
 ```r

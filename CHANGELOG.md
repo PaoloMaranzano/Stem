@@ -18,6 +18,40 @@ between the reference papers and the code, see
 
 ### 2026-09-04
 
+**The conceptual map is now generated, in both formats.**
+`inst/scripts/make-function-map.R` holds the map as tables of nodes and edges
+and emits both `inst/extdata/STEM_function_map.svg` and the new
+`inst/extdata/STEM_function_map.pdf`, so the two cannot drift apart. It ships
+with the package, so a user can rerun it. The layout stays explicit rather than
+computed by a graph-drawing algorithm, because the point of the map is the
+reading imposed on the package - four bands, from the data up to the clustered
+layer - which an automatic layout would not reproduce.
+
+`STEM_function_map_original.pdf` has been removed. It was the map of version
+1.0: dot-separated names (`Stem.Model`, `Stem.Estimation`) that no longer exist,
+and no SC-STEM layer at all. It documented a package that is not this one.
+
+The regeneration also caught a name the diagram had missed: it still said
+`scstem_neighbours`, whereas the function was renamed `scstem_neighbors` in the
+American-English pass.
+
+**Documented the statistical features and the scope of the model.**
+A new section of the README, and a matching block in `?SCSTEM_Estim`, state what
+the family covers and what it does not: Gaussian response only; univariate
+response, with the multivariate part being the latent state; exponential spatial
+covariance, hence isotropic and stationary within a regime, the partition being
+the only source of non-stationarity across the domain; point-referenced
+locations, fixed over time; a discrete and regularly spaced time index; a known
+loading matrix, common across regimes; `C0` fixed while `m0` is estimated.
+
+The entry that matters most is that **missing values are not supported**, in the
+response no more than in the covariates or the coordinates: `STEM_Model()`
+rejects them and the Kalman recursion has no partial-observation branch. This is
+a restriction of the implementation, not of the model, and the two cases are not
+equally hard: for the response the standard state-space treatment applies
+directly, whereas gaps in the covariates would require a stochastic E-step,
+since the design matrix enters the closed-form M-step updates.
+
 **Package logo.**
 The hexagon now carries the three ideas the package is about: a relief
 silhouette for space, a node-and-edge network split by color into two regimes,

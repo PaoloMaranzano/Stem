@@ -28,7 +28,7 @@
 #'
 #' \strong{Caveats.} Two warnings apply to any likelihood-based comparison in
 #' this setting. First, the partition is itself optimized on the data, so the
-#' maximized likelihood retains an optimizm bias that a parameter count of the
+#' maximized likelihood retains an optimism bias that a parameter count of the
 #' form \eqn{k(r + 3 + 3p)} does not fully correct; in-sample criteria therefore
 #' tend to favor small \eqn{\phi} and large \eqn{k}. Second, the cluster-wise
 #' variance components shrink as the assignment step pursues within-cluster
