@@ -175,3 +175,51 @@ test_that("SC-STEM estimation tolerates gaps in the response", {
   expect_length(fit$group, s$d)
   expect_true(all(fit$group %in% 1:2))
 })
+
+test_that("STEM_Fitted reproduces the observations and predicts the blanks", {
+  s <- po_subset(Tn = 40L, d = 8L)
+
+  set.seed(77)
+  cells <- sample(length(s$z), 25)
+  truth <- s$z[cells]
+  z_na <- s$z; z_na[cells] <- NA
+
+  mod <- STEM_Model(z = z_na, covariates = s$covariates,
+                    coordinates = s$coordinates,
+                    phi = po_phi(), K = matrix(1, s$d, 1))
+  fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
+  zhat <- STEM_Fitted(fit)
+
+  expect_equal(dim(zhat), dim(s$z))
+  ### wherever the response was observed the completion returns it unchanged
+  obs <- !is.na(z_na)
+  expect_equal(zhat[obs], z_na[obs])
+  ### and the blanks are filled with finite predictions
+  expect_true(all(is.finite(zhat[cells])))
+  ### which beat the station means, the natural naive alternative
+  naive <- matrix(colMeans(z_na, na.rm = TRUE), nrow(z_na), ncol(z_na),
+                  byrow = TRUE)[cells]
+  expect_lt(sqrt(mean((zhat[cells] - truth)^2)),
+            sqrt(mean((naive - truth)^2)))
+})
+
+test_that("a fully missing time point falls back on the signal", {
+  s <- po_subset(Tn = 40L, d = 8L)
+  z_na <- s$z
+  z_na[11, ] <- NA
+
+  mod <- STEM_Model(z = z_na, covariates = s$covariates,
+                    coordinates = s$coordinates,
+                    phi = po_phi(), K = matrix(1, s$d, 1))
+  fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
+  zhat <- STEM_Fitted(fit)
+
+  ### with nothing observed there is no spatial correction, so the prediction
+  ### is exactly the signal x'beta + K yhat
+  XX <- Stem:::changedimension_covariates(s$covariates, s$d, ncol(s$covariates),
+                                          nrow(z_na))
+  b <- matrix(as.numeric(fit$estimates$phi.hat$beta), ncol = 1)
+  ysm <- as.numeric(fit$estimates$y.smoothed)
+  signal <- as.numeric(XX[, , 11] %*% b) + ysm[11]
+  expect_equal(as.numeric(zhat[11, ]), signal)
+})

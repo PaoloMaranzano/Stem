@@ -23,8 +23,8 @@ suppressMessages(pkgload::load_all(
 CACHE   <- file.path("dev", "paper", "cache")
 FIGDIR  <- "C:/Users/paulm/Dropbox/Applicazioni/Overleaf/SC-STEM package paper/Figures"
 K_GRID  <- 1:4
-PHI_GRID <- c(0, 0.25, 0.5, 0.75, 1)
-BAND    <- c(0.25, 1)          # the moderate-penalty band of the tuning rule
+PHI_GRID <- c(0, 0.25, 0.5, 0.75, 1, 1.5, 2)
+BAND    <- c(0.25, 2)          # the moderate-penalty band of the tuning rule
 KNN     <- 5
 B_BOOT  <- 200
 SEED    <- 20260904
