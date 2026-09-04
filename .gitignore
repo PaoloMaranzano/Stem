@@ -15,3 +15,6 @@ desktop.ini
 /doc/
 /Meta/
 inst/doc/
+
+# Cached results of the paper scripts: large, regenerable, and not part of the package
+dev/paper/cache/
