@@ -20,9 +20,10 @@ Authors@R:
     )
 Description: Estimation of hierarchical spatio-temporal models through the
     Expectation-Maximization (EM) algorithm within a likelihood-based
-    framework, following Fasso, Cameletti and Nicolis (2007)
-    <doi:10.1002/env.837> and Fasso and Cameletti (2010)
-    <doi:10.1177/0037549709102150>, with the EM machinery of McLachlan and
+    framework, following Fasso and Cameletti (2010)
+    <doi:10.1177/0037549709102150> and the heterogeneous-network model of
+    Fasso, Cameletti and Nicolis (2007) <doi:10.1002/env.837>, with the EM
+    machinery of McLachlan and
     Krishnan (2008, ISBN:9780470191613). Parameters are estimated by maximum
     likelihood via Kalman filtering and smoothing; standard errors and spatial
     prediction uncertainty are obtained by a spatio-temporal parametric

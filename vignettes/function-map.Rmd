@@ -124,3 +124,15 @@ which package functions each function calls; it is stored, in text form, in
 ```{r edges, eval = FALSE}
 system.file("extdata", "STEM_function_map.md", package = "Stem")
 ```
+
+## Is the implementation faithful to the papers?
+
+The estimation code has been checked equation by equation against the three
+companion works of Fassò and Cameletti that define the STEM model — the
+heterogeneous-network paper of 2007, the technical report that introduced this
+package, and the 2010 synthesis whose Equations (12)–(21) the code implements.
+The result, including the one defect the check turned up, is documented in:
+
+```{r verification, eval = FALSE}
+browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))
+```

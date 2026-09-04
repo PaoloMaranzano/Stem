@@ -132,25 +132,67 @@ vignette("SCSTEM", package = "Stem")          # spatially-clustered STEM
 vignette("function-map", package = "Stem")    # map of the package
 ```
 
-## References
+The implementation has been checked equation by equation against the three
+reference papers. That verification ships with the package as a standalone
+document:
 
-Besag, J. (1986). On the statistical analysis of dirty pictures. *JRSS-B*, 48,
-259–302.
+```r
+browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))
+```
 
-Cerqueti, R., Maranzano, P. and Mattera, R. (2025). Spatially-clustered spatial
-autoregressive models with application to agricultural market concentration in
-Europe. *JABES*. <https://doi.org/10.1007/s13253-025-00685-7>
+## Theoretical references
 
-Fassò, A., Cameletti, M. and Nicolis, O. (2007). Air quality monitoring using
-heterogeneous networks. *Environmetrics*, 18, 245–264.
+The STEM model implemented here comes from three companion works by Fassò and
+Cameletti, which play different roles.
+
+**Fassò, A., Cameletti, M. and Nicolis, O. (2007).** Air quality monitoring
+using heterogeneous networks. *Environmetrics*, 18, 245–264.
 <https://doi.org/10.1002/env.837>
+> Introduces the *geostatistical dynamical calibration* (GDC) model, the most
+> general of the three: it adds instrument calibration components — an additive
+> bias `A(t)` and a multiplicative bias `B(t)` — so that a network of
+> heterogeneous instruments (gravimetric and TEOM monitors) can be modelled
+> jointly, with the loading matrix obtained by empirical orthogonal functions.
+> The model estimated by this package is the special case with no calibration
+> bias.
 
-Fassò, A. and Cameletti, M. (2010). A unified statistical approach for
+**Fassò, A. and Cameletti, M. (2007).** A general spatio-temporal model for
+environmental data. *GRASPA Technical Report* n. 27.
+> The direct theoretical reference for this package, which it announces by name.
+> It states the three-stage hierarchy, the scaled spatial covariance
+> `Gamma(h) = 1 + gamma` at `h = 0` and `C_theta(h)` otherwise with
+> `gamma = sigma2eps/sigma2omega`, the choice of estimating `log(gamma)` rather
+> than `sigma2eps` for positive-definiteness, the EM algorithm with closed-form
+> M-steps for `beta`, `sigma2omega`, `G`, `Sigma_eta` and `m0` and
+> Newton-Raphson for the spatial covariance parameters, and the spatio-temporal
+> parametric bootstrap.
+
+**Fassò, A. and Cameletti, M. (2010).** A unified statistical approach for
 simulation, modeling, analysis and mapping of environmental data. *Simulation*,
 86, 139–153. <https://doi.org/10.1177/0037549709102150>
+> The most complete published statement: the same model and EM algorithm, plus
+> the kriging predictor used by `STEM_Kriging()`, the bootstrap of
+> `STEM_Bootstrap()`, and a sensitivity analysis of the model components. Its
+> Equations (12)–(18) are what the estimation code implements.
 
-Sugasawa, S. and Murakami, D. (2021). Spatially clustered regression. *Spatial
-Statistics*, 44, 100525. <https://doi.org/10.1016/j.spasta.2021.100525>
+The spatially-clustered layer adapts algorithmic devices from a separate
+literature; the statistical model remains the STEM one above.
+
+**Besag, J. (1986).** On the statistical analysis of dirty pictures.
+*JRSS-B*, 48, 259–302.
+> The Iterated Conditional Modes algorithm used for the label update.
+
+**Sugasawa, S. and Murakami, D. (2021).** Spatially clustered regression.
+*Spatial Statistics*, 44, 100525.
+<https://doi.org/10.1016/j.spasta.2021.100525>
+> The Potts-type spatial penalty on the partition.
+
+**Cerqueti, R., Maranzano, P. and Mattera, R. (2025).** Spatially-clustered
+spatial autoregressive models with application to agricultural market
+concentration in Europe. *JABES*.
+<https://doi.org/10.1007/s13253-025-00685-7>
+> The same penalty carried over to spatial econometric models, and the
+> hyperparameter-selection practice this package follows.
 
 ## Authors
 

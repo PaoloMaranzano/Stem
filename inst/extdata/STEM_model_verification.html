@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stem: model verification against the reference papers</title>
+<style>
+  /* Self-contained: no external fonts or stylesheets, so the document renders
+     identically offline and inside R help browsers. */
+  :root {
+    --ground:#f6f7f8; --surface:#fff; --surface-2:#eef1f3;
+    --line:#dde3e7; --line-soft:#e9edf0;
+    --ink:#16212b; --ink-2:#3c4c59; --ink-3:#6b7a86;
+    --accent:#1f6f8b; --accent-soft:#e3eef2; --accent-line:#a9cbd7;
+    --amber:#9a5f18; --amber-soft:#f6ecdd;
+    --green:#37704c; --green-soft:#e4efe7;
+    --rose:#97364a; --rose-soft:#f6e4e7;
+    --serif: Georgia, "Times New Roman", "Nimbus Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+    --measure: 70ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#12181d; --surface:#182027; --surface-2:#1e282f;
+      --line:#2b3841; --line-soft:#232e36;
+      --ink:#e7edf1; --ink-2:#b6c3cc; --ink-3:#86949e;
+      --accent:#6fb6cf; --accent-soft:#17323d; --accent-line:#2f5c6c;
+      --amber:#d69a54; --amber-soft:#33281a;
+      --green:#82bd97; --green-soft:#1b2f23;
+      --rose:#dd8e9c; --rose-soft:#331f25;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1000px; margin:0 auto; padding:0 clamp(1rem,4vw,3rem) 4rem; }
+  header {
+    border-bottom:1px solid var(--line);
+    padding:clamp(2rem,5vw,3.5rem) 0 1.75rem; margin-bottom:2.5rem;
+  }
+  .eyebrow {
+    font-family:var(--mono); font-size:.72rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 .9rem;
+  }
+  h1 {
+    font-family:var(--serif); font-weight:700;
+    font-size:clamp(1.9rem,4.8vw,2.7rem); line-height:1.1;
+    letter-spacing:-.015em; margin:0 0 .8rem; text-wrap:balance;
+  }
+  .standfirst {
+    font-family:var(--serif); font-size:clamp(1rem,2vw,1.18rem);
+    line-height:1.5; color:var(--ink-2); max-width:var(--measure); margin:0 0 1.4rem;
+  }
+  .meta {
+    display:flex; flex-wrap:wrap; gap:.5rem 1.5rem;
+    font-family:var(--mono); font-size:.75rem; color:var(--ink-3);
+  }
+  .meta b { color:var(--ink-2); font-weight:600; }
+  section { margin:0 0 3rem; }
+  h2 {
+    font-family:var(--serif); font-size:clamp(1.3rem,2.7vw,1.7rem);
+    font-weight:600; letter-spacing:-.01em; line-height:1.2;
+    margin:0 0 .3rem; text-wrap:balance;
+  }
+  h3 { font-size:1rem; font-weight:700; margin:1.9rem 0 .5rem; }
+  .kicker {
+    font-family:var(--mono); font-size:.7rem; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--ink-3); margin:0 0 1.3rem;
+    padding-bottom:.65rem; border-bottom:1px solid var(--line-soft);
+  }
+  p { max-width:var(--measure); margin:0 0 1rem; }
+  p.lede { color:var(--ink-2); }
+  ul { max-width:var(--measure); padding-left:1.15rem; }
+  li { margin-bottom:.4rem; }
+  code {
+    font-family:var(--mono); font-size:.855em; background:var(--surface-2);
+    border:1px solid var(--line-soft); border-radius:3px;
+    padding:.08em .34em; white-space:nowrap;
+  }
+  a { color:var(--accent); text-underline-offset:2px; }
+  a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+  .scroller {
+    overflow-x:auto; border:1px solid var(--line); border-radius:8px;
+    background:var(--surface); margin:1.3rem 0 1.5rem;
+  }
+  table { border-collapse:collapse; width:100%; min-width:640px; font-size:.89rem; }
+  thead th {
+    text-align:left; font-family:var(--mono); font-size:.68rem;
+    letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3);
+    font-weight:600; padding:.78rem 1rem; background:var(--surface-2);
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  tbody td {
+    padding:.8rem 1rem; border-bottom:1px solid var(--line-soft);
+    vertical-align:top; line-height:1.5;
+  }
+  tbody tr:last-child td { border-bottom:none; }
+  .sev {
+    display:inline-block; font-family:var(--mono); font-size:.66rem;
+    letter-spacing:.07em; font-weight:600; padding:.14rem .42rem;
+    border-radius:3px; white-space:nowrap;
+  }
+  .sev.ok  { background:var(--green-soft); color:var(--green); }
+  .sev.bug { background:var(--amber-soft); color:var(--amber); }
+  .callout {
+    background:var(--surface); border:1px solid var(--line);
+    border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+    padding:1.05rem 1.25rem; margin:1.4rem 0;
+  }
+  .callout > :last-child { margin-bottom:0; }
+  .callout .tag {
+    font-family:var(--mono); font-size:.68rem; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--accent); display:block; margin-bottom:.4rem;
+  }
+  .callout.warn { border-left-color:var(--amber); }
+  .callout.warn .tag { color:var(--amber); }
+  .callout.good { border-left-color:var(--green); }
+  .callout.good .tag { color:var(--green); }
+  .eq {
+    font-family:var(--mono); font-size:.85rem; background:var(--surface);
+    border:1px solid var(--line); border-radius:6px;
+    padding:.75rem 1rem; overflow-x:auto; white-space:pre; margin:1rem 0;
+    max-width:none;
+  }
+  footer {
+    border-top:1px solid var(--line); padding-top:1.4rem; margin-top:2.5rem;
+    font-size:.85rem; color:var(--ink-3); max-width:var(--measure);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">R package Stem &middot; technical note</p>
+    <h1>Model verification against the reference papers</h1>
+    <p class="standfirst">Every equation of the STEM model, its EM algorithm, its kriging predictor and its parametric bootstrap, checked line by line against the three companion works of Fass&ograve; and Cameletti that define it. The core is faithful. One defect was found, in a branch of the likelihood evaluation, and fixed.</p>
+    <div class="meta">
+      <span><b>Package</b> Stem 2.0.0</span>
+      <span><b>Scope</b> STEM core, not the SC-STEM layer</span>
+      <span><b>Result</b> 1 defect found and corrected</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>How the three papers relate</h2>
+    <p class="kicker">They build on one another; only one is the direct reference</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Work</th><th>Role</th><th>Relation to the package</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Fass&ograve;, Cameletti, Nicolis (2007)</b><br><span style="color:var(--ink-3);font-size:.85em">Environmetrics 18, 245&ndash;264</span></td>
+            <td>The <b>geostatistical dynamical calibration</b> (GDC) model, the most general of the three: instrument calibration with an additive bias <code>A(t)</code> and a multiplicative bias <code>B(t)</code>, loadings from empirical orthogonal functions, heterogeneous networks mixing gravimetric and TEOM monitors.</td>
+            <td>The package implements the <b>special case with no calibration bias</b>.</td>
+          </tr>
+          <tr>
+            <td><b>Fass&ograve;, Cameletti (2007)</b><br><span style="color:var(--ink-3);font-size:.85em">GRASPA Technical Report n. 27</span></td>
+            <td>The three-stage hierarchical model with covariates, the EM algorithm, and the spatio-temporal parametric bootstrap.</td>
+            <td><b>The direct reference.</b> It announces this package by name: <em>&ldquo;Software availability: R package Stem &mdash; Developer: Michela Cameletti&rdquo;</em>.</td>
+          </tr>
+          <tr>
+            <td><b>Fass&ograve;, Cameletti (2010)</b><br><span style="color:var(--ink-3);font-size:.85em">Simulation 86, 139&ndash;153</span></td>
+            <td>The fullest published statement: the same model and EM, plus the kriging predictor, the bootstrap and a sensitivity analysis of the model components.</td>
+            <td>Its <b>Equations (12)&ndash;(21)</b> are what the estimation code implements.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The model itself is the three-stage hierarchy</p>
+    <div class="eq">Z_t = X_t beta + K Y_t + e_t        e_t = omega_t + epsilon_t
+Y_t = G Y_{t-1} + eta_t             eta_t ~ N(0, Sigma_eta)</div>
+    <p>with a measurement error <code>epsilon</code> that is white in space and time, a spatial component <code>omega</code> that is white in time but correlated in space, and a latent temporal process <code>Y_t</code> shared by the network through the loading matrix <code>K</code>.</p>
+  </section>
+
+  <section>
+    <h2>Correspondences verified</h2>
+    <p class="kicker">Equation by equation</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Equation</th><th>What it states</th><th>Where it lives in the code</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Eq. (7) TR<br>Eq. (8) 2010</td>
+            <td>Scaled spatial covariance <code>Gamma(0) = 1 + gamma</code>, <code>Gamma(h) = C_theta(h)</code> with <code>gamma = sigma2eps/sigma2omega</code>, and <code>Sigma_e = sigma2omega * Gamma</code>.</td>
+            <td><code>Sigmastar.exp</code>, as <code>diag(exp(logb), d) + exp(-exp(logtheta) * dist)</code></td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (8) TR</td>
+            <td>&ldquo;For positive definiteness reasons, it is preferable to estimate <code>log(gamma)</code> instead of <code>sigma2eps</code>.&rdquo;</td>
+            <td><code>logb = log(sigma2eps/sigma2omega)</code>; the code also reparametrises <code>logtheta = log(theta)</code> for the same reason.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (9)</td>
+            <td>Likelihood by the prediction-error decomposition, with <code>Omega_t = K P_t K' + Sigma_e</code>.</td>
+            <td><code>filterstep</code>: <code>Q = F'RF + V</code>, then <code>mvtnorm::dmvnorm</code>.</td>
+            <td><span class="sev bug">1 defect</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (12)&ndash;(13)</td>
+            <td><code>Qtilde = T log|Sigma_e| + tr[Sigma_e^-1 W]</code>, with <code>W</code> the sum of residual outer products plus <code>K P_t K'</code>.</td>
+            <td><code>Q_function_addendo1</code>, and <code>BB_list</code> inside <code>kalman</code>.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (14)</td>
+            <td><code>beta = [sum X'Sigma_e^-1 X]^-1 {sum X'Sigma_e^-1 (Z_t - K y_t)}</code>.</td>
+            <td><code>MM</code>, <code>v</code>, <code>beta_j</code>.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (15)</td>
+            <td><code>sigma2omega &lt;- sigma2omega/(T n) * tr[Sigma_e^-1 W]</code>.</td>
+            <td><code>sum(diag(Gamma^-1 BB))/(n*d)</code>. Correct because <code>Sigma_e^-1 = Gamma^-1/sigma2omega</code>, and because in this code <code>n</code> counts <em>time points</em> while <code>d</code> counts locations &mdash; the opposite of the papers' notation.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (16)&ndash;(18)</td>
+            <td><code>G = S10 S00^-1</code>, <code>Sigma_eta = S11 - S10 S00^-1 S10'</code>, <code>mu0 = y0</code> from the smoother.</td>
+            <td><code>G_j</code>, <code>Sigmaeta_j</code>, <code>m0_j</code>. The <code>S</code> matrices in the code are unnormalised sums, and the division by <code>nobs</code> in <code>Sigmaeta_j</code> compensates exactly.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (19)</td>
+            <td>Newton-Raphson on <code>{theta, sigma2eps}</code>, minimising <code>Qtilde</code>.</td>
+            <td><code>d1_Q</code>, <code>d2_Q</code>, <code>d12_Q</code> and the derivatives of <code>Sigma*</code>, re-derived by hand and matching. The mixed derivative correctly exploits <code>d2 Sigma*/d logtheta d loggamma = 0</code>, since the two parameters enter additively.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Eq. (20)&ndash;(21)</td>
+            <td>Kriging: <code>uhat = mu2 + Omega' Sigma_e^-1 (Z_t - mu1)</code> and <code>sigma2_K = sigma2omega - Omega' Sigma_e^-1 Omega</code>.</td>
+            <td><code>spatial.pred</code>, called from <code>STEM_Kriging</code> with <code>Sigma12 = sigma2omega * exp(-theta h)</code>.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Section 4 (2010)</td>
+            <td>Parametric bootstrap drawing from Eq. (6)&ndash;(7) at <code>Psi_hat</code>, starting from <code>y0* ~ N(mu0_hat, Sigma0)</code>.</td>
+            <td><code>STEM_Simulation</code> driven by <code>STEM_Bootstrap</code>.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+          <tr>
+            <td>Convergence</td>
+            <td>Two relative criteria, required jointly: on the parameter vector and on the log-likelihood.</td>
+            <td><code>conv.par</code> and <code>conv.log</code> in <code>STEM_Estimation</code>.</td>
+            <td><span class="sev ok">OK</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>The defect</h2>
+    <p class="kicker">filterstep, univariate branch</p>
+
+    <p>The mean of the one-step-ahead predictive distribution is, by Equation (9),</p>
+    <div class="eq">mu_t = X_t beta + K y_t^{t-1}</div>
+    <p>so the regression term is <b>added</b> to the state contribution. The multivariate branch of <code>filterstep</code> does exactly that. The univariate branch subtracted it:</p>
+
+    <div class="eq">/* before */  z - (f - XXXcov %*% betacov)
+/* after  */  z - (f + XXXcov %*% betacov)</div>
+
+    <div class="callout warn">
+      <span class="tag">Why it had gone unnoticed</span>
+      <p>The branch is reached only when a fit has a <b>single location</b>, which essentially never happens for a pooled model over a monitoring network. A clusterwise algorithm changes that: every cluster is a fit in its own right, and a small cluster is reachable. The defect would have produced a silently wrong log-likelihood &mdash; and therefore wrong information criteria and a wrong cluster assignment &mdash; rather than an error.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Consequence for the spatially-clustered layer</h2>
+    <p class="kicker">Why the SC-STEM assignment score rests on solid ground</p>
+
+    <p>The label update of <code>SCSTEM_Estim</code> ranks clusters by a per-location conditional pseudo-likelihood whose variance is <code>sigma2eps + sigma2omega</code>. Equation (7) of the technical report justifies that value exactly:</p>
+
+    <div class="eq">Sigma_e[i,i] = sigma2omega * Gamma(0)
+             = sigma2omega * (1 + gamma)
+             = sigma2omega + sigma2eps</div>
+
+    <div class="callout good">
+      <span class="tag">In short</span>
+      <p>The spatially-clustered extension is built on the correct covariance structure of the original model. What it cannot inherit is an exact per-location decomposition of the likelihood: the spatial covariance couples the locations, so the assignment score has to be a pseudo-likelihood. That is a property of the spatio-temporal specification, and it is why the alternating algorithm is not globally monotone &mdash; see <code>?SCSTEM_Estim</code>.</p>
+    </div>
+  </section>
+
+  <footer>
+    Part of the documentation of the R package <b>Stem</b>. Open it from R with
+    <code>system.file("extdata", "STEM_model_verification.html", package = "Stem")</code>.
+    See also <code>vignette("function-map", package = "Stem")</code> for the call graph,
+    and <code>NEWS.md</code> for the full list of changes in this release.
+  </footer>
+
+</div>
+</body>
+</html>

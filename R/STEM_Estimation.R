@@ -50,13 +50,37 @@
 #'
 #' @author Michela Cameletti  < michela.cameletti@unibg.it >
 #'
-#' @references Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal dynamic state-space model with the EM algorithm to patch gaps in daily riverflow series}. Hydrology and Earth System Sciences 9, 209--224.
-#' Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring using heterogeneous networks}. Environmetrics 18, 245--264.
-#' Fasso', A., Cameletti, M. (2007) \emph{A general spatio-temporal model for environmental data}. Tech.rep. n.27 \emph{Graspa} - The Italian Group of Environmental Statistics.
-#' Fassò, A. and M. Cameletti (2010). \emph{A Unified Statistical Approach for Simulation, Modeling, Analysis and Mapping of Environmental Data}. SIMULATION 86(3): 139-153. <doi: 10.1177/0037549709102150>
-#' Mc Lachlan, G.J., Krishnan, T. (1997) \emph{The EM Algorithm and Extensions}. Wiley, New York.
-#' Shumway, R.H., Stoffer, D.S. (2006) \emph{Time Series Analysis and Its Applications: with R Examples}. Springer, New York.
-#' Xu, K., Wikle, C.K. (2007) \emph{Estimation of parameterized spatio-temporal dynamic models}. Journal of Statistical Inference and Planning 137,  567--588.
+#' @references
+#' The model estimated by this function, its EM algorithm and the
+#' parametric bootstrap are those of the following three companion works.
+#'
+#' Fasso, A., Cameletti, M., Nicolis, O. (2007) \emph{Air quality monitoring
+#' using heterogeneous networks}. Environmetrics, 18, 245--264.
+#' \doi{10.1002/env.837}
+#'
+#' Fasso, A., Cameletti, M. (2007) \emph{A general spatio-temporal model for
+#' environmental data}. GRASPA Technical Report n. 27, The Italian Group of
+#' Environmental Statistics. The reference that introduces this package.
+#'
+#' Fasso, A., Cameletti, M. (2010) \emph{A unified statistical approach for
+#' simulation, modeling, analysis and mapping of environmental data}.
+#' Simulation, 86, 139--153. \doi{10.1177/0037549709102150}
+#'
+#' Further background:
+#'
+#' Amisigo, B.A., Van De Giesen, N.C. (2005) \emph{Using a spatio-temporal
+#' dynamic state-space model with the EM algorithm to patch gaps in daily
+#' riverflow series}. Hydrology and Earth System Sciences, 9, 209--224.
+#'
+#' McLachlan, G.J., Krishnan, T. (2008) \emph{The EM Algorithm and
+#' Extensions}, 2nd edition. Wiley, New York.
+#'
+#' Shumway, R.H., Stoffer, D.S. (2006) \emph{Time Series Analysis and Its
+#' Applications: with R Examples}. Springer, New York.
+#'
+#' Xu, K., Wikle, C.K. (2007) \emph{Estimation of parameterized
+#' spatio-temporal dynamic models}. Journal of Statistical Inference and
+#' Planning, 137, 567--588.
 #'
 #'
 #' @examples
