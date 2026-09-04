@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stem 2.0.0: defects fixed and code changes</title>
+<style>
+  :root {
+    --ground:#f6f7f8; --surface:#fff; --surface-2:#eef1f3;
+    --line:#dde3e7; --line-soft:#e9edf0;
+    --ink:#16212b; --ink-2:#3c4c59; --ink-3:#6b7a86;
+    --accent:#1f6f8b; --accent-soft:#e3eef2; --accent-line:#a9cbd7;
+    --amber:#9a5f18; --amber-soft:#f6ecdd;
+    --green:#37704c; --green-soft:#e4efe7;
+    --rose:#97364a; --rose-soft:#f6e4e7;
+    --serif: Georgia, "Times New Roman", "Nimbus Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+    --measure: 70ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#12181d; --surface:#182027; --surface-2:#1e282f;
+      --line:#2b3841; --line-soft:#232e36;
+      --ink:#e7edf1; --ink-2:#b6c3cc; --ink-3:#86949e;
+      --accent:#6fb6cf; --accent-soft:#17323d; --accent-line:#2f5c6c;
+      --amber:#d69a54; --amber-soft:#33281a;
+      --green:#82bd97; --green-soft:#1b2f23;
+      --rose:#dd8e9c; --rose-soft:#331f25;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 clamp(1rem,4vw,3rem) 4rem; }
+  header {
+    border-bottom:1px solid var(--line);
+    padding:clamp(2rem,5vw,3.5rem) 0 1.75rem; margin-bottom:2.5rem;
+  }
+  .eyebrow {
+    font-family:var(--mono); font-size:.72rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 .9rem;
+  }
+  h1 {
+    font-family:var(--serif); font-weight:700;
+    font-size:clamp(1.9rem,4.8vw,2.7rem); line-height:1.1;
+    letter-spacing:-.015em; margin:0 0 .8rem; text-wrap:balance;
+  }
+  .standfirst {
+    font-family:var(--serif); font-size:clamp(1rem,2vw,1.18rem);
+    line-height:1.5; color:var(--ink-2); max-width:var(--measure); margin:0 0 1.4rem;
+  }
+  .meta {
+    display:flex; flex-wrap:wrap; gap:.5rem 1.5rem;
+    font-family:var(--mono); font-size:.75rem; color:var(--ink-3);
+  }
+  .meta b { color:var(--ink-2); font-weight:600; }
+  section { margin:0 0 3rem; }
+  h2 {
+    font-family:var(--serif); font-size:clamp(1.3rem,2.7vw,1.7rem);
+    font-weight:600; letter-spacing:-.01em; line-height:1.2;
+    margin:0 0 .3rem; text-wrap:balance;
+  }
+  h3 { font-size:1rem; font-weight:700; margin:1.9rem 0 .5rem; }
+  .kicker {
+    font-family:var(--mono); font-size:.7rem; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--ink-3); margin:0 0 1.3rem;
+    padding-bottom:.65rem; border-bottom:1px solid var(--line-soft);
+  }
+  p { max-width:var(--measure); margin:0 0 1rem; }
+  p.lede { color:var(--ink-2); }
+  ul { max-width:var(--measure); padding-left:1.15rem; }
+  li { margin-bottom:.4rem; }
+  code {
+    font-family:var(--mono); font-size:.855em; background:var(--surface-2);
+    border:1px solid var(--line-soft); border-radius:3px;
+    padding:.08em .34em; white-space:nowrap;
+  }
+  a { color:var(--accent); text-underline-offset:2px; }
+  a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+  .scroller {
+    overflow-x:auto; border:1px solid var(--line); border-radius:8px;
+    background:var(--surface); margin:1.3rem 0 1.5rem;
+  }
+  table { border-collapse:collapse; width:100%; min-width:680px; font-size:.89rem; }
+  thead th {
+    text-align:left; font-family:var(--mono); font-size:.68rem;
+    letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3);
+    font-weight:600; padding:.78rem 1rem; background:var(--surface-2);
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  tbody td {
+    padding:.8rem 1rem; border-bottom:1px solid var(--line-soft);
+    vertical-align:top; line-height:1.5;
+  }
+  tbody tr:last-child td { border-bottom:none; }
+  .sev {
+    display:inline-block; font-family:var(--mono); font-size:.66rem;
+    letter-spacing:.07em; font-weight:600; padding:.14rem .42rem;
+    border-radius:3px; white-space:nowrap;
+  }
+  .sev.crit { background:var(--rose-soft);  color:var(--rose); }
+  .sev.maj  { background:var(--amber-soft); color:var(--amber); }
+  .sev.min  { background:var(--surface-2);  color:var(--ink-3); }
+  .callout {
+    background:var(--surface); border:1px solid var(--line);
+    border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
+    padding:1.05rem 1.25rem; margin:1.4rem 0;
+  }
+  .callout > :last-child { margin-bottom:0; }
+  .callout .tag {
+    font-family:var(--mono); font-size:.68rem; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--accent); display:block; margin-bottom:.4rem;
+  }
+  .callout.warn { border-left-color:var(--amber); }
+  .callout.warn .tag { color:var(--amber); }
+  .callout.good { border-left-color:var(--green); }
+  .callout.good .tag { color:var(--green); }
+  .eq {
+    font-family:var(--mono); font-size:.85rem; background:var(--surface);
+    border:1px solid var(--line); border-radius:6px;
+    padding:.75rem 1rem; overflow-x:auto; white-space:pre; margin:1rem 0;
+    max-width:none; line-height:1.55;
+  }
+  .ba { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:1rem; margin:1.4rem 0; }
+  .ba .panel { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:1rem 1.15rem 1.15rem; }
+  .ba .panel h4 {
+    font-family:var(--mono); font-size:.7rem; letter-spacing:.13em;
+    text-transform:uppercase; margin:0 0 .75rem; color:var(--ink-3);
+  }
+  .ba .panel.after h4 { color:var(--accent); }
+  .ba .panel ul { margin:0; padding-left:1.05rem; }
+  .ba .panel li { font-size:.9rem; }
+  footer {
+    border-top:1px solid var(--line); padding-top:1.4rem; margin-top:2.5rem;
+    font-size:.85rem; color:var(--ink-3); max-width:var(--measure);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">R package Stem &middot; development report</p>
+    <h1>Defects fixed and code changes</h1>
+    <p class="standfirst">What was wrong in the package before version 2.0.0, what was changed, and why. Eight substantive defects: four in the score that assigns locations to clusters, three in the numerical engine inherited from version 1.0, one introduced and corrected during this work. None of them raised an error; all of them changed results.</p>
+    <div class="meta">
+      <span><b>Release</b> 2.0.0</span>
+      <span><b>Defects</b> 8 fixed</span>
+      <span><b>Tests</b> 43 assertions</span>
+      <span><b>Check</b> R CMD check --as-cran clean</span>
+    </div>
+  </header>
+
+  <div class="callout">
+    <span class="tag">Scope</span>
+    <p>This document is the development record. The mapping between the reference papers and the implementation &mdash; which equation lives in which function &mdash; is a separate document that ships with the package:
+    <code>system.file("extdata", "STEM_model_verification.html", package = "Stem")</code>. The user-facing summary of the release is <code>NEWS.md</code>.</p>
+  </div>
+
+  <section>
+    <h2>Defects in the cluster assignment score</h2>
+    <p class="kicker">SCSTEM_Estim, before 2.0.0</p>
+
+    <p class="lede">The score deciding which cluster a location belongs to contained four defects. None produced an error: they silently produced the wrong partition, and therefore the wrong cluster-wise coefficients.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>What was there</th><th>Consequence</th><th>Severity</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>The quadratic form of the state equation was divided by <code>m0</code> instead of <code>Sigmaeta</code> &mdash; indices <code>ncov+4</code> against <code>ncov+3</code> of the flattened parameter vector.</td>
+            <td><code>m0</code> is a mean, not a variance, and is routinely negative on log-transformed data. When it is, the term changes sign and the score rewards the <em>worse</em> fit.</td>
+            <td><span class="sev crit">Critical</span></td>
+          </tr>
+          <tr>
+            <td><code>sigma2omega</code> and <code>sigma2eps</code> were read from the pooled fit rather than from the candidate cluster.</td>
+            <td>The term becomes constant across clusters and drops out of the <code>argmax</code>. The <code>nugget_var</code> argument therefore had no effect at all, with either value.</td>
+            <td><span class="sev crit">Critical</span></td>
+          </tr>
+          <tr>
+            <td>The predictor used the lagged smoothed state <code>y[t-1]</code>.</td>
+            <td>The measurement equation is <code>z_t = X_t beta + K y_t + e_t</code>: the fit was being evaluated against the wrong state.</td>
+            <td><span class="sev maj">Major</span></td>
+          </tr>
+          <tr>
+            <td>The score was divided by the number of locations.</td>
+            <td>An arbitrary rescaling between the likelihood and the penalty, leaving <code>phi_penalty</code> without an interpretable scale and not comparable across datasets.</td>
+            <td><span class="sev maj">Major</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The contribution is now an explicit conditional pseudo-likelihood, documented as such, and used <em>only</em> to rank clusters: every reported quantity comes from the exact cluster-wise likelihoods of the final refit.</p>
+  </section>
+
+  <section>
+    <h2>Robustness of the numerical engine</h2>
+    <p class="kicker">Pre-existing, inherited from version 1.0</p>
+
+    <p class="lede">Three defects in code that predates this work. They were harmless for a single pooled fit, which is how the package had always been used, and fatal for a clusterwise algorithm, which refits the model on hundreds of different subsets of locations.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Where</th><th>What was there</th><th>Consequence</th><th>Severity</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>kalman</code></td>
+            <td>The Newton-Raphson step was used without validation: a singular or non-finite Hessian, a zero denominator in the relative criterion, and a fallback grid search that could evaluate <code>log(0)</code> when the scale underflowed.</td>
+            <td><code>NaN</code> reaching the <code>while</code> condition, hence <em>&ldquo;missing value where TRUE/FALSE needed&rdquo;</em> and an aborted fit.</td>
+            <td><span class="sev crit">Critical</span></td>
+          </tr>
+          <tr>
+            <td><code>STEM_Estimation</code></td>
+            <td>The same pattern in the outer EM loop, with no check on the iterate itself.</td>
+            <td>The same error. <b>Measured effect: the parametric bootstrap went from 4 usable draws out of 12 to 12 out of 12 once both were fixed.</b></td>
+            <td><span class="sev crit">Critical</span></td>
+          </tr>
+          <tr>
+            <td><code>filterstep</code></td>
+            <td>The univariate branch computed the predictive mean as <code>f - X beta</code>. Equation (9) gives <code>mu_t = X_t beta + K y_t</code>: the regression term is <em>added</em>, as the multivariate branch three lines above does correctly.</td>
+            <td>Reached only when a fit has a single location &mdash; essentially never for a pooled model over a network, but reachable cluster by cluster. Produced a silently wrong log-likelihood, hence wrong information criteria and a wrong assignment.</td>
+            <td><span class="sev maj">Major</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>All three now keep the last valid iterate and warn, rather than propagating a non-finite value into a logical test. Found while reading the reference papers against the code.</p>
+
+    <div class="callout warn">
+      <span class="tag">Consequence for earlier results</span>
+      <p>Clustered results produced with the previous version are not comparable with the current ones. This includes those in <code>script/sugasawa amkm 3 cluster bootstrap param 10 perc.R</code> in the Google Drive folder, which predates the rewrite.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Defect introduced during this work</h2>
+    <p class="kicker">And how it was caught</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Where</th><th>What happened</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>SCSTEM_Bootstrap</code></td>
+            <td>The arguments of the refits were rebuilt from a settings list stored in the fitted object. When an argument was later removed from <code>SCSTEM_Estim</code>, every draw failed with <em>&ldquo;unused argument&rdquo;</em> &mdash; reported only as a lost replicate, so the bootstrap silently returned nothing usable.</td>
+            <td>The forwarded list is now filtered against <code>formals(SCSTEM_Estim)</code>, and a regression test asserts the invariant.</td>
+          </tr>
+          <tr>
+            <td><code>STEM_Simulation</code></td>
+            <td><code>mvrnorm()</code> was called unqualified, working only through a <code>NAMESPACE</code> import; it broke as soon as the file was sourced directly.</td>
+            <td>Now <code>MASS::mvrnorm()</code>. Every external call in the package is namespaced.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Algorithmic changes in SC-STEM</h2>
+    <p class="kicker">Adapting the apparatus of the spatially-clustered literature</p>
+
+    <div class="ba">
+      <div class="panel">
+        <h4>Before</h4>
+        <ul>
+          <li>Simultaneous label update, without guarantees and able to cycle</li>
+          <li>Information criteria counting the <em>number of clusters</em> as the number of parameters</li>
+          <li>No selection of the penalty; <code>k</code> chosen by minimising BIC with no safeguards</li>
+          <li>Bootstrap conditional on the partition</li>
+          <li>AMKM initialisation from <code>SCDA</code>, a package not on CRAN</li>
+          <li>Asymmetric k-nearest-neighbour graph used for an undirected penalty</li>
+        </ul>
+      </div>
+      <div class="panel after">
+        <h4>After</h4>
+        <ul>
+          <li>Sequential ICM sweep, penalty recomputed on the fly; the simultaneous update kept as an option</li>
+          <li><code>k_eff * (ncov + 3 + 3p)</code> parameters, <code>n = d*T</code> observations, exact log-likelihood of the final refit</li>
+          <li>Two-step rule: BIC inside a moderate band, then the smallest penalty on the ARI stability plateau</li>
+          <li>Refit-with-clustering bootstrap: the partition is re-estimated at every draw</li>
+          <li>Internal k-means on PCA-compressed covariate means, with an admissibility filter and a repair step</li>
+          <li>Graph symmetrised</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Two mechanisms that had to be added</h3>
+
+    <p>The first was found empirically: without constraints <b>the partition always collapses</b>. The cluster with the smallest residual variance attracts every location &mdash; the clusterwise counterpart of the degenerate-likelihood problem of Gaussian mixtures. On the <code>pm10</code> data it collapses to a single cluster <em>even with the penalty set to zero</em>.</p>
+
+    <p>The remedy is a minimum-size constraint in the sweep. But the constraint freezes the locations of any cluster sitting at the threshold, and with small networks most of the partition then stays at its initial value. Hence the second mechanism, a <b>size-preserving swap pass</b>: it exchanges the labels of two locations when doing so increases the objective. Cluster sizes are unchanged, so feasibility holds by construction, and a swap is accepted only on strict improvement. An exact bound on the achievable penalty gain discards most candidate pairs without evaluating them.</p>
+
+    <div class="callout">
+      <span class="tag">A property worth knowing</span>
+      <p>A test written against the cross-sectional intuition failed, and it was right to: <b>the alternation is not globally monotone</b>. In the STEM measurement equation the spatial covariance couples the locations, so the exact marginal likelihood does not factorise and the assignment score must be a pseudo-likelihood, while the parameter step maximises the exact within-cluster likelihood. A parameter update can therefore lower the penalised objective while raising the exact likelihood.</p>
+      <p>This is a property of the spatio-temporal specification. The implementation copes by always returning the best partition visited, reporting both <code>best_objective</code> and <code>last_objective</code>; it is documented in <code>?SCSTEM_Estim</code> and in the SC-STEM vignette.</p>
+    </div>
+
+    <h3>The scale of the penalty</h3>
+    <p>Transferring the penalty from the cross-sectional literature does not work: there each unit contributes one observation, here it contributes <code>T</code>, and the log-likelihood differences between clusters grow with <code>T</code> and with the scale of the response. The default <code>phi_scale = "auto"</code> normalises by the median spread of the per-location contributions divided by the average number of neighbours, so that <code>phi</code> around one is the point where agreeing with the neighbourhood is worth about as much as picking the best-fitting cluster, and a grid on <code>[0, 2]</code> is informative on any dataset. <code>"per-observation"</code> and <code>"raw"</code> remain available.</p>
+  </section>
+
+  <section>
+    <h2>CRAN compliance</h2>
+    <p class="kicker">The review comments, point by point</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Reviewer's request</th><th>What was done</th></tr></thead>
+        <tbody>
+          <tr><td>Drop the redundant &ldquo;in R&rdquo; from the title</td><td>Title is now <em>Spatio-Temporal Expectation-Maximization Models</em>.</td></tr>
+          <tr><td>References in DESCRIPTION with <code>&lt;doi:...&gt;</code></td><td>All references carry a DOI or an ISBN with no space after the colon. The Description was rewritten to cover the spatially-clustered layer as well.</td></tr>
+          <tr><td><code>T</code>/<code>F</code> replaced by <code>TRUE</code>/<code>FALSE</code></td><td>No occurrence remains in <code>R/</code> or in <code>man/</code>.</td></tr>
+          <tr><td>Console output that cannot be suppressed</td><td>This was the point still open after the June 2026 pass: <code>cat()</code> survived in <code>STEM_Estimation.R</code>, <code>STEM_Bootstrap.fn.R</code> and <code>kalman.R</code>, and <code>print()</code> in <code>SCSTEM_Bootstrap.R</code>. All are now <code>message()</code> behind <code>verbose = FALSE</code>; the only remaining <code>cat()</code> calls are inside <code>print()</code> methods, which the reviewer explicitly allows.</td></tr>
+          <tr><td>Do not modify <code>.GlobalEnv</code></td><td>The stray <code>.Random.seed</code> assignment is gone. Where a seed is needed, an internal helper sets it and restores the previous RNG state on exit; a regression test asserts it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Issues the check raised on its own</h3>
+    <ul>
+      <li><b><code>pm10</code> was source code, not data</b>: the same 250 KB file was duplicated in <code>R/</code> and <code>data/</code>. It is now <code>data/pm10.rda</code>, 25 KB.</li>
+      <li><b><code>SCDA</code> is not on CRAN</b>: an unreachable dependency in <code>Imports</code> is an automatic rejection. Removed; the initialisation is internal and any external partition can be supplied through the new <code>init_partition</code> argument.</li>
+      <li><b><code>dplyr</code> and <code>sf</code> were unused</b>: removed. Every external call is written <code>package::function()</code> and <code>NAMESPACE</code> carries no <code>importFrom</code>.</li>
+      <li><code>ts()</code> unqualified in <code>filtering()</code> and <code>smoothing()</code> (NOTE); <code>verbose</code> undocumented in two manual pages (WARNING); the <code>STEM_Bootstrap</code> example running over five seconds (NOTE).</li>
+    </ul>
+
+    <div class="callout good">
+      <span class="tag">Two operational traps, documented in cran-comments.md</span>
+      <p><b>Do not run the check inside OneDrive.</b> <code>R CMD check</code> creates thousands of small files and the sync client stalls it: it hangs at <em>checking package dependencies</em> indefinitely. Outside OneDrive it completes in minutes.</p>
+      <p><b>Pandoc</b> is needed for the vignettes and for checking README and NEWS. If it is not on the path:
+      <code>Sys.setenv(RSTUDIO_PANDOC = "C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools")</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Verification</h2>
+    <p class="kicker">What is checked, and how</p>
+
+    <p>The <code>testthat</code> suite covers the invariants that the defects above violated:</p>
+    <ul>
+      <li>the pooled SC-STEM fit at <code>k = 1</code> reproduces <code>STEM_Estimation</code> exactly;</li>
+      <li>the returned partition is admissible and attains the best visited objective;</li>
+      <li>the parameter count behind the information criteria is <code>k_eff * (ncov + 3 + 3p)</code> and the sample size is <code>d * T</code>;</li>
+      <li>the neighbour graph is symmetric with a zero diagonal;</li>
+      <li>the ICM sweep is monotone at fixed parameters, and the swap pass preserves cluster sizes;</li>
+      <li>estimation leaves the caller's RNG state untouched;</li>
+      <li>the bootstrap is reproducible under a fixed seed, produces usable draws, and forwards only arguments that <code>SCSTEM_Estim</code> accepts.</li>
+    </ul>
+
+    <p>43 assertions, all passing. <code>R CMD check --as-cran</code> reports <code>Status: OK</code> with no errors, warnings or notes.</p>
+  </section>
+
+  <footer>
+    Development record for the R package <b>Stem</b>, kept in <code>dev/</code> and excluded from the built
+    package through <code>.Rbuildignore</code>. The user-facing changelog is <code>NEWS.md</code>; the mapping
+    from the reference papers to the code is
+    <code>inst/extdata/STEM_model_verification.html</code>.
+  </footer>
+
+</div>
+</body>
+</html>

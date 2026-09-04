@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stem: model verification against the reference papers</title>
+<title>Stem: from the papers to the code</title>
 <style>
   /* Self-contained: no external fonts or stylesheets, so the document renders
      identically offline and inside R help browsers. */
@@ -12,9 +12,6 @@
     --line:#dde3e7; --line-soft:#e9edf0;
     --ink:#16212b; --ink-2:#3c4c59; --ink-3:#6b7a86;
     --accent:#1f6f8b; --accent-soft:#e3eef2; --accent-line:#a9cbd7;
-    --amber:#9a5f18; --amber-soft:#f6ecdd;
-    --green:#37704c; --green-soft:#e4efe7;
-    --rose:#97364a; --rose-soft:#f6e4e7;
     --serif: Georgia, "Times New Roman", "Nimbus Roman", serif;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
@@ -26,9 +23,6 @@
       --line:#2b3841; --line-soft:#232e36;
       --ink:#e7edf1; --ink-2:#b6c3cc; --ink-3:#86949e;
       --accent:#6fb6cf; --accent-soft:#17323d; --accent-line:#2f5c6c;
-      --amber:#d69a54; --amber-soft:#33281a;
-      --green:#82bd97; --green-soft:#1b2f23;
-      --rose:#dd8e9c; --rose-soft:#331f25;
     }
   }
   * { box-sizing: border-box; }
@@ -87,7 +81,7 @@
     overflow-x:auto; border:1px solid var(--line); border-radius:8px;
     background:var(--surface); margin:1.3rem 0 1.5rem;
   }
-  table { border-collapse:collapse; width:100%; min-width:640px; font-size:.89rem; }
+  table { border-collapse:collapse; width:100%; min-width:660px; font-size:.89rem; }
   thead th {
     text-align:left; font-family:var(--mono); font-size:.68rem;
     letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3);
@@ -99,13 +93,7 @@
     vertical-align:top; line-height:1.5;
   }
   tbody tr:last-child td { border-bottom:none; }
-  .sev {
-    display:inline-block; font-family:var(--mono); font-size:.66rem;
-    letter-spacing:.07em; font-weight:600; padding:.14rem .42rem;
-    border-radius:3px; white-space:nowrap;
-  }
-  .sev.ok  { background:var(--green-soft); color:var(--green); }
-  .sev.bug { background:var(--amber-soft); color:var(--amber); }
+  th.eqcol, td.eqcol { white-space:nowrap; font-family:var(--mono); font-size:.82rem; }
   .callout {
     background:var(--surface); border:1px solid var(--line);
     border-left:3px solid var(--accent); border-radius:0 8px 8px 0;
@@ -116,15 +104,11 @@
     font-family:var(--mono); font-size:.68rem; letter-spacing:.13em;
     text-transform:uppercase; color:var(--accent); display:block; margin-bottom:.4rem;
   }
-  .callout.warn { border-left-color:var(--amber); }
-  .callout.warn .tag { color:var(--amber); }
-  .callout.good { border-left-color:var(--green); }
-  .callout.good .tag { color:var(--green); }
   .eq {
     font-family:var(--mono); font-size:.85rem; background:var(--surface);
     border:1px solid var(--line); border-radius:6px;
     padding:.75rem 1rem; overflow-x:auto; white-space:pre; margin:1rem 0;
-    max-width:none;
+    max-width:none; line-height:1.55;
   }
   footer {
     border-top:1px solid var(--line); padding-top:1.4rem; margin-top:2.5rem;
@@ -137,165 +121,255 @@
 
   <header>
     <p class="eyebrow">R package Stem &middot; technical note</p>
-    <h1>Model verification against the reference papers</h1>
-    <p class="standfirst">Every equation of the STEM model, its EM algorithm, its kriging predictor and its parametric bootstrap, checked line by line against the three companion works of Fass&ograve; and Cameletti that define it. The core is faithful. One defect was found, in a branch of the likelihood evaluation, and fixed.</p>
+    <h1>From the papers to the code</h1>
+    <p class="standfirst">Where each equation of the STEM model lives in the package: the covariance structure, the EM algorithm, the Newton-Raphson step for the spatial parameters, the kriging predictor and the parametric bootstrap, mapped onto the functions that implement them. Written as a reading guide for anyone who wants to follow the source with the papers open.</p>
     <div class="meta">
       <span><b>Package</b> Stem 2.0.0</span>
-      <span><b>Scope</b> STEM core, not the SC-STEM layer</span>
-      <span><b>Result</b> 1 defect found and corrected</span>
+      <span><b>Covers</b> the STEM core</span>
+      <span><b>Notation</b> that of the papers</span>
     </div>
   </header>
 
   <section>
-    <h2>How the three papers relate</h2>
+    <h2>The three reference works</h2>
     <p class="kicker">They build on one another; only one is the direct reference</p>
 
     <div class="scroller">
       <table>
-        <thead><tr><th>Work</th><th>Role</th><th>Relation to the package</th></tr></thead>
+        <thead><tr><th>Work</th><th>What it contributes</th><th>Relation to the package</th></tr></thead>
         <tbody>
           <tr>
             <td><b>Fass&ograve;, Cameletti, Nicolis (2007)</b><br><span style="color:var(--ink-3);font-size:.85em">Environmetrics 18, 245&ndash;264</span></td>
-            <td>The <b>geostatistical dynamical calibration</b> (GDC) model, the most general of the three: instrument calibration with an additive bias <code>A(t)</code> and a multiplicative bias <code>B(t)</code>, loadings from empirical orthogonal functions, heterogeneous networks mixing gravimetric and TEOM monitors.</td>
-            <td>The package implements the <b>special case with no calibration bias</b>.</td>
+            <td>The <b>geostatistical dynamical calibration</b> (GDC) model, the most general of the three: instrument calibration through an additive bias <code>A(t)</code> and a multiplicative bias <code>B(t)</code>, loadings obtained from empirical orthogonal functions, and a network mixing gravimetric and TEOM monitors.</td>
+            <td>The package implements the <b>special case without calibration bias</b>, with <code>K</code> playing the role of the EOF loading matrix.</td>
           </tr>
           <tr>
             <td><b>Fass&ograve;, Cameletti (2007)</b><br><span style="color:var(--ink-3);font-size:.85em">GRASPA Technical Report n. 27</span></td>
-            <td>The three-stage hierarchical model with covariates, the EM algorithm, and the spatio-temporal parametric bootstrap.</td>
+            <td>The three-stage hierarchical model with covariates, the EM algorithm with closed-form M-steps, and the spatio-temporal parametric bootstrap.</td>
             <td><b>The direct reference.</b> It announces this package by name: <em>&ldquo;Software availability: R package Stem &mdash; Developer: Michela Cameletti&rdquo;</em>.</td>
           </tr>
           <tr>
             <td><b>Fass&ograve;, Cameletti (2010)</b><br><span style="color:var(--ink-3);font-size:.85em">Simulation 86, 139&ndash;153</span></td>
             <td>The fullest published statement: the same model and EM, plus the kriging predictor, the bootstrap and a sensitivity analysis of the model components.</td>
-            <td>Its <b>Equations (12)&ndash;(21)</b> are what the estimation code implements.</td>
+            <td>Its <b>Equations (12)&ndash;(21)</b> are the ones the estimation code follows, and the equation numbers used below refer to it unless marked TR.</td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <p>The model itself is the three-stage hierarchy</p>
-    <div class="eq">Z_t = X_t beta + K Y_t + e_t        e_t = omega_t + epsilon_t
-Y_t = G Y_{t-1} + eta_t             eta_t ~ N(0, Sigma_eta)</div>
-    <p>with a measurement error <code>epsilon</code> that is white in space and time, a spatial component <code>omega</code> that is white in time but correlated in space, and a latent temporal process <code>Y_t</code> shared by the network through the loading matrix <code>K</code>.</p>
   </section>
 
   <section>
-    <h2>Correspondences verified</h2>
-    <p class="kicker">Equation by equation</p>
+    <h2>The model</h2>
+    <p class="kicker">Three stages, collapsed into a state-space form</p>
+
+    <p>Concentrations are observed at <code>n</code> locations over <code>T</code> days. The first stage separates the measurement error from the underlying level; the second gives that level a regression part, a latent temporal part and a spatial part; the third makes the latent part Markovian.</p>
+
+    <div class="eq">z(s,t) = u(s,t) + epsilon(s,t)                     (1)
+u(s,t) = X(s,t) beta + K(s) y_t + omega(s,t)      (2)
+y_t    = G y_{t-1} + eta_t                        (4)</div>
+
+    <p>Substituting (2) into (1) gives the two-stage state-space form actually estimated,</p>
+
+    <div class="eq">Z_t = X_t beta + K y_t + e_t          e_t = omega_t + epsilon_t   (6)
+y_t = G y_{t-1} + eta_t                                          (7)</div>
+
+    <p>with three mutually independent, temporally white error components: the instrumental error <code>epsilon</code>, with variance <code>sigma2eps</code>; the innovation <code>eta</code>, with variance-covariance <code>Sigma_eta</code>; and the small-scale spatial component <code>omega</code>, white in time but spatially correlated,</p>
+
+    <div class="eq">Cov[omega(s,t), omega(s',t)] = sigma2omega * C_theta(h)
+C_theta(h) = exp(-theta * h)          h = ||s - s'||        (3)</div>
+
+    <p>The parameter set is</p>
+
+    <div class="eq">Psi = (beta, sigma2eps, theta, sigma2omega, G, Sigma_eta, mu_0)   (5)</div>
+
+    <p>with <code>C_0</code> held fixed. Setting <code>p = 1</code> and <code>K = 1</code>, the usual choice, gives a single latent process shared by the whole network.</p>
+  </section>
+
+  <section>
+    <h2>The covariance structure</h2>
+    <p class="kicker">Equation (8), and Equation (7) of the technical report</p>
+
+    <p>The two error components of <code>e_t</code> combine into a single variance-covariance matrix, written as a common variance times a <em>scaled</em> spatial covariance function:</p>
+
+    <div class="eq">Sigma_e = sigma2omega * Gamma(h)
+
+           / 1 + gamma      h = 0
+Gamma(h) = |                              gamma = sigma2eps / sigma2omega
+           \ C_theta(h)     h > 0</div>
+
+    <p>Two things follow, and both are visible in the code.</p>
+
+    <p>First, <code>sigma2eps</code> is the <b>nugget</b> of the spatial process in the geostatistical sense. Second, the technical report notes that <em>&ldquo;for positive definiteness reasons, it is preferable to estimate <code>log(gamma)</code> instead of <code>sigma2eps</code>&rdquo;</em>, which is why the internal parametrisation carries <code>logb = log(gamma)</code> rather than the variance itself. The package applies the same reasoning to the range parameter and works with <code>logtheta = log(theta)</code>.</p>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>Sigmastar.exp(d, logb, logtheta, dist)</code> returns <code>Gamma</code> as <code>diag(exp(logb), d) + exp(-exp(logtheta) * dist)</code>. The diagonal is <code>exp(logb) + 1 = 1 + gamma</code> and the off-diagonal is <code>C_theta(h)</code>, matching the definition exactly. Everywhere the full <code>Sigma_e</code> is needed, the code multiplies this by <code>sigma2omega</code>.</p>
+      <p>A useful consequence for the clustered layer: the marginal variance of a single observation is <code>Sigma_e[i,i] = sigma2omega * (1 + gamma) = sigma2omega + sigma2eps</code>, which is the variance used by the per-location contribution in <code>SCSTEM_Estim</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The likelihood</h2>
+    <p class="kicker">Equation (9)</p>
+
+    <p>The likelihood is written through the prediction-error decomposition of the Kalman filter:</p>
+
+    <div class="eq">log L(Psi; Z) = -nT/2 log(2 pi)
+                - 1/2 SUM_t [ log|Omega_t| + (Z_t - mu_t)' Omega_t^-1 (Z_t - mu_t) ]
+
+mu_t    = X_t beta + K y_t^{t-1}
+Omega_t = K P_t^{t-1} K' + Sigma_e</div>
+
+    <p>Each term is the log density of the one-step-ahead predictive distribution of <code>Z_t</code>, whose mean adds the regression part to the state contribution and whose variance adds the state prediction uncertainty to the observation covariance.</p>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>filterstep</code> computes <code>a = G m</code>, <code>R = G C G' + W</code>, <code>f = F'a</code> and <code>Q = F'RF + V</code>, so that <code>f + X beta</code> is <code>mu_t</code> and <code>Q</code> is <code>Omega_t</code>. The term is then evaluated with <code>mvtnorm::dmvnorm</code>, and <code>filtering</code> accumulates the sum over <code>t</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The EM algorithm</h2>
+    <p class="kicker">Equations (11)&ndash;(19)</p>
+
+    <p>Direct maximisation of (9) is awkward, so estimation goes through EM on the complete-data likelihood, treating the latent process as the missing data. The E-step assembles the objective from the Kalman smoother output <code>y_t^T</code>, <code>P_t^T</code> and <code>P_{t,t-1}^T</code>; the M-step maximises it in two blocks. Most parameters have closed forms; only the two spatial-covariance parameters need a numerical step.</p>
+
+    <h3>Building blocks</h3>
+
+    <div class="eq">Qtilde = T log|Sigma_e| + tr[Sigma_e^-1 W]                        (12)
+
+W = SUM_t (Z_t - X_t beta - K y_t^T)(Z_t - X_t beta - K y_t^T)'
+  + SUM_t K P_t^T K'                                            (13)
+
+S00 = SUM_t (y_{t-1}^T y_{t-1}^T' + P_{t-1}^T)
+S10 = SUM_t (y_t^T y_{t-1}^T'     + P_{t,t-1}^T)
+S11 = SUM_t (y_t^T y_t^T'         + P_t^T)</div>
+
+    <h3>Closed-form updates</h3>
 
     <div class="scroller">
       <table>
-        <thead><tr><th>Equation</th><th>What it states</th><th>Where it lives in the code</th><th>Verdict</th></tr></thead>
+        <thead><tr><th class="eqcol">Eq.</th><th>Update</th><th>In the code</th></tr></thead>
         <tbody>
           <tr>
-            <td>Eq. (7) TR<br>Eq. (8) 2010</td>
-            <td>Scaled spatial covariance <code>Gamma(0) = 1 + gamma</code>, <code>Gamma(h) = C_theta(h)</code> with <code>gamma = sigma2eps/sigma2omega</code>, and <code>Sigma_e = sigma2omega * Gamma</code>.</td>
-            <td><code>Sigmastar.exp</code>, as <code>diag(exp(logb), d) + exp(-exp(logtheta) * dist)</code></td>
-            <td><span class="sev ok">OK</span></td>
+            <td class="eqcol">(14)</td>
+            <td><code>beta = [SUM_t X_t' Sigma_e^-1 X_t]^-1 {SUM_t X_t' Sigma_e^-1 (Z_t - K y_t^T)}</code> &mdash; a generalised least squares step on the data net of the latent process.</td>
+            <td><code>kalman</code>: <code>MM</code> is the left factor, <code>v</code> the right one, <code>beta_j</code> the solution.</td>
           </tr>
           <tr>
-            <td>Eq. (8) TR</td>
-            <td>&ldquo;For positive definiteness reasons, it is preferable to estimate <code>log(gamma)</code> instead of <code>sigma2eps</code>.&rdquo;</td>
-            <td><code>logb = log(sigma2eps/sigma2omega)</code>; the code also reparametrises <code>logtheta = log(theta)</code> for the same reason.</td>
-            <td><span class="sev ok">OK</span></td>
+            <td class="eqcol">(15)</td>
+            <td><code>sigma2omega &lt;- sigma2omega / (T n) * tr[Sigma_e^-1 W]</code></td>
+            <td><code>sum(diag(Gamma^-1 %*% BB)) / (n*d)</code>. The <code>sigma2omega</code> factor cancels against the one inside <code>Sigma_e^-1</code>, which is why the code inverts the scaled <code>Gamma</code> rather than <code>Sigma_e</code>. Note the local naming: in the sources <code>n</code> counts <em>time points</em> and <code>d</code> counts locations, the opposite of the papers.</td>
           </tr>
           <tr>
-            <td>Eq. (9)</td>
-            <td>Likelihood by the prediction-error decomposition, with <code>Omega_t = K P_t K' + Sigma_e</code>.</td>
-            <td><code>filterstep</code>: <code>Q = F'RF + V</code>, then <code>mvtnorm::dmvnorm</code>.</td>
-            <td><span class="sev bug">1 defect</span></td>
+            <td class="eqcol">(16)</td>
+            <td><code>G = S10 S00^-1</code></td>
+            <td><code>G_j</code>. With <code>flag.Gdiag = TRUE</code> only the diagonal is retained.</td>
           </tr>
           <tr>
-            <td>Eq. (12)&ndash;(13)</td>
-            <td><code>Qtilde = T log|Sigma_e| + tr[Sigma_e^-1 W]</code>, with <code>W</code> the sum of residual outer products plus <code>K P_t K'</code>.</td>
-            <td><code>Q_function_addendo1</code>, and <code>BB_list</code> inside <code>kalman</code>.</td>
-            <td><span class="sev ok">OK</span></td>
+            <td class="eqcol">(17)</td>
+            <td><code>Sigma_eta = S11 - S10 S00^-1 S10'</code></td>
+            <td><code>Sigmaeta_j</code>. The <code>S</code> matrices in the code are unnormalised sums, and the division by the number of time points restores the identity.</td>
           </tr>
           <tr>
-            <td>Eq. (14)</td>
-            <td><code>beta = [sum X'Sigma_e^-1 X]^-1 {sum X'Sigma_e^-1 (Z_t - K y_t)}</code>.</td>
-            <td><code>MM</code>, <code>v</code>, <code>beta_j</code>.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Eq. (15)</td>
-            <td><code>sigma2omega &lt;- sigma2omega/(T n) * tr[Sigma_e^-1 W]</code>.</td>
-            <td><code>sum(diag(Gamma^-1 BB))/(n*d)</code>. Correct because <code>Sigma_e^-1 = Gamma^-1/sigma2omega</code>, and because in this code <code>n</code> counts <em>time points</em> while <code>d</code> counts locations &mdash; the opposite of the papers' notation.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Eq. (16)&ndash;(18)</td>
-            <td><code>G = S10 S00^-1</code>, <code>Sigma_eta = S11 - S10 S00^-1 S10'</code>, <code>mu0 = y0</code> from the smoother.</td>
-            <td><code>G_j</code>, <code>Sigmaeta_j</code>, <code>m0_j</code>. The <code>S</code> matrices in the code are unnormalised sums, and the division by <code>nobs</code> in <code>Sigmaeta_j</code> compensates exactly.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Eq. (19)</td>
-            <td>Newton-Raphson on <code>{theta, sigma2eps}</code>, minimising <code>Qtilde</code>.</td>
-            <td><code>d1_Q</code>, <code>d2_Q</code>, <code>d12_Q</code> and the derivatives of <code>Sigma*</code>, re-derived by hand and matching. The mixed derivative correctly exploits <code>d2 Sigma*/d logtheta d loggamma = 0</code>, since the two parameters enter additively.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Eq. (20)&ndash;(21)</td>
-            <td>Kriging: <code>uhat = mu2 + Omega' Sigma_e^-1 (Z_t - mu1)</code> and <code>sigma2_K = sigma2omega - Omega' Sigma_e^-1 Omega</code>.</td>
-            <td><code>spatial.pred</code>, called from <code>STEM_Kriging</code> with <code>Sigma12 = sigma2omega * exp(-theta h)</code>.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Section 4 (2010)</td>
-            <td>Parametric bootstrap drawing from Eq. (6)&ndash;(7) at <code>Psi_hat</code>, starting from <code>y0* ~ N(mu0_hat, Sigma0)</code>.</td>
-            <td><code>STEM_Simulation</code> driven by <code>STEM_Bootstrap</code>.</td>
-            <td><span class="sev ok">OK</span></td>
-          </tr>
-          <tr>
-            <td>Convergence</td>
-            <td>Two relative criteria, required jointly: on the parameter vector and on the log-likelihood.</td>
-            <td><code>conv.par</code> and <code>conv.log</code> in <code>STEM_Estimation</code>.</td>
-            <td><span class="sev ok">OK</span></td>
+            <td class="eqcol">(18)</td>
+            <td><code>mu_0 = y_0^T</code>, the smoothed state at time zero.</td>
+            <td><code>m0_j</code>, from the backward recursion.</td>
           </tr>
         </tbody>
       </table>
     </div>
-  </section>
 
-  <section>
-    <h2>The defect</h2>
-    <p class="kicker">filterstep, univariate branch</p>
+    <h3>The Newton-Raphson step</h3>
 
-    <p>The mean of the one-step-ahead predictive distribution is, by Equation (9),</p>
-    <div class="eq">mu_t = X_t beta + K y_t^{t-1}</div>
-    <p>so the regression term is <b>added</b> to the state contribution. The multivariate branch of <code>filterstep</code> does exactly that. The univariate branch subtracted it:</p>
+    <p>No closed form exists for <code>{theta, sigma2eps}</code>, so they are obtained by minimising <code>Qtilde</code> numerically, holding the other parameters at their updated values:</p>
 
-    <div class="eq">/* before */  z - (f - XXXcov %*% betacov)
-/* after  */  z - (f + XXXcov %*% betacov)</div>
+    <div class="eq">Psi_(i+1) = Psi_(i) - H^-1 * Delta                               (19)</div>
 
-    <div class="callout warn">
-      <span class="tag">Why it had gone unnoticed</span>
-      <p>The branch is reached only when a fit has a <b>single location</b>, which essentially never happens for a pooled model over a monitoring network. A clusterwise algorithm changes that: every cluster is a fit in its own right, and a small cluster is reachable. The defect would have produced a silently wrong log-likelihood &mdash; and therefore wrong information criteria and a wrong cluster assignment &mdash; rather than an error.</p>
+    <p>where <code>Delta</code> and <code>H</code> are the gradient and Hessian of <code>Qtilde</code> with respect to <code>(logtheta, log gamma)</code>. Differentiating (12) gives, for a generic parameter of the scaled covariance,</p>
+
+    <div class="eq">dQ  = T tr[G^-1 dG] - (1/s2om) tr[G^-1 dG G^-1 W]
+
+d2Q = T tr[G^-1 d2G] - T tr[G^-1 dG G^-1 dG]
+    - (1/s2om) tr[G^-1 d2G G^-1 W]
+    + (2/s2om) tr[G^-1 dG G^-1 dG G^-1 W]
+
+where G = Gamma and dG, d2G are its derivatives</div>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>d1_Q</code>, <code>d2_Q</code> and <code>d12_Q</code> implement those three expressions; <code>d1_Sigmastar_logtheta.exp</code>, <code>d2_Sigmastar_logtheta.exp</code>, <code>d1_Sigmastar_logb.exp</code> and <code>d2_Sigmastar_logb.exp</code> supply the derivatives of <code>Gamma</code>.</p>
+      <p>Two structural facts make these simple. The range parameter affects only the off-diagonal, so the derivative with respect to <code>logtheta</code> has a zero diagonal; and the two parameters enter <code>Gamma</code> additively, one on the diagonal and one off it, so the mixed second derivative of <code>Gamma</code> vanishes and <code>d12_Q</code> keeps only the two trace terms that survive.</p>
+    </div>
+
+    <h3>Convergence</h3>
+
+    <p>The outer loop stops when two relative criteria are met <em>jointly</em>: one on the parameter vector, one on the log-likelihood. Relative rather than absolute criteria, so that parameters on very different scales are treated alike.</p>
+
+    <div class="eq">||Psi_(k+1) - Psi_(k)|| / ||Psi_(k)||                       &lt; precision
+||log L(Psi_(k+1)) - log L(Psi_(k))|| / ||log L(Psi_(k))||  &lt; precision</div>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>STEM_Estimation</code> returns them as <code>convergence.par$conv.par</code> and <code>convergence.par$conv.log</code>, together with the number of EM iterations and the number of inner Newton-Raphson iterations per EM step.</p>
     </div>
   </section>
 
   <section>
-    <h2>Consequence for the spatially-clustered layer</h2>
-    <p class="kicker">Why the SC-STEM assignment score rests on solid ground</p>
+    <h2>Spatial prediction</h2>
+    <p class="kicker">Equations (20)&ndash;(21)</p>
 
-    <p>The label update of <code>SCSTEM_Estim</code> ranks clusters by a per-location conditional pseudo-likelihood whose variance is <code>sigma2eps + sigma2omega</code>. Equation (7) of the technical report justifies that value exactly:</p>
+    <p>Mapping the process at an unobserved location <code>s_0</code> follows from the joint Gaussian distribution of the observed vector and the unobserved value, conditionally on the latent state. The result is the simple kriging predictor and its prediction error variance:</p>
 
-    <div class="eq">Sigma_e[i,i] = sigma2omega * Gamma(0)
-             = sigma2omega * (1 + gamma)
-             = sigma2omega + sigma2eps</div>
+    <div class="eq">uhat(s_0,t) = mu_2 + Omega' Sigma_e^-1 (Z_t - mu_1)              (20)
+sigma2_K(s_0) = sigma2omega - Omega' Sigma_e^-1 Omega            (21)
 
-    <div class="callout good">
-      <span class="tag">In short</span>
-      <p>The spatially-clustered extension is built on the correct covariance structure of the original model. What it cannot inherit is an exact per-location decomposition of the likelihood: the spatial covariance couples the locations, so the assignment score has to be a pseudo-likelihood. That is a property of the spatio-temporal specification, and it is why the alternating algorithm is not globally monotone &mdash; see <code>?SCSTEM_Estim</code>.</p>
+mu_1 = X_t beta + K y_t             mu_2 = X(s_0,t) beta + K(s_0) y_t
+Omega has elements Cov[z(s_i,t), u(s_0,t)] = sigma2omega * C_theta(||s_i - s_0||)</div>
+
+    <p>Because the parameter set and the latent process are not known, the plug-in approach substitutes the ML estimates and the smoother output. The resulting variance therefore ignores the uncertainty of the estimates themselves, which is what the bootstrap of the next section is for.</p>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>STEM_Kriging</code> builds the distance matrix between the new locations and the network, then calls <code>spatial.pred</code> with <code>Sigma11 = sigma2omega * Gamma</code>, <code>Sigma12 = sigma2omega * exp(-theta * h)</code> and <code>Sigma22 = sigma2omega * I</code>. It returns the predictions and their standard errors at the requested time point.</p>
     </div>
+  </section>
+
+  <section>
+    <h2>Uncertainty by parametric bootstrap</h2>
+    <p class="kicker">Section 4 of the 2010 paper</p>
+
+    <p>The EM algorithm returns point estimates but no standard errors, and the asymptotic distribution of the estimates is not a good guide here: the papers note that the estimate distributions are markedly asymmetric. The bootstrap resamples directly from the fitted model.</p>
+
+    <p>Each replicate draws a new latent path and a new dataset from Equations (6) and (7) with the parameter set replaced by its ML estimate, starting from an initial state drawn from its own fitted distribution; the whole EM estimation, and if wanted the spatial prediction, is then repeated on the simulated data. Across replicates this gives standard errors, percentile confidence intervals free of normality assumptions, and the full empirical distribution of each parameter.</p>
+
+    <div class="callout">
+      <span class="tag">In the code</span>
+      <p><code>STEM_Simulation</code> performs the draw: it builds <code>Vmat = sigma2omega * Gamma</code>, draws <code>y_0</code> from its initial distribution, then propagates the state and generates the observations period by period. <code>STEM_Bootstrap</code> repeats <em>simulate, then re-estimate</em> over the requested number of replicates and returns the list of fits.</p>
+      <p>The spatially-clustered counterpart, <code>SCSTEM_Bootstrap</code>, uses the same generator regime by regime and additionally re-runs the clustering on every draw, so that the uncertainty of the estimated partition is propagated as well.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where to look next</h2>
+    <p class="kicker">Reading the sources alongside the papers</p>
+
+    <ul>
+      <li><code>STEM_Model</code> assembles the data and the starting values; the validation of dimensions lives in <code>STEM_Skeleton</code> and <code>STEM_Data</code>.</li>
+      <li><code>STEM_Estimation</code> is the outer EM loop and the convergence test; <code>kalman</code> is one full E-step plus M-step.</li>
+      <li>Inside <code>kalman</code>: <code>filtering</code> and <code>smoothing</code> for the recursions, <code>Q_function_addendo1/2/3</code> for the three pieces of the objective, the <code>d1_*</code>/<code>d2_*</code> family for the Newton-Raphson step.</li>
+      <li><code>vignette("function-map", package = "Stem")</code> shows how these call one another.</li>
+      <li>The spatially-clustered layer sits on top and is documented separately, in <code>?SCSTEM_Estim</code> and <code>vignette("SCSTEM", package = "Stem")</code>.</li>
+    </ul>
+
+    <p>A note on notation, worth keeping in mind when reading the sources: the papers use <code>n</code> for the number of locations and <code>T</code> for the number of time points, whereas the code uses <code>n</code> for time points and <code>d</code> for locations. The formulas are the same; only the letters differ.</p>
   </section>
 
   <footer>
     Part of the documentation of the R package <b>Stem</b>. Open it from R with
-    <code>system.file("extdata", "STEM_model_verification.html", package = "Stem")</code>.
-    See also <code>vignette("function-map", package = "Stem")</code> for the call graph,
-    and <code>NEWS.md</code> for the full list of changes in this release.
+    <code>browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))</code>.
+    Equation numbers refer to Fass&ograve; and Cameletti (2010) unless marked TR, in which case
+    they refer to the GRASPA technical report.
   </footer>
 
 </div>

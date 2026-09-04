@@ -75,7 +75,7 @@
 #' }
 #'
 #' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
-#'   Michela Cameletti
+#'   Francesco Caccia, Michela Cameletti
 #'
 #' @references
 #' Chatterjee, S., Lahiri, P., Li, H. (2008) \emph{Parametric bootstrap

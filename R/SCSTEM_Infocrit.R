@@ -69,7 +69,7 @@
 #' }
 #'
 #' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
-#'   Michela Cameletti
+#'   Francesco Caccia, Michela Cameletti
 #'
 #' @references
 #' Cerqueti, R., Maranzano, P., Mattera, R. (2025) \emph{Spatially-clustered

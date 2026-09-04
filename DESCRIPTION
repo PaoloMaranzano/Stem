@@ -11,6 +11,12 @@ Authors@R:
       email = "michela.cameletti@unibg.it"
       ),
     person(
+      given = "Francesco",
+      family = "Caccia",
+      role = c("aut", "cph"),
+      email = "francesco.caccia2000@gmail.com"
+      ),
+    person(
       given = "Paolo",
       family = "Maranzano",
       role = c("aut", "cre", "cph"),

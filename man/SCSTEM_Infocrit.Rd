@@ -136,7 +136,7 @@ Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
-  Michela Cameletti
+  Francesco Caccia, Michela Cameletti
 }
 \keyword{models}
 \keyword{spatial}

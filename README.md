@@ -20,32 +20,39 @@ For a network of `d` locations observed over `T` time points, the STEM model is
 a hierarchical state-space model with a measurement equation and a transition
 equation:
 
-```math
-z_t = X_t \beta + K y_t + e_t, \qquad e_t \sim N(0, \Sigma_e)
+```
+  z_t = X_t beta + K y_t + e_t          e_t  ~ N(0, Sigma_e)
+  y_t = G y_{t-1} + eta_t               eta_t ~ N(0, Sigma_eta)
+                                        y_0  ~ N(m_0, C_0)
+
+  Sigma_e = sigma2eps * I  +  sigma2omega * exp(-theta * h)
+            \___________/     \_____________________________/
+              nugget            spatially correlated component
 ```
 
-```math
-y_t = G y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta), \qquad y_0 \sim N(m_0, C_0)
-```
-
-```math
-\Sigma_e = \sigma^2_\varepsilon I + \sigma^2_\omega \exp(-\theta h)
-```
-
-so the network shares a latent temporal process `y_t`, loaded on the locations
-through `K`, on top of a spatially correlated error with a nugget.
+So the network shares a latent temporal process `y_t`, loaded on the locations
+through `K`, on top of a spatially correlated error with a nugget. Here `h` is
+the distance between two locations, `X_t` holds the covariates and `beta` the
+regression coefficients.
 
 SC-STEM assigns each location to one of `k` latent regimes and fits a separate
 STEM model within each of them, estimating labels and parameters jointly by
 maximising a Potts-penalised log-likelihood:
 
-```math
-Q = \sum_{i=1}^{d} \ell_{i k_i} + \phi\, c \sum_{i<j} w_{ij}\, \mathbb{1}(k_i = k_j)
+```
+  Q(labels) = SUM_i  loglik_i(regime of i)                     <- fit
+            + phi * c * SUM_{i<j} w_ij * 1{regime i = regime j} <- spatial cohesion
 ```
 
 where `phi >= 0` tunes how strongly neighbouring locations are pushed into the
-same regime, and `c` is a scale factor documented in `?SCSTEM_Estim`. Setting
-`k = 1` returns the pooled model.
+same regime, `w_ij` is the symmetrised k-nearest-neighbour adjacency indicator
+and `c` is a scale factor documented in `?SCSTEM_Estim`. Setting `k = 1` returns
+the pooled model.
+
+> The equations are written as plain text on purpose. A README is rendered by
+> GitHub, by RStudio, by r-universe and by pkgdown, and none of them guarantees
+> the same maths engine. The typeset version lives in the manual pages
+> (`?STEM_Model`, `?SCSTEM_Estim`) and in the vignettes.
 
 ## Installation
 
@@ -132,13 +139,17 @@ vignette("SCSTEM", package = "Stem")          # spatially-clustered STEM
 vignette("function-map", package = "Stem")    # map of the package
 ```
 
-The implementation has been checked equation by equation against the three
-reference papers. That verification ships with the package as a standalone
-document:
+A reading guide mapping each equation of the papers onto the function that
+implements it ships with the package as a standalone document:
 
 ```r
 browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))
 ```
+
+The development record — the defects fixed in this release and the reasoning
+behind the algorithmic changes — is kept in the repository, outside the built
+package, at [`dev/code-changes-report.html`](dev/code-changes-report.html). The
+user-facing summary is [`NEWS.md`](NEWS.md).
 
 ## Theoretical references
 
@@ -196,7 +207,7 @@ concentration in Europe. *JABES*.
 
 ## Authors
 
-Michela Cameletti (aut),
+Michela Cameletti (aut), Francesco Caccia (aut),
 [Paolo Maranzano](https://orcid.org/0000-0002-9228-2759) (aut, cre).
 
 Licensed under GPL (>= 2).

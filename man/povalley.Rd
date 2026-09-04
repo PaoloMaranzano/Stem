@@ -25,6 +25,7 @@ A list with five components, following the same conventions as
 \source{
 European Environment Agency, air quality e-reporting database,
 \url{https://www.eea.europa.eu/en/analysis/publications/air-quality-e-reporting}.
+Data prepared by Francesco Caccia.
 }
 \usage{
 data(povalley)
@@ -71,6 +72,6 @@ plot(povalley$dates, povalley$z[, 1], type = "l",
   \code{\link{SCSTEM_Estim}}
 }
 \author{
-Paolo Maranzano
+Francesco Caccia, Paolo Maranzano
 }
 \keyword{datasets}
