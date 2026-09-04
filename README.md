@@ -16,23 +16,36 @@ across spatial regimes that are estimated from the data rather than imposed.
 
 ## The models
 
-For a network of $d$ locations observed over $T$ time points,
+For a network of `d` locations observed over `T` time points, the STEM model is
+a hierarchical state-space model with a measurement equation and a transition
+equation:
 
-$$z_t = X_t \beta + K y_t + e_t, \qquad e_t \sim N(0, \Sigma_e),$$
-$$y_t = G y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta),$$
+```math
+z_t = X_t \beta + K y_t + e_t, \qquad e_t \sim N(0, \Sigma_e)
+```
 
-with $\Sigma_e = \sigma^2_\varepsilon I + \sigma^2_\omega \exp(-\theta h)$: a
-latent temporal process shared by the network, plus a spatially correlated
-error with a nugget.
+```math
+y_t = G y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta), \qquad y_0 \sim N(m_0, C_0)
+```
 
-SC-STEM assigns each location to one of $k$ latent regimes and fits a separate
+```math
+\Sigma_e = \sigma^2_\varepsilon I + \sigma^2_\omega \exp(-\theta h)
+```
+
+so the network shares a latent temporal process `y_t`, loaded on the locations
+through `K`, on top of a spatially correlated error with a nugget.
+
+SC-STEM assigns each location to one of `k` latent regimes and fits a separate
 STEM model within each of them, estimating labels and parameters jointly by
-maximising a Potts-penalised log-likelihood
+maximising a Potts-penalised log-likelihood:
 
-$$Q = \sum_{i=1}^{d} \ell_{i k_i} + \phi\, c \sum_{i<j} w_{ij}\,\mathbb{I}(k_i = k_j),$$
+```math
+Q = \sum_{i=1}^{d} \ell_{i k_i} + \phi\, c \sum_{i<j} w_{ij}\, \mathbb{1}(k_i = k_j)
+```
 
-where $\phi \ge 0$ tunes how strongly neighbouring locations are pushed into the
-same regime. Setting $k = 1$ returns the pooled model.
+where `phi >= 0` tunes how strongly neighbouring locations are pushed into the
+same regime, and `c` is a scale factor documented in `?SCSTEM_Estim`. Setting
+`k = 1` returns the pooled model.
 
 ## Installation
 
@@ -51,7 +64,7 @@ remotes::install_github("PaoloMaranzano/Stem")
 | `STEM_Kriging()` | spatial prediction at unobserved locations |
 | `STEM_Bootstrap()` | parametric bootstrap for the pooled model |
 | `SCSTEM_Estim()` | fit a spatially-clustered STEM model |
-| `SCSTEM_Infocrit()` | information criteria over a grid of $(k, \phi)$ |
+| `SCSTEM_Infocrit()` | information criteria over a grid of `(k, phi)` |
 | `SCSTEM_Select()` | two-step selection of the hyperparameters |
 | `SCSTEM_Bootstrap()` | refit-with-clustering parametric bootstrap |
 | `SCSTEM_BootInference()` | standard errors, intervals and between-regime tests |
@@ -141,7 +154,7 @@ Statistics*, 44, 100525. <https://doi.org/10.1016/j.spasta.2021.100525>
 
 ## Authors
 
-Michela Cameletti (aut), Francesco Caccia (aut),
+Michela Cameletti (aut),
 [Paolo Maranzano](https://orcid.org/0000-0002-9228-2759) (aut, cre).
 
 Licensed under GPL (>= 2).

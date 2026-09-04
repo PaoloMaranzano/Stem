@@ -138,7 +138,7 @@ area prediction}. Journal of the Royal Statistical Society, Series B, 68,
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
-  Francesco Caccia, Michela Cameletti
+  Michela Cameletti
 }
 \keyword{models}
 \keyword{spatial}
