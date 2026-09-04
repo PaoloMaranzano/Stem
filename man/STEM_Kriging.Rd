@@ -78,6 +78,7 @@ mod1 <- STEM_Model(z=z,covariates=covariates,coordinates=coordinates,phi=phi,K=K
 class(mod1)
 
 #mod1 is given as output by the STEM_Model function
+\donttest{
 mod1.est <- STEM_Estimation(mod1)
 
 #coordinates of the 25 new points displaced in a regular grid (S=25)
@@ -124,6 +125,7 @@ points(coord.new[,1],coord.new[,2],col=2,pch=19)
 byline <- min((range(xxx)[2]-range(xxx)[1])/4,(range(yyy)[2]-range(yyy)[1])/4)
 abline(v=seq(range(xxx)[1],range(xxx)[2],by=byline),col="grey",lty=2)
 abline(h=seq(range(yyy)[1],range(yyy)[2],by=byline),col="grey",lty=2)
+}
 
 }
 \references{

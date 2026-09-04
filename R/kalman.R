@@ -9,6 +9,12 @@
     if(distance=='euclidean'){dist = as.matrix(stats::dist(coordinates,diag=TRUE))} #distance matrix}
     if(distance=='geo'){dist = as.matrix(geodist::geodist(coordinates,measure='geodesic'))} #distance matrix}
 
+    ### Missing observations, following Durbin and Koopman (2012), Sect. 4.10.
+    ### The observed-row index of every time point is computed once: the filter
+    ### restricts the measurement equation to those rows, and the M-step
+    ### completes the sufficient statistics over the missing ones.
+    obs_ix = stem_obs_index(z)
+
     ####################
     ###Model definition
     ###if you want to check the model use phi_j=phi_start
@@ -82,10 +88,21 @@
     ###FIRST STEP: Calculate C*_{n,n-1} (start of the iterative procedure --> CCC[[n]])
     ###Pn_n-1=R_n=G_n%*%C_n-1%*%t(G_n)+W_n
     ###A_n=R_n%*%F_n%*%solve(t(F_n)%*%R_n%*%F_n+V_n)
+    ### The gain that starts the lag-one recursion has to be the one actually
+    ### used at time n, so it is built on the observed rows only (Durbin and
+    ### Koopman 2012, Sect. 4.10). With nothing observed at time n the gain is
+    ### zero, which is the Z_t = 0 device of that section.
+    oi_n            = obs_ix$idx[[nobs]]
     R_n 			= SSmodel$Gmat %*% mod1.filter$C[[nobs-1]] %*%t(SSmodel$Gmat)+ SSmodel$Wmat
-    A_n 			= R_n%*%SSmodel$Fmat %*%
-      solve(diag(regularization,nrow(t(SSmodel$Fmat) %*% R_n %*% SSmodel$Fmat + SSmodel$Vmat))+t(SSmodel$Fmat) %*% R_n %*% SSmodel$Fmat + SSmodel$Vmat)
-    CCC[[nobs]] 	= (diag(p)-A_n %*% t(SSmodel$Fmat)) %*% SSmodel$Gmat %*% mod1.filter$C[[nobs-1]]
+    if (length(oi_n) == 0L) {
+      CCC[[nobs]]   = SSmodel$Gmat %*% mod1.filter$C[[nobs-1]]
+    } else {
+      Fmat_n        = SSmodel$Fmat[, oi_n, drop = FALSE]
+      Vmat_n        = SSmodel$Vmat[oi_n, oi_n, drop = FALSE]
+      Q_n           = t(Fmat_n) %*% R_n %*% Fmat_n + Vmat_n
+      A_n 			= R_n %*% Fmat_n %*% solve(diag(regularization,nrow(Q_n)) + Q_n)
+      CCC[[nobs]] 	= (diag(p)-A_n %*% t(Fmat_n)) %*% SSmodel$Gmat %*% mod1.filter$C[[nobs-1]]
+    }
 
     ################################
     ###loop for calculating the other elements of CCC using cov_lagone fucntion (see function.R)
@@ -166,16 +183,65 @@
     ###sigma2omega=sigma2epsilon if logb=0 (exp(logb)=1)
     #W=eq 13 Fasso'-Cameletti
     #W=BB
+    ### E-step for the measurement equation. In the complete case this is
+    ###   BB_t = Z C^s_t Z' + r_t r_t' ,
+    ### the conditional second moment of the measurement error given the data.
+    ### With missing entries the same quantity has to be COMPLETED, because the
+    ### EM algorithm maximizes the expected complete-data log-likelihood. The
+    ### observed block keeps the form above; the missing block is predicted from
+    ### the observed one by Gaussian conditioning on Sigma_e -- the same algebra
+    ### as kriging at a fixed time point -- and its conditional variance Omega_t
+    ### is added back. Writing S_t for the matrix that lifts a residual defined
+    ### on the observed rows to the full vector (identity on the observed rows,
+    ### P_t on the missing ones),
+    ###
+    ###   BB_t = S_t Zo C^s_t Zo' S_t' + Omega_t + (S_t r_o)(S_t r_o)' ,
+    ###
+    ### which reduces to the complete-data formula when nothing is missing and
+    ### to Sigma_e when nothing is observed. Note that the conditional mean of a
+    ### missing element is NOT the signal alone: that would be exact only for a
+    ### diagonal Sigma_e. The completed observations zhat are kept for the beta
+    ### update below.
+    blocks  = stem_blocks_cache(SSmodel$Vmat, d, regularization)
+    Zmat    = t(SSmodel$Fmat)                     # d x p loading matrix
     BB_list = list()
+    zhat    = matrix(NA_real_, nobs, d)
+
     for (tt in 1:nobs) {
-      BB_list[[tt]] = 	t(SSmodel$Fmat) %*% mod1.smoother$C[[tt]] %*% SSmodel$Fmat +
-        ((t(matrix(zz[tt,],nrow=1)) - covariates[,,tt]%*%phi_j$beta - t(SSmodel$Fmat) %*% t(matrix(mod1.smoother$m[tt,],nrow=1)))
-         %*% t(t(matrix(zz[tt,],nrow=1)) -covariates[,,tt]%*%phi_j$beta- t(SSmodel$Fmat) %*% t(matrix(mod1.smoother$m[tt,],nrow=1)))   )
+      msm = matrix(mod1.smoother$m[tt,], ncol = 1)          # p x 1
+      Csm = mod1.smoother$C[[tt]]
+      Xb  = covariates[,,tt] %*% phi_j$beta                 # d x 1
+      sig = Zmat %*% msm                                    # d x 1
+      oi  = obs_ix$idx[[tt]]
+
+      if (obs_ix$complete[tt]) {
+        r_t           = matrix(zz[tt,], ncol = 1) - Xb - sig
+        BB_list[[tt]] = Zmat %*% Csm %*% t(Zmat) + r_t %*% t(r_t)
+        zhat[tt,]     = zz[tt,]
+      } else {
+        bl = blocks(obs_ix$key[tt], oi)
+        if (length(oi) == 0L) {
+          BB_list[[tt]] = bl$Omega
+          zhat[tt,]     = Xb + sig
+        } else {
+          Zo   = Zmat[oi, , drop = FALSE]
+          r_o  = matrix(zz[tt, oi], ncol = 1) - Xb[oi, , drop = FALSE] -
+                   sig[oi, , drop = FALSE]
+          SZo  = bl$S %*% Zo
+          rhat = bl$S %*% r_o
+          BB_list[[tt]] = SZo %*% Csm %*% t(SZo) + bl$Omega + rhat %*% t(rhat)
+          zhat[tt,]     = Xb + sig + rhat
+        }
+      }
     }
     BB = sumMatrices(BB_list)
 
     D = solve(diag(regularization,nrow(cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)) %*% BB
     #sigma2omega_j=tr(sigmaeinersa*W) in Fasso Cameletti 12
+    ### The divisor stays n*d, the COMPLETE-data count, and not the number of
+    ### observed values: the EM algorithm maximizes the expected complete-data
+    ### log-likelihood, and BB above already carries the conditional variance of
+    ### whatever was not observed.
     sigma2omega_j = sum(diag(D))/(n*d)
 
     #############################
@@ -185,9 +251,14 @@
     #v_t=z_t-K_t y_t
     Sigmae_inversa = solve(diag(regularization,nrow(sigma2omega_j * cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+sigma2omega_j * cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist))
 
+    ### zhat is the observation vector completed by the E-step: it equals z
+    ### wherever z was observed and the conditional expectation of the missing
+    ### element given everything observed elsewhere. The design matrix and
+    ### Sigma_e stay at their full dimension, as they must, since the M-step
+    ### maximizes the expected COMPLETE-data log-likelihood.
     vvt_list = list ()
     for (tt in 1:nobs) {
-      vt 		=  matrix(unlist(z[tt,]),ncol=1) - t(SSmodel$Fmat) %*% mod1.smoother$m[tt,]
+      vt 		=  matrix(zhat[tt,],ncol=1) - t(SSmodel$Fmat) %*% mod1.smoother$m[tt,]
       vvt_list[[tt]] 	= t(covariates[,,tt]) %*%  Sigmae_inversa  %*% vt
     }
     v = sumMatrices(vvt_list)

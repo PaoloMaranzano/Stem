@@ -205,6 +205,8 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
     gen[[g]]$skeleton$phi <- gen[[g]]$estimates$phi.hat
   }
 
+  na_pattern <- is.na(base_model$data$z)
+
   one_draw <- function(b) {
 
     z_star <- matrix(NA_real_, nrow = Tobs, ncol = d)
@@ -218,6 +220,11 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
     ### observed series, so that the refit still sees a complete network
     miss <- which(apply(z_star, 2, function(cc) all(is.na(cc))))
     if (length(miss)) z_star[, miss] <- base_model$data$z[, miss]
+
+    ### The replicate has to reproduce the observed design, missing values
+    ### included: a bootstrap sample with a complete response would understate
+    ### the uncertainty of a fit obtained from an incomplete one.
+    if (any(na_pattern)) z_star[na_pattern] <- NA_real_
 
     mod_star <- STEM_Model(z = z_star,
                            covariates = base_model$data$covariates,

@@ -103,7 +103,6 @@
 ###   sigma2omega  scalar, cluster-wise spatial variance
 `scstem_loglike_i` <- function(z_i, X_i, beta, ysm, K_i, sigma2eps, sigma2omega) {
 
-  Tobs <- length(z_i)
   v <- as.numeric(sigma2eps) + as.numeric(sigma2omega)
   if (!is.finite(v) || v <= 0) return(-Inf)
 
@@ -113,7 +112,15 @@
   fit_t <- as.numeric(as.matrix(X_i) %*% matrix(as.numeric(beta), ncol = 1)) +
     as.numeric(ysm %*% t(K_i))
 
-  res <- z_i - fit_t
+  ### Only the time points at which this location was observed contribute, and
+  ### the count of terms is its own T_i. The missingness pattern of a location
+  ### does not depend on the cluster it is being scored against, so the scores
+  ### stay comparable across clusters, which is all the assignment step needs.
+  keep <- !is.na(z_i)
+  Tobs <- sum(keep)
+  if (Tobs == 0L) return(-Inf)
+
+  res <- z_i[keep] - fit_t[keep]
   out <- -0.5 * Tobs * log(2 * pi * v) - 0.5 * sum(res^2) / v
   if (!is.finite(out)) return(-Inf)
   out

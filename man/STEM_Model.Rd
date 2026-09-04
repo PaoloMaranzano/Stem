@@ -56,7 +56,17 @@ The input list must have:
 }
 }
 \note{
-No missing values are allowed in \code{z}, \code{covariates}, or \code{coordinates}.
+Missing values are allowed in the response \code{z}, and are handled by the
+EM algorithm as prescribed by Durbin and Koopman (2012, 2nd ed.), Sections
+2.7 and 4.10: at each time point the measurement equation is restricted to
+the locations actually observed, and a time point at which nothing is
+observed contributes no update and no likelihood term. The panel may
+therefore be unbalanced. Every location must retain at least one observation.
+
+No missing values are allowed in \code{covariates} or \code{coordinates}: the
+design matrix enters the closed-form M-step updates directly and the
+coordinates enter the distance matrix, so gaps there would require a
+stochastic E-step. Impute them before fitting.
 }
 \examples{
 # Load data

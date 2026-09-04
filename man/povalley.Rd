@@ -47,7 +47,10 @@ only when they covered the whole 2019-2023 window with at most 366 missing
 days on each pollutant and an altitude not exceeding 250 meters, so that the
 network describes the plain rather than the surrounding reliefs. Residual
 gaps and outliers were interpolated series by series, and the concentrations
-were rounded to the nearest integer and truncated at zero.
+were rounded to the nearest integer and truncated at zero. The response could
+equally have been left incomplete, since \code{\link{STEM_Estimation}} now
+handles missing values in \code{z} natively; the covariates, which the model
+requires complete, had to be filled in any case.
 
 Note that the response is on the original scale, not on the logarithmic one
 used by \code{\link{pm10}}.

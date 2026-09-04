@@ -71,6 +71,7 @@
 #' class(mod1)
 #'
 #' #mod1 is given as output by the STEM_Model function
+#' \donttest{
 #' mod1.est <- STEM_Estimation(mod1)
 #'
 #' #coordinates of the 25 new points displaced in a regular grid (S=25)
@@ -117,6 +118,7 @@
 #' byline <- min((range(xxx)[2]-range(xxx)[1])/4,(range(yyy)[2]-range(yyy)[1])/4)
 #' abline(v=seq(range(xxx)[1],range(xxx)[2],by=byline),col="grey",lty=2)
 #' abline(h=seq(range(yyy)[1],range(yyy)[2],by=byline),col="grey",lty=2)
+#' }
 #'
 #' @seealso See Also \link{STEM_Model}, \link{pm10} and \link{STEM_Estimation}
 #'
@@ -180,12 +182,24 @@ if (distance=='geo'){
   }
 }
 
-multi.pred = spatial.pred(mu1 = covariates[,,time.point]%*%phi$beta + K%*%y.smoothed[time.point,],
+### The predictor conditions on the values observed at the chosen time point.
+### When some of them are missing, the conditioning set is restricted to the
+### rows actually observed -- the same selection as in the filter (Durbin and
+### Koopman 2012, Sect. 4.10) -- so that the kriging equations are solved on the
+### observed sub-vector. With nothing observed at that time point the predictor
+### falls back on the unconditional mean of the new locations.
+mu1.full   = covariates[,,time.point]%*%phi$beta + K%*%y.smoothed[time.point,]
+Sigma11.full = phi$sigma2omega * cov.spat(d=d , logb=phi$logb , logtheta=phi$logtheta , dist=dist)
+Sigma12.full = phi$sigma2omega * exp(-phi$theta * new.distancematrix)
+X1.full    = z[time.point,]
+obs.k      = which(!is.na(X1.full))
+
+multi.pred = spatial.pred(mu1 = mu1.full[obs.k, , drop = FALSE],
 				mu2	= covariates.newlocations %*% phi$beta + K.newlocations %*% y.smoothed[time.point,],
-				Sigma11 = phi$sigma2omega * cov.spat(d=d , logb=phi$logb , logtheta=phi$logtheta , dist=dist),
-				Sigma12 = phi$sigma2omega * exp(-phi$theta * new.distancematrix),
+				Sigma11 = Sigma11.full[obs.k, obs.k, drop = FALSE],
+				Sigma12 = Sigma12.full[, obs.k, drop = FALSE],
 				Sigma22 = diag(phi$sigma2omega,m),
-				X1	= z[time.point,]
+				X1	= X1.full[obs.k]
 		)
 
 

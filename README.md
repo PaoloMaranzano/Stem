@@ -134,21 +134,36 @@ the current implementation, not the model on paper.
 | Non-stationarity in space | across regimes only | Each regime carries its own $\theta_k$, $\sigma^2_{\epsilon k}$, $\sigma^2_{\omega k}$, so the partition is itself a coarse form of non-stationarity. |
 | Spatial support | point-referenced | Distances `"euclidean"` or `"geo"`. Areal data only through centroids, and only when the units are small relative to the distances between them. |
 | Time | discrete, regularly spaced | The state equation links consecutive time points; irregular spacing would need a continuous-time formulation. |
-| Panel | balanced and complete | Every location observed at every time point. |
-| **Missing values in `z`** | **not supported** | `STEM_Model()` rejects them. See the note below. |
-| **Missing values in covariates or coordinates** | **not supported** | Same. Impute before fitting. |
-| Network composition | fixed over time | Stations entering or leaving the window have to be dropped. |
+| Panel | may be unbalanced | Gaps in the response are allowed; see the note below. |
+| **Missing values in `z`** | **supported** | Handled by the EM algorithm following Durbin and Koopman (2012), Sect. 2.7 and 4.10. Every location must keep at least one observation. |
+| **Missing values in covariates or coordinates** | **not supported** | The design matrix enters the closed-form M-step and the coordinates the distance matrix. Impute before fitting. |
+| Network composition | fixed over time | A station entering or leaving the window is represented by marking the unobserved periods as `NA` in the response. |
 | Regime sizes (SC-STEM only) | bounded below | Each regime needs enough locations for its own fit, which caps the number of regimes that can be entertained on a given network. |
 
-> **On missing values.** This is a restriction of the implementation, not of the
-> model, and the two cases are not equally hard. For the *response* the standard
-> state-space treatment applies directly: at a time point where only some
-> locations are observed, the Kalman update runs on the corresponding rows of
-> the measurement equation and the smoother returns the conditional moments
-> given whatever was observed. For the *covariates* the design matrix enters the
-> closed-form M-step updates, so gaps there would require a genuinely stochastic
-> E-step. Supporting missing responses is the most useful extension we can
-> identify, and it is on the roadmap.
+> **On missing values in the response.** The treatment follows Durbin and
+> Koopman (2012, 2nd ed.), Sections 2.7 and 4.10. At each time point the
+> measurement equation is restricted to the locations actually observed, through
+> a selection matrix whose rows are a subset of the rows of the identity; a time
+> point at which nothing is observed contributes no update and no likelihood
+> term, which is their `Z_t = 0` device. The backward smoothing recursions need
+> no change at all, since they read the filtered moments and the transition,
+> never the data.
+>
+> The M-step is where the work is. EM maximizes the *expected complete-data*
+> log-likelihood, so the sufficient statistics are completed rather than
+> truncated: a missing value enters through its conditional expectation given
+> everything observed, and its conditional variance is added back as a
+> correction. That conditional expectation is *not* the signal alone — which
+> would be exact only for a diagonal covariance — because the spatial covariance
+> couples the locations, so the missing block of the measurement error is
+> predicted from the observed one by the same algebra as kriging at a fixed time
+> point. The divisor of the variance update stays the complete-data count, for
+> the same reason. Kriging and both bootstraps follow: the predictor conditions
+> on the observed sub-vector, and a bootstrap replicate reproduces the observed
+> design, gaps included.
+>
+> On complete data every result is bit-for-bit what it was before the feature
+> was added; this is asserted by the test suite.
 
 ## Installation
 

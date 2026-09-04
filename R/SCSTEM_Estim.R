@@ -144,15 +144,26 @@
 #' point-referenced and fixed over time, and the time index is discrete and
 #' regularly spaced.
 #'
-#' \strong{Missing values are not supported}, neither in the response nor in
-#' the covariates or the coordinates: \code{\link{STEM_Model}} rejects them, so
-#' the panel must be balanced and complete. This is a restriction of the
-#' implementation rather than of the model. For the response the standard
-#' state-space treatment would apply directly -- at a time point where only some
-#' locations are observed, the Kalman update runs on the corresponding rows of
-#' the measurement equation -- whereas gaps in the covariates would require a
-#' stochastic E-step, since the design matrix enters the closed-form M-step
-#' updates. Until then, impute before fitting.
+#' \strong{Missing values} are supported in the \emph{response}, and handled as
+#' prescribed by Durbin and Koopman (2012, 2nd ed.), Sections 2.7 and 4.10: at
+#' each time point the measurement equation is restricted to the locations
+#' actually observed, through a selection matrix whose rows are a subset of the
+#' rows of the identity, and a time point at which nothing is observed
+#' contributes no update and no likelihood term. Because the EM algorithm
+#' maximizes the expected complete-data log-likelihood, the M-step completes the
+#' sufficient statistics: a missing value enters through its conditional
+#' expectation given everything observed, and its conditional variance is added
+#' back as a correction. Note that this conditional expectation is not the
+#' signal alone, since the spatial covariance couples the locations, so the
+#' missing block of the measurement error is predicted from the observed one by
+#' the same algebra as kriging at a fixed time point. In the assignment step,
+#' each location is scored on the time points at which it was observed.
+#'
+#' Missing values are \emph{not} supported in the covariates or the coordinates:
+#' the design matrix enters the closed-form M-step updates directly and the
+#' coordinates enter the distance matrix, so gaps there would require a
+#' stochastic E-step. Impute them before fitting. Every location must retain at
+#' least one observation.
 #'
 #' @param StemModel an object of class \dQuote{STEM_Model} given as output by
 #'   the \code{\link{STEM_Model}} function.

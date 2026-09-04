@@ -20,7 +20,12 @@ function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',p
 
         ##STEP 2: SIMULATIOM
         StemModel$skeleton$phi = StemModel$estimates$phi.hat   #it follows that the initial values are given by the ML Estimates
+	na.pattern	= is.na(StemModel$data$z)
 	simulated.z	= STEM_Simulation(StemModel = StemModel,distance=distance)
+	### The replicate reproduces the observed design, missing values included:
+	### a bootstrap sample with a complete response would understate the
+	### uncertainty of a fit obtained from an incomplete one.
+	if (any(na.pattern)) simulated.z[na.pattern] = NA_real_
 	StemModel$data$z = simulated.z
 
 	###STEP 3: PARAMETER ESTIMATION

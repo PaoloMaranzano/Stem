@@ -18,6 +18,66 @@ between the reference papers and the code, see
 
 ### 2026-09-04
 
+**Missing values in the response are now supported.**
+Following Durbin and Koopman (2012, 2nd ed.), Sections 2.7 and 4.10. At each
+time point the measurement equation is restricted to the locations actually
+observed, through the selection matrix whose rows are a subset of the rows of
+the identity: `z`, the loading matrix and the measurement covariance are all
+pre-multiplied by it, and the Kalman recursion proceeds on an observation vector
+whose dimension varies over time. A time point at which nothing is observed
+contributes no update and no likelihood term, which is their `Z_t = 0` device.
+The likelihood therefore stays the exact likelihood of the observed data by the
+prediction-error decomposition. The backward smoothing recursions needed no
+change at all: they read the filtered moments and the transition, never the
+data, and the same is true of `B_function()`, `cov_lagone()` and the M-step
+updates of `G`, `Sigmaeta` and `m0`, which are functions of the smoothed states
+alone.
+
+The work is in the M-step, and this is where a naive implementation goes wrong.
+EM maximizes the expected COMPLETE-data log-likelihood, so the sufficient
+statistics have to be completed rather than truncated. A missing value enters
+through its conditional expectation given everything observed, and its
+conditional variance is added back as a correction term; the divisor of the
+`sigma2omega` update stays the complete-data count `n*d`, not the number of
+observed values.
+
+The subtlety is what that conditional expectation is. Durbin and Koopman remark
+that a missing element can be estimated by the corresponding element of
+`Z_t yhat_t`, which is exact when the measurement covariance is diagonal - and
+that is not this model. Here `Sigma_e` couples the locations, so the conditional
+mean of a missing observation is its signal PLUS the part of the measurement
+error predicted from the neighbors observed at the same instant, by the usual
+Gaussian conditioning. It is the same algebra as kriging, applied at a fixed
+time point. Ignoring that term would bias the variance components downwards, by
+charging to noise a residual the model can explain spatially.
+
+The rest of the chain follows. `STEM_Kriging()` conditions on the sub-vector
+observed at the chosen time point instead of the whole of `z_t`, and falls back
+on the unconditional mean where nothing was observed. `scstem_loglike_i()` scores
+a location on the time points at which it was observed, with its own `T_i`;
+since a location's missingness pattern does not depend on the cluster it is
+being scored against, the scores stay comparable across clusters. Both
+bootstraps reimpose the observed pattern of gaps on every replicate, since a
+replicate with a complete response would understate the uncertainty of a fit
+obtained from an incomplete one. `STEM_Model()` now rejects missing values only
+in the covariates and the coordinates, and additionally rejects a location with
+no observed value at all.
+
+Verified on four counts. On complete data the estimates are **bit-for-bit
+identical** to those of the previous commit - maximum absolute difference
+exactly zero across all parameters and the log-likelihood, checked by running
+the working tree and `HEAD` side by side on the `pm10` example. With 15 percent
+of the response blanked at random the fit runs and the estimates move little.
+A time point at which nothing is observed is handled. And on data simulated from
+a known truth, a 20 percent MCAR gap recovers the true parameters as accurately
+as the complete data do, which is what an unbiased treatment should look like.
+`tests/testthat/test-missing.R` adds 35 assertions, including the algebra of the
+conditional blocks against direct Gaussian conditioning.
+
+One bug found and fixed while testing: pasting an empty observed-index gave the
+same cache key as a complete time point, so a fully missing row was served the
+complete-data shortcut and the accumulation failed.
+
 **The conceptual map is now generated, in both formats.**
 `inst/scripts/make-function-map.R` holds the map as tables of nodes and edges
 and emits both `inst/extdata/STEM_function_map.svg` and the new
@@ -44,13 +104,13 @@ the only source of non-stationarity across the domain; point-referenced
 locations, fixed over time; a discrete and regularly spaced time index; a known
 loading matrix, common across regimes; `C0` fixed while `m0` is estimated.
 
-The entry that matters most is that **missing values are not supported**, in the
-response no more than in the covariates or the coordinates: `STEM_Model()`
-rejects them and the Kalman recursion has no partial-observation branch. This is
-a restriction of the implementation, not of the model, and the two cases are not
-equally hard: for the response the standard state-space treatment applies
-directly, whereas gaps in the covariates would require a stochastic E-step,
-since the design matrix enters the closed-form M-step updates.
+Writing that section is what surfaced the missing-value question. At the time it
+recorded that missing values were not supported anywhere - `STEM_Model()`
+rejected them and the Kalman recursion had no partial-observation branch - and
+noted that the response case was the standard state-space treatment while the
+covariate case would need a stochastic E-step. The response half was implemented
+straight afterwards, in the entry above; the table now reflects that, and the
+restriction stands only for the covariates and the coordinates.
 
 **Package logo.**
 The hexagon now carries the three ideas the package is about: a relief
