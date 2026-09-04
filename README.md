@@ -114,9 +114,9 @@ conditional on a partition that is itself estimated.
 ## Documentation
 
 ```r
-vignette("Stem", package = "Stem")          # the classical STEM workflow
-vignette("SCSTEM", package = "Stem")        # spatially-clustered STEM
-vignette("function-map", package = "Stem")  # map of the package
+vignette("getting-started", package = "Stem") # the classical STEM workflow
+vignette("SCSTEM", package = "Stem")          # spatially-clustered STEM
+vignette("function-map", package = "Stem")    # map of the package
 ```
 
 ## References

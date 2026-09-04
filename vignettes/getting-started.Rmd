@@ -1,0 +1,179 @@
+---
+title: "1. Getting started with STEM models"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{1. Getting started with STEM models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6.5,
+  fig.height = 4
+)
+```
+
+```{r load}
+library(Stem)
+```
+
+## The model
+
+`Stem` estimates hierarchical spatio-temporal models of the form
+
+$$
+z_t = X_t \beta + K y_t + e_t, \qquad e_t \sim N(0, \Sigma_e),
+$$
+$$
+y_t = G y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta), \qquad
+y_0 \sim N(m_0, C_0),
+$$
+
+for $t = 1, \dots, T$. The observation vector $z_t$ collects the measurements at
+$d$ spatial locations; $y_t$ is a $p$-dimensional latent temporal process shared
+by the network and loaded on the locations through the $d \times p$ matrix $K$;
+$X_t$ holds $r$ known covariates. The spatial covariance is
+
+$$
+\Sigma_e = \sigma^2_\varepsilon I + \sigma^2_\omega C(h; \theta), \qquad
+C(h; \theta) = \exp(-\theta h),
+$$
+
+so that $\sigma^2_\varepsilon$ is a nugget and $\sigma^2_\omega$ the variance of
+the spatially correlated component. The parameter vector is
+$\phi = (\beta, \sigma^2_\varepsilon, \sigma^2_\omega, \theta, G, \Sigma_\eta,
+m_0)$, estimated by maximum likelihood through Kalman filtering and smoothing
+inside an EM algorithm, with $C_0$ held fixed.
+
+## Data
+
+The package ships two datasets. `pm10` is the small example of Fassò and
+Cameletti: 22 stations and 366 days of log PM10, with emissions and altitude as
+covariates. `povalley` is a larger, real network of 36 background stations in
+the Po Valley observed daily over 2019--2023.
+
+```{r data}
+data(pm10)
+
+str(pm10, max.level = 1)
+
+coordinates <- pm10$coords * 1000   # from km to metres
+covariates <- pm10$covariates
+z <- pm10$z
+
+dim(z)            # T x d
+dim(covariates)   # (T * d) x r
+```
+
+The covariate matrix stacks the $T \times r$ block of each station on top of the
+next: rows $1, \dots, T$ belong to the first station, rows $T+1, \dots, 2T$ to
+the second, and so on. Keeping this convention is essential, because every
+routine of the package relies on it to slice the data by location.
+
+## Building a model object
+
+`STEM_Model()` assembles the data and the starting values into an object of
+class `STEM_Model`. The starting values are supplied through the list `phi`,
+which must have exactly the components of the parameter vector.
+
+```{r model}
+phi <- list(
+  beta        = matrix(c(3.65, 0.046, -0.904), 3, 1),
+  sigma2eps   = 0.1,
+  sigma2omega = 0.2,
+  theta       = 0.01,
+  G           = matrix(0.77, 1, 1),
+  Sigmaeta    = matrix(0.3, 1, 1),
+  m0          = as.matrix(0),
+  C0          = as.matrix(1)
+)
+
+K <- matrix(1, ncol(z), 1)   # a single latent process, loaded on every station
+
+mod <- STEM_Model(
+  z = z,
+  covariates = covariates,
+  coordinates = coordinates,
+  phi = phi,
+  K = K
+)
+
+class(mod)
+```
+
+## Estimation
+
+`STEM_Estimation()` runs the EM algorithm. Convergence is declared when both the
+relative change of the parameter vector and the relative change of the
+log-likelihood fall below `precision`. Progress messages are off by default and
+can be turned on with `verbose = TRUE`.
+
+```{r estimation}
+fit <- STEM_Estimation(mod, precision = 0.01, distance = "euclidean")
+
+round(unlist(fit$estimates$phi.hat), 5)
+
+fit$estimates$loglik
+fit$estimates$convergence.par[c("conv.log", "conv.par", "iterEM")]
+```
+
+Use `distance = "geo"` when the coordinates are longitude and latitude, as in
+`povalley`; the geodesic distance is then computed with `geodist`.
+
+The smoothed latent process is returned as a `ts` object:
+
+```{r smoothed, fig.alt = "Smoothed latent temporal process"}
+plot(fit$estimates$y.smoothed, ylab = "smoothed latent state", xlab = "day")
+```
+
+## Uncertainty: the parametric bootstrap
+
+The EM algorithm returns point estimates but no standard errors.
+`STEM_Bootstrap()` simulates `B` datasets from the fitted model and re-estimates
+the parameters on each of them.
+
+```{r bootstrap, eval = FALSE}
+boot <- STEM_Bootstrap(fit, B = 100, distance = "euclidean")
+
+npar <- 9
+boot.estimates <- t(vapply(boot$boot.output, function(b) {
+  p <- b$estimates$phi.hat
+  c(p$beta, p$sigma2eps, p$sigma2omega, p$theta, p$G, p$Sigmaeta, p$m0)
+}, numeric(npar)))
+
+se <- sqrt(diag(stats::var(stats::na.omit(boot.estimates))))
+round(se, 5)
+```
+
+## Spatial prediction
+
+`STEM_Kriging()` predicts the process at unobserved locations, given their
+coordinates, covariates and loading matrix.
+
+## Where to go next
+
+The second vignette, *Spatially-clustered STEM models*, shows what to do when a
+single global regression is not plausible over the whole network, and the
+coefficients themselves should be allowed to vary across spatial regimes:
+
+```{r next, eval = FALSE}
+vignette("SCSTEM", package = "Stem")
+```
+
+A conceptual map of how the functions call one another is the third vignette:
+
+```{r map, eval = FALSE}
+vignette("function-map", package = "Stem")
+```
+
+## References
+
+Fassò, A., Cameletti, M. and Nicolis, O. (2007). Air quality monitoring using
+heterogeneous networks. *Environmetrics*, 18, 245--264.
+
+Fassò, A. and Cameletti, M. (2010). A unified statistical approach for
+simulation, modeling, analysis and mapping of environmental data. *Simulation*,
+86, 139--153.
