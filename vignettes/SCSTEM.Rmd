@@ -43,12 +43,13 @@ Labels and parameters are estimated jointly by maximising a Potts-penalised
 log-likelihood
 
 $$
-Q = \sum_{i=1}^{d} \ell_{i k_i}
-  + \phi\, c \sum_{i<j} w_{ij}\, \mathbb{I}(k_i = k_j),
+Q = \sum_{i=1}^{d} \ell_i(k_i)
+  + \phi\, c \sum_{(i,j) \in E} I(k_i = k_j),
 $$
 
-where $w_{ij}$ is the symmetrised $k$-nearest-neighbour adjacency and $\phi \ge
-0$ controls how strongly neighbouring locations are pushed into the same regime.
+where $E$ is the edge set of the symmetrised $k$-nearest-neighbour graph, each
+unordered pair counted once, and $\phi \ge 0$ controls how strongly neighbouring
+locations are pushed into the same regime.
 This is the penalty of Sugasawa and Murakami (2021), in the form used for
 spatially-clustered Fay--Herriot and spatial autoregressive models.
 

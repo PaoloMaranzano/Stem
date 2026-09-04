@@ -100,13 +100,14 @@ The partition is not imposed. Labels $k_1, \ldots, k_d$ and parameters are
 estimated jointly by maximising a Potts-penalised log-likelihood,
 
 ```math
-Q = \sum_{i=1}^{d} \ell_i(k_i) + \phi \, c \sum_{i<j} w_{ij} \, I(k_i = k_j)
+Q = \sum_{i=1}^{d} \ell_i(k_i) + \phi \, c \sum_{(i,j) \in E} I(k_i = k_j)
 ```
 
 where $\ell_i(k)$ is the log-likelihood contribution of location $i$ under the
-parameters of regime $k$, $w_{ij}$ is the symmetrised $k$-nearest-neighbour
-adjacency indicator, $I(\cdot)$ the indicator function, and $c$ a scale factor
-documented in `?SCSTEM_Estim`.
+parameters of regime $k$, $E$ is the edge set of the symmetrised
+$k$-nearest-neighbour graph with each unordered pair counted once,
+$I(\cdot)$ the indicator function, and $c$ a scale factor documented in
+`?SCSTEM_Estim`.
 
 The penalty is what makes the regimes *spatial*. The first term rewards fit and
 would happily scatter the labels; the second rewards neighbouring locations

@@ -151,11 +151,12 @@ recovers the pooled \code{\link{STEM_Estimation}} fit.
 
 \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
 by maximizing the penalised log-likelihood
-\deqn{Q = \sum_{i=1}^{d} \ell_{i k_i} +
-          \phi\, c \sum_{i<j} w_{ij} I(k_i = k_j),}
-where \eqn{\ell_{ik}} is the log-likelihood contribution of location \eqn{i}
-under the parameters of cluster \eqn{k}, \eqn{w_{ij}} is the symmetrised
-\code{knn} adjacency indicator and \eqn{c > 0} is the scale factor discussed
+\deqn{Q = \sum_{i=1}^{d} \ell_i(k_i) +
+          \phi\, c \sum_{(i,j) \in E} I(k_i = k_j),}
+where \eqn{\ell_i(k)} is the log-likelihood contribution of location \eqn{i}
+under the parameters of cluster \eqn{k}, \eqn{E} is the edge set of the
+symmetrised \code{knn} graph with each unordered pair counted once, and
+\eqn{c > 0} is the scale factor discussed
 below. This is the Potts-type penalty introduced for spatially-clustered
 regression by Sugasawa and Murakami (2021) and carried over to
 spatially-clustered spatial autoregressive models by Cerqueti, Maranzano and
