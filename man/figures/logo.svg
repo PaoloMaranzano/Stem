@@ -1,24 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="278" viewBox="0 0 240 278" role="img" aria-labelledby="title desc">
-<title id="title">STEM package logo</title>
-<desc id="desc">A stylized hexagon logo for the STEM package with connected spatio-temporal nodes and the letters STEM.</desc>
-<polygon points="120,8 222,67 222,211 120,270 18,211 18,67" fill="#f7fbff" stroke="#24435c" stroke-width="8"/>
-<g stroke="#5b7186" stroke-width="4" opacity="0.9">
-<line x1="68" y1="86" x2="122" y2="66"/>
-<line x1="122" y1="66" x2="174" y2="104"/>
-<line x1="68" y1="86" x2="90" y2="150"/>
-<line x1="90" y1="150" x2="160" y2="164"/>
-<line x1="174" y1="104" x2="160" y2="164"/>
-<line x1="90" y1="150" x2="122" y2="212"/>
-<line x1="160" y1="164" x2="122" y2="212"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="240" height="276" role="img" aria-labelledby="logo-title logo-desc">
+<title id="logo-title">Stem</title>
+<desc id="logo-desc">A monitoring network on a valley floor framed by reliefs, split by color into two spatial regimes, with one time series per regime running along the base.</desc>
+<defs>
+  <clipPath id="stem-hex">
+    <path d="M50 0 L100 28.75 L100 86.25 L50 115 L0 86.25 L0 28.75 Z"/>
+  </clipPath>
+</defs>
+
+<path d="M50 0 L100 28.75 L100 86.25 L50 115 L0 86.25 L0 28.75 Z" fill="#12262e"/>
+
+<g clip-path="url(#stem-hex)">
+
+  <!-- space: the valley floor, framed by the reliefs -->
+  <path d="M0 31 L12 25 L22 29 L33 19 L44 26 L55 17 L66 25 L78 20 L89 27 L100 30
+           L100 86.25 L50 115 L0 86.25 Z" fill="#1b3b46"/>
+  <path d="M0 31 L12 25 L22 29 L33 19 L44 26 L55 17 L66 25 L78 20 L89 27 L100 30"
+        fill="none" stroke="#2f5d6b" stroke-width="1" stroke-linejoin="round"/>
+
+  <!-- the neighborhood edges the partition cuts -->
+  <g stroke="#4a6b78" stroke-width="1" opacity=".55">
+    <line x1="38" y1="36" x2="58" y2="42"/>
+    <line x1="30" y1="44" x2="52" y2="48"/>
+  </g>
+
+  <!-- regime 1 -->
+  <g stroke="#5fb0cc" stroke-width="1.7" stroke-linecap="round">
+    <line x1="26" y1="32" x2="38" y2="36"/>
+    <line x1="38" y1="36" x2="22" y2="40"/>
+    <line x1="22" y1="40" x2="30" y2="44"/>
+    <line x1="30" y1="44" x2="38" y2="36"/>
+    <line x1="26" y1="32" x2="22" y2="40"/>
+  </g>
+
+  <!-- regime 2 -->
+  <g stroke="#e0a458" stroke-width="1.7" stroke-linecap="round">
+    <line x1="58" y1="42" x2="72" y2="36"/>
+    <line x1="58" y1="42" x2="52" y2="48"/>
+    <line x1="52" y1="48" x2="68" y2="52"/>
+    <line x1="68" y1="52" x2="72" y2="36"/>
+    <line x1="58" y1="42" x2="68" y2="52"/>
+  </g>
+
+  <g fill="#5fb0cc">
+    <circle cx="26" cy="32" r="3.2"/><circle cx="38" cy="36" r="3.2"/>
+    <circle cx="22" cy="40" r="3.2"/><circle cx="30" cy="44" r="3.2"/>
+  </g>
+  <g fill="#e0a458">
+    <circle cx="58" cy="42" r="3.2"/><circle cx="72" cy="36" r="3.2"/>
+    <circle cx="52" cy="48" r="3.2"/><circle cx="68" cy="52" r="3.2"/>
+  </g>
+
+  <!-- time: one series per regime -->
+  <g fill="none" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M14 64 L23 59 L32 62 L41 58 L50 63 L59 59 L68 65 L77 60 L86 62" stroke="#5fb0cc"/>
+    <path d="M14 70 L23 73 L32 68 L41 72 L50 67 L59 71 L68 69 L77 73 L86 69" stroke="#e0a458"/>
+  </g>
+
+  <text x="50" y="95" text-anchor="middle" textLength="60" lengthAdjust="spacingAndGlyphs"
+        fill="#f2f7f9" font-family="Georgia,'Times New Roman',Times,serif"
+        font-size="26" font-weight="700">Stem</text>
+
 </g>
-<g fill="#7fb3d5" stroke="#24435c" stroke-width="4">
-<circle cx="68" cy="86" r="13"/>
-<circle cx="122" cy="66" r="13"/>
-<circle cx="174" cy="104" r="13"/>
-<circle cx="90" cy="150" r="13"/>
-<circle cx="160" cy="164" r="13"/>
-<circle cx="122" cy="212" r="13"/>
-</g>
-<text x="120" y="142" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="48" font-weight="700" fill="#24435c">STEM</text>
-<text x="120" y="184" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#24435c">spatio-temporal EM</text>
+
+<path d="M50 0 L100 28.75 L100 86.25 L50 115 L0 86.25 L0 28.75 Z"
+      fill="none" stroke="#5fb0cc" stroke-width="2.5"/>
 </svg>

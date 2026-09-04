@@ -18,6 +18,30 @@ between the reference papers and the code, see
 
 ### 2026-09-04
 
+**Package logo.**
+The hexagon now carries the three ideas the package is about: a relief
+silhouette for space, a node-and-edge network split by color into two regimes,
+and one time series per regime along the base. The faint gray edges are the ones
+the partition cuts, which is what the spatial penalty pays for.
+
+The wordmark was the hard part, and the difficulty was structural rather than
+typographic. In a pointy-top hexagon the width collapses below the widest band -
+at the baseline where the word had been sitting the shape is only about 24 units
+across - so the word could not grow without being clipped. Moving it up into the
+full-width band took it from 15 units to 26. Two further adjustments came out of
+looking at the render: the series were made angular rather than wavy, because
+smooth curves under a mountain range read as water, and the ridge was broadened,
+because sharp peaks and sharp series were competing for the same reading.
+
+`man/figures/logo.svg` is the scalable master and `man/figures/logo.png` the
+rendered artifact, both produced from one set of coordinates. The README points
+at the PNG: the SVG carries live text, so its wordmark depends on whichever
+serif the viewer has, and GitHub sanitizes SVG attributes before serving them,
+possibly including the `textLength` that guarantees the word fits.
+`dev/make-logo.R` redraws the PNG at any size. It uses base graphics, which can
+only clip to a rectangle, so every element of the composition is laid out to
+fall inside the hexagon and no clipping is needed.
+
 **American English throughout, and ASCII only.**
 Every source, vignette and document converted to American spelling: `-ize`
 rather than `-ise`, `neighbor` rather than `neighbour`, `modeling`, `center`,

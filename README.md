@@ -1,4 +1,4 @@
-# Stem <img src="man/figures/logo.svg" align="right" height="132" alt="" />
+# Stem <img src="man/figures/logo.png" align="right" height="132" alt="" />
 
 <!-- badges: start -->
 [![License: GPL v2+](https://img.shields.io/badge/License-GPL%20(%3E%3D%202)-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
