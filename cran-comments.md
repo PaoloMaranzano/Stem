@@ -65,7 +65,7 @@ build and the check from a directory that is not synced:
 
 ```r
 # from any non-synced working directory
-pkg <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
+pkg <- "<path to the working copy of this repository>"
 tar <- devtools::build(pkg, path = tempdir())
 rcmdcheck::rcmdcheck(tar, args = c("--as-cran", "--no-manual"),
                      error_on = "warning")
