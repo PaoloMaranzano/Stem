@@ -17,30 +17,22 @@
 
 OUT <- "C:/Users/paulm/AppData/Local/Temp/claude/C--Users-paulm-OneDrive-Documenti-GitHub/04684892-cef9-43d7-b1db-6450eb10b1ec/scratchpad"
 
-NU_SP  <- 0.4                          # variance of each coordinate
+## The geometry itself lives in 06-dgp.R, which is what the simulation actually
+## generates from; the figures source it rather than restating it, so a change
+## to the design cannot leave the illustration behind.
+source(file.path("C:/Users/paulm/OneDrive/Documenti/GitHub/Stem",
+                 "dev", "paper", "06-dgp.R"))
+
 D_GRID <- c(0, 1/3, 2/3, 1)
 N_GRID <- c(20, 40, 60, 80, 100)
 COL    <- c("#1f6f8b", "#e0a458", "#5b8c5a", "#a8516e")
 GREY   <- "#8a939f"
 
-## centres of the K clusters at overlap d, nearest-neighbour distance 2d
-centres <- function(K, d) {
-  if (K == 2L) return(cbind(c(-d, d), c(0, 0)))
-  if (K == 3L) { r <- 2 * d / sqrt(3); a <- c(90, 210, 330) * pi / 180
-                 return(cbind(r * cos(a), r * sin(a))) }
-  if (K == 4L) return(cbind(c(d, -d, d, -d), c(d, d, -d, -d)))
-  stop("K must be 2, 3 or 4")
-}
-
-## one draw: n units allocated to K clusters with equal probabilities, then the
-## coordinates drawn from the cluster-specific isotropic Gaussian
+## one draw, in the abstract plane of the design: dgp_locations() also maps it
+## to longitude and latitude, which the figures do not need
 draw <- function(n, K, d, nu_sp = NU_SP, seed = 1) {
-  set.seed(seed)
-  mu <- centres(K, d)
-  g  <- sample.int(K, n, replace = TRUE)
-  xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sqrt(nu_sp)),
-              mu[g, 2] + stats::rnorm(n, sd = sqrt(nu_sp)))
-  list(xy = xy, g = g, mu = mu)
+  loc <- dgp_locations(n, K, d, nu_sp = nu_sp, balanced = TRUE, seed = seed)
+  list(xy = loc$xy, g = loc$labels, mu = loc$mu)
 }
 
 panel <- function(s, lim, cex_pt = 0.9, show_centres = TRUE) {
@@ -129,7 +121,7 @@ message("wrote fig_overlap_dispersion.pdf")
 cat("\nStandardised separation 2*omega/sqrt(nu_sp), by omega:\n")
 print(round(setNames(2 * D_GRID / sqrt(NU_SP), c("0", "1/3", "2/3", "1")), 2))
 
-cat("\nExpected units per cluster with equal probabilities:\n")
+cat("\nUnits per cluster, balanced allocation:\n")
 tab <- outer(N_GRID, c(2, 3), function(n, K) floor(n / K))
 dimnames(tab) <- list(paste0("n=", N_GRID), c("K=2", "K=3"))
 print(tab)

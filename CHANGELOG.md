@@ -16,6 +16,58 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-06 (later)
+
+**The Newton-Raphson step no longer rebuilds what it already has.** With the
+filter and the M-step down to `O(d^3 + T d^2)`, the inner Newton-Raphson loop
+that updates `theta` and `log b` became the next thing worth looking at. Four
+separate redundancies were in it.
+
+*The exponential kernel.* `Sigmastar.exp()`, `d1_Sigmastar_logtheta.exp()` and
+`d2_Sigmastar_logtheta.exp()` each evaluated `exp(-exp(logtheta) * dist)`
+independently, and the two derivatives each formed `exp(logtheta) * dist`
+twice. That is three `d x d` elementwise exponentials and four scalings per
+inner iteration, of which one and one are needed. All three functions now take
+the kernel as an optional argument and `kalman()` computes it once. A covariance
+function that does not accept it still builds its own, so a user-supplied
+`cov.spat` keeps working.
+
+*The derivative with respect to `log b` is not a matrix.* It is `exp(logb)`
+times the identity. It was being materialised as a dense `d x d` matrix --
+160,000 doubles at `d = 400` to carry 400 of them -- and then multiplied into
+`X^{-1}`, an `O(d^3)` matrix product standing in for an `O(d^2)` scaling.
+`d1_Sigmastar_logb.exp()` and `d2_Sigmastar_logb.exp()` now return the
+multiplier itself, and `d1_Q()`, `d2_Q()` and `d12_Q()` recognise a scalar
+argument as a multiple of the identity through the two new helpers
+`stem_xprod()` and `stem_xtrace()`.
+
+*The shared products.* `X^{-1} dSigma/dlogtheta` entered three of the five
+derivative evaluations and was formed three times; the same for `log b`. The
+five functions now accept the products, and `kalman()` forms each once. Between
+this and the previous point the `d x d` matrix products per inner iteration go
+from twelve to five.
+
+*Two factorisations where one does.* `Q_function_addendo1()` called `solve()`,
+which factorises its argument, and then `determinant()`, which factorises it
+again. One Cholesky now gives both: the log determinant is read off the diagonal
+of the factor and `chol2inv()` inverts from it, with a fallback for a matrix
+that has lost positive definiteness numerically -- which the grid search can
+produce at extreme parameter values. This function is called a hundred times
+whenever that grid search fires, so the saving is largest exactly where the
+cost was worst.
+
+**The smoother no longer computes a quantity nobody reads.** `smoothing()`
+built, row by row, the `n x d` matrix of fitted means `F' m_t` and returned it
+as `ss$mu`. Nothing in the package ever looked at it: `kalman()` forms its own
+fitted values from the smoothed states. At `n = 730` and `d = 400` it allocated
+and discarded 2.3 megabytes on every EM iteration.
+
+Each changed expression was checked against the one it replaces at random
+inputs: the covariance and both derivatives with respect to `log(theta)` agree
+exactly, and the five derivatives of the objective agree to between 0 and
+1.3e-15 in relative terms, on both the path `kalman()` takes and the path an
+outside caller takes.
+
 ### 2026-09-06
 
 **The Kalman filter no longer forms or inverts the `d x d` predictive

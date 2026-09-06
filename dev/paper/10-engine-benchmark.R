@@ -12,11 +12,11 @@
 ## The check that matters is not the timing but the agreement: both changes are
 ## algebraic identities, so the estimates must coincide to floating point.
 ##
-##   Rscript dev/paper/10-engine-benchmark.R
+##   Rscript dev/paper/10-engine-benchmark.R [reference commit]
 ## ---------------------------------------------------------------------------
 
 PKG  <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
-REF  <- "7d0b094"
+REF  <- (function(a) if (length(a)) a[1] else "7d0b094")(commandArgs(TRUE))
 TMP  <- tempfile("stem-ref-"); dir.create(TMP)
 
 load_env <- function(dir) {

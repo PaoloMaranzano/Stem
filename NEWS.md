@@ -144,6 +144,14 @@ draws out of 12 to 12 out of 12.
   receive the inverse of the scaled covariance from the caller instead of
   recomputing it up to seven times each, and every trace of a matrix product is
   evaluated without forming the product.
+* The Newton-Raphson step that updates the two covariance parameters shares
+  what it used to rebuild: the exponential kernel is evaluated once per
+  iteration rather than three times, the derivative with respect to `log b` is
+  carried as the multiplier of the identity that it is rather than as a dense
+  matrix, the products against the inverse covariance are formed once instead
+  of three times each, and the log determinant and the inverse now come from a
+  single Cholesky factorisation. The `d x d` matrix products per inner
+  iteration go from twelve to five.
 * `mvtnorm` moves from `Imports` to `Suggests`: no function in the package uses
   it any more, though the test suite still does, as an independent reference
   implementation of the likelihood.

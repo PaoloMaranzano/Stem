@@ -10,9 +10,6 @@
     d <- ss$d
     nobs <- ss$n
 
-    mu <- matrix(NA, nobs, d)
-    mu[nobs,] <- t(ss$Fmat) %*% m[nobs,]
-
     for (tt in (nobs-1):1)    {
 
       if (ss$p == 1)
@@ -37,8 +34,20 @@
 
       m[tt,]  <- nextstep$ms
       C[[tt]] <- nextstep$Cs
-      mu[tt,] <- t(ss$Fmat) %*% m[tt,]
     }
+
+    ### The smoother used to build, row by row inside the loop, the n x d matrix
+    ### mu with mu[t,] = F' m_t, and return it as ss$mu. Nothing in the package
+    ### ever read it: kalman() forms its own fitted values from the smoothed
+    ### states, and the quantity is not part of any returned object. It is no
+    ### longer computed. At n = 730 and d = 400 it allocated and threw away 2.3
+    ### megabytes on every EM iteration, hundreds of times over an SC-STEM grid.
+    ###
+    ### Superseded:
+    ###   mu <- matrix(NA, nobs, d)
+    ###   mu[nobs,] <- t(ss$Fmat) %*% m[nobs,]        # before the loop
+    ###   mu[tt,]   <- t(ss$Fmat) %*% m[tt,]          # inside the loop
+    ###   ss$mu     <- mu
 
     ss$m0 <- m0
     ss$C0 <- C0
@@ -50,7 +59,6 @@
       ss$m <- m
     }
     ss$C <- C
-    ss$mu <- mu
     ss
   }
 

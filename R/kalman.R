@@ -16,6 +16,16 @@
     ### completes the sufficient statistics over the missing ones.
     obs_ix = stem_obs_index(z)
 
+    ### whether the spatial covariance function can be handed the exponential
+    ### kernel it would otherwise rebuild; checked once rather than per
+    ### Newton-Raphson iteration
+    cov.spat.takes.E = "E" %in% names(formals(cov.spat))
+
+    ### The spatial correlation at the parameter values this E-step conditions
+    ### on. It enters the measurement covariance, the update of sigma2omega and
+    ### the update of beta, and was being rebuilt for each of them.
+    Sigmastar_j = cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)
+
     ####################
     ###Model definition
     ###if you want to check the model use phi_j=phi_start
@@ -23,7 +33,7 @@
     SSmodel  = list(z	= zz,
                     Fmat 	= phi_j$K,
                     Gmat 	= phi_j$G,
-                    Vmat 	= phi_j$sigma2omega * cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist),
+                    Vmat 	= phi_j$sigma2omega * Sigmastar_j,
                     Wmat 	= phi_j$Sigmaeta,
                     m0   		= t(phi_j$m0),
                     C0   		= phi_j$C0,
@@ -289,7 +299,17 @@
       }
     }
 
-    D = solve(diag(regularization,nrow(cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)) %*% BB
+    ### The spatial correlation at the CURRENT parameter values is the same
+    ### matrix that built Vmat at the top of this function and that the update
+    ### of beta needs below. It was being rebuilt five times in one pass -- and
+    ### twice within each of the two expressions, once only to read nrow(), which
+    ### is d. It is now built once, at line 31, and reused.
+    ###
+    ### Superseded:
+    ###   D = solve(diag(regularization, nrow(cov.spat(d=d, logb=phi_j$logb,
+    ###         logtheta=phi_j$logtheta, dist=dist))) +
+    ###       cov.spat(d=d, logb=phi_j$logb, logtheta=phi_j$logtheta, dist=dist)) %*% BB
+    D = solve(diag(regularization, d) + Sigmastar_j) %*% BB
     #sigma2omega_j=tr(sigmaeinersa*W) in Fasso Cameletti 12
     ### The divisor stays n*d, the COMPLETE-data count, and not the number of
     ### observed values: the EM algorithm maximizes the expected complete-data
@@ -302,7 +322,13 @@
     ############################
     #\sum_t X_t^\prime \Sigma_e^-1 v_t
     #v_t=z_t-K_t y_t
-    Sigmae_inversa = solve(diag(regularization,nrow(sigma2omega_j * cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+sigma2omega_j * cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist))
+    ### Superseded:
+    ###   Sigmae_inversa = solve(diag(regularization,
+    ###     nrow(sigma2omega_j * cov.spat(d=d, logb=phi_j$logb,
+    ###          logtheta=phi_j$logtheta, dist=dist))) +
+    ###     sigma2omega_j * cov.spat(d=d, logb=phi_j$logb,
+    ###                              logtheta=phi_j$logtheta, dist=dist))
+    Sigmae_inversa = solve(diag(regularization, d) + sigma2omega_j * Sigmastar_j)
 
     ### zhat is the observation vector completed by the E-step: it equals z
     ### wherever z was observed and the conditional expectation of the missing
@@ -370,7 +396,17 @@
       logtheta.iniz = logtheta
 
       while(!cond.hessiana && n_iter_Hess < 30) {
-        cov.spat.mat = do.call(cov.spat, list(logb=logb,d=d,logtheta=logtheta,dist=dist))
+
+        ### The covariance and both of its derivatives with respect to
+        ### log(theta) are built on the same exponential kernel exp(-theta h),
+        ### which is a d x d elementwise exp(): it is evaluated once here and
+        ### handed to all three, instead of three times over.
+        Ker = exp(-exp(logtheta) * dist)
+        cs_args = list(logb=logb,d=d,logtheta=logtheta,dist=dist)
+        ### a covariance function that does not take the kernel builds it
+        ### itself, so a user-supplied cov.spat keeps working unchanged
+        if (cov.spat.takes.E) cs_args$E = Ker
+        cov.spat.mat = do.call(cov.spat, cs_args)
 
         ### The five derivative evaluations below all need the inverse of the
         ### same matrix and its product with BB. They are formed once here and
@@ -378,31 +414,40 @@
         ### superseded d2_Q() alone called solve(X) seven times.
         Xi_cur  = solve(cov.spat.mat)
         XiB_cur = Xi_cur %*% BB
-        d1theta = d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist)
-        d2theta = d2_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist)
+        d1theta = d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist,E=Ker)
+        d2theta = d2_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist,E=Ker)
+        ### these two are exp(logb) times the identity, and are carried as that
+        ### single number: the products against them are scalings, not matrix
+        ### products (see d1_Sigmastar_logb.exp)
         d1logb  = d1_Sigmastar_logb.exp(logb=logb,d=d)
         d2logb  = d2_Sigmastar_logb.exp(logb=logb,d=d)
+
+        ### X^{-1} dSigma/dparameter enters three of the five evaluations for
+        ### log(theta) and three for log(b). Formed once each.
+        Pt_cur  = Xi_cur %*% d1theta
+        P2t_cur = Xi_cur %*% d2theta
+        Pb_cur  = d1logb * Xi_cur
 
         derivata_prima_logtheta 	= d1_Q(
           n	= n,
           X	= cov.spat.mat,
           d1_X  = d1theta,
           sigma2omega = sigma2omega_j,
-          B       = BB, Xi = Xi_cur, XiB = XiB_cur)
+          B       = BB, Xi = Xi_cur, XiB = XiB_cur, P = Pt_cur)
         derivata_seconda_logtheta 	= d2_Q(
           n	= n,
           X      = cov.spat.mat,
           d1_X	= d1theta,
           d2_X = d2theta,
           sigma2omega = sigma2omega_j,
-          B      = BB, Xi = Xi_cur, XiB = XiB_cur)
+          B      = BB, Xi = Xi_cur, XiB = XiB_cur, P = Pt_cur, P2 = P2t_cur)
 
         derivata_prima_logb    		= d1_Q(
           n	 = n,
           X       = cov.spat.mat,
           d1_X  = d1logb,
           sigma2omega = sigma2omega_j,
-          B       = BB, Xi = Xi_cur, XiB = XiB_cur)
+          B       = BB, Xi = Xi_cur, XiB = XiB_cur, P = Pb_cur)
 
         derivata_seconda_logb    	= d2_Q(
           n	= n,
@@ -410,7 +455,7 @@
           d1_X	= d1logb,
           d2_X	= d2logb,
           sigma2omega = sigma2omega_j,
-          B	= BB, Xi = Xi_cur, XiB = XiB_cur)
+          B	= BB, Xi = Xi_cur, XiB = XiB_cur, P = Pb_cur, P2 = Pb_cur)
 
         derivata_mista        		=  d12_Q(
           n	= n,
@@ -418,7 +463,7 @@
           d1_X_theta  = d1theta,
           d1_X_logb   = d1logb,
           sigma2omega = sigma2omega_j,
-          B	= BB, Xi = Xi_cur, XiB = XiB_cur)
+          B	= BB, Xi = Xi_cur, XiB = XiB_cur, Pt = Pt_cur, Pb = Pb_cur)
 
 
         hessiana  = matrix( c(derivata_seconda_logtheta, derivata_mista, derivata_mista, derivata_seconda_logb),2,2)
