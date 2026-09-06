@@ -31,7 +31,7 @@ GREY   <- "#8a939f"
 ## one draw, in the abstract plane of the design: dgp_locations() also maps it
 ## to longitude and latitude, which the figures do not need
 draw <- function(n, K, d, nu_sp = NU_SP, seed = 1) {
-  loc <- dgp_locations(n, K, d, nu_sp = nu_sp, balanced = TRUE, seed = seed)
+  loc <- dgp_locations(n, K, d, nu_sp = nu_sp, balance = "balanced", seed = seed)
   list(xy = loc$xy, g = loc$labels, mu = loc$mu)
 }
 

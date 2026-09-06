@@ -46,18 +46,32 @@ scen <- dgp_scenarios()
 cells_timing <- rbind(
   ## block A: the n by T cross, at K = 2, moderate overlap, all contrasts
   expand.grid(n = dims$n, TN = dims$TN, K = 2L, d = 2/3, id = "S4",
-              block = "A", stringsAsFactors = FALSE),
-  ## block B: K, overlap and scenario at a middling (n, T)
-  expand.grid(n = 60L, TN = 365L, K = dims$K, d = c(0, 2/3),
+              balance = "balanced", block = "A", stringsAsFactors = FALSE),
+  ## block B: K, overlap, balance and scenario at a middling (n, T)
+  expand.grid(n = 60L, TN = 365L, K = c(2L, 3L), d = c(0, 2/3),
               id = c("S0", "S1b", "S3b", "S4"),
-              block = "B", stringsAsFactors = FALSE)
+              balance = dims$balance, block = "B", stringsAsFactors = FALSE),
+  ## block C: the pooled case, which carries neither an overlap nor a balance
+  expand.grid(n = dims$n, TN = dims$TN, K = 1L, d = 2/3, id = "S0",
+              balance = "balanced", block = "C", stringsAsFactors = FALSE)
 )
 ## cheapest first, so that an interrupted run still covers the design
 cells_timing <- cells_timing[order(cells_timing$n * cells_timing$TN), ]
 
-cells_full <- expand.grid(n = dims$n, TN = dims$TN, K = dims$K, d = dims$d,
-                          id = scen$id, block = "full",
-                          stringsAsFactors = FALSE)
+## The full design. K = 1 has a single regime, so the overlap, the balance and
+## the scenario are all vacuous there: it enters once per (n, T), with the
+## dispersion inflated so that the map is the same size as at K = 2 -- see
+## dgp_locations(). Cells whose imbalance cannot be realised with regimes of at
+## least N_MIN units are dropped rather than silently rebalanced.
+cells_full <- rbind(
+  expand.grid(n = dims$n, TN = dims$TN, K = 1L, d = 2/3, id = "S0",
+              balance = "balanced", block = "full", stringsAsFactors = FALSE),
+  expand.grid(n = dims$n, TN = dims$TN, K = c(2L, 3L), d = dims$d,
+              id = scen$id, balance = dims$balance, block = "full",
+              stringsAsFactors = FALSE)
+)
+cells_full <- cells_full[mapply(dgp_feasible, cells_full$n, cells_full$K,
+                                cells_full$balance), ]
 
 cells <- if (mode == "timing") cells_timing else cells_full
 rownames(cells) <- NULL
@@ -68,7 +82,8 @@ rownames(cells) <- NULL
 run_one <- function(cell, rep) {
 
   row <- scen[scen$id == cell$id, , drop = FALSE]
-  dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$d, row, rep = rep)
+  dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$d, row, rep = rep,
+                  balance = cell$balance)
 
   ## starting values from the pooled OLS fit, as a user would
   ols <- stats::lm.fit(x = dat$covariates, y = as.vector(dat$z))
@@ -93,7 +108,7 @@ run_one <- function(cell, rep) {
   ari  <- if (is.null(gsel)) NA_real_ else scstem_ari(gsel, dat$labels)
 
   data.frame(block = cell$block, n = cell$n, TN = cell$TN, K = cell$K,
-             d = cell$d, id = cell$id, rep = rep,
+             d = cell$d, id = cell$id, balance = cell$balance, rep = rep,
              k_hat = sel$k_selected, phi_hat = sel$phi_selected, ari = ari,
              nconf = nrow(ic$table), nfail = nrow(ic$failed),
              secs = secs, stringsAsFactors = FALSE)
@@ -103,10 +118,11 @@ run_one <- function(cell, rep) {
 ## The loop, appending as it goes
 ## ---------------------------------------------------------------------------
 done <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
-key  <- function(x) paste(x$block, x$n, x$TN, x$K, x$d, x$id, x$rep, sep = "|")
+key  <- function(x) paste(x$block, x$n, x$TN, x$K, x$d, x$id, x$balance,
+                          x$rep, sep = "|")
 
-cat(sprintf("%-5s %4s %5s %2s %5s %-4s %4s | %8s %6s %6s %6s\n",
-            "block", "n", "T", "K", "d", "scen", "rep",
+cat(sprintf("%-5s %4s %5s %2s %5s %-4s %-10s %4s | %8s %6s %6s %6s\n",
+            "block", "n", "T", "K", "d", "scen", "balance", "rep",
             "secs", "k_hat", "phi", "ARI"))
 
 for (i in seq_len(nrow(cells))) {
@@ -116,17 +132,17 @@ for (i in seq_len(nrow(cells))) {
     if (!is.null(done) && key(cell) %in% key(done)) next
 
     out <- tryCatch(run_one(cell, r), error = function(e) {
-      cbind(cell[c("block", "n", "TN", "K", "d", "id", "rep")],
+      cbind(cell[c("block", "n", "TN", "K", "d", "id", "balance", "rep")],
             k_hat = NA_integer_, phi_hat = NA_real_, ari = NA_real_,
             nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_)
     })
 
     utils::write.table(out, CSV, sep = ",", row.names = FALSE,
                        col.names = !file.exists(CSV), append = file.exists(CSV))
-    cat(sprintf("%-5s %4d %5d %2d %5.2f %-4s %4d | %8.1f %6s %6s %6s\n",
-                out$block, out$n, out$TN, out$K, out$d, out$id, out$rep,
-                out$secs, format(out$k_hat), format(round(out$phi_hat, 2)),
-                format(round(out$ari, 3))))
+    cat(sprintf("%-5s %4d %5d %2d %5.2f %-4s %-10s %4d | %8.1f %6s %6s %6s\n",
+                out$block, out$n, out$TN, out$K, out$d, out$id, out$balance,
+                out$rep, out$secs, format(out$k_hat),
+                format(round(out$phi_hat, 2)), format(round(out$ari, 3))))
     utils::flush.console()
   }
 }

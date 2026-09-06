@@ -74,10 +74,113 @@
 ## kilometres.
 ## ---------------------------------------------------------------------------
 
+## ---------------------------------------------------------------------------
+## THE GENERATOR, IN FULL
+##
+## Write K for the number of regimes, n for the number of locations, T for the
+## number of time points, g_i in {1,...,K} for the regime of location i and
+## I_g = {i : g_i = g} for its index set.
+##
+## (1) Regime sizes.  n_1,...,n_K from dgp_sizes(): equal up to the remainder
+##     under "balanced", proportional to 1:2:...:K under "unbalanced", in both
+##     cases with every n_g >= N_MIN. Labels are assigned in blocks, so the
+##     partition is fixed within a cell and only the coordinates are random.
+##
+## (2) Coordinates.  In the abstract plane of the overlap design,
+##
+##        s_i | g_i = g  ~  N_2( mu_g , nu_sp I_2 ) ,        independent over i,
+##
+##     with mu_g = dgp_centres(K, omega): centres at nearest-neighbour distance
+##     2*omega, so 2*omega / sqrt(nu_sp) is the standardised separation and is
+##     the same for every K. For K = 1, nu_sp is replaced by
+##     nu_sp + Var(mu | K = 2, omega). The plane is mapped affinely to longitude
+##     and latitude at UNIT_KM kilometres per unit, centred on (LON0, LAT0), and
+##     h_ij is the geodesic distance between s_i and s_j.
+##
+## (3) Covariate.  One standardised, exogenous covariate, an AR(1) in time whose
+##     innovations are a spatially correlated field:
+##
+##        x_1 = w_1 ,   x_t = a x_{t-1} + sqrt(1 - a^2) w_t ,
+##        w_t ~ N_n(0, C_x) ,   (C_x)_ij = exp(-h_ij / rho_x) ,
+##
+##     with a = 0.7 and rho_x = 100 km, then centred and scaled over all nT
+##     values. A covariate independent across stations would make a coefficient
+##     contrast trivially visible; a perfectly common one would make it
+##     indistinguishable from the latent process. This sits in between.
+##
+## (4) Latent processes.  One AR(1) per regime, with cross-correlated
+##     innovations:
+##
+##        y_t = diag(G_1,...,G_K) y_{t-1} + eta_t ,   eta_t ~ N_K(0, Sigma_eta),
+##        Sigma_eta = D R_rho D ,  D = diag(sigma_eta,1 , ... , sigma_eta,K) ,
+##        (R_rho)_gh = rho for g != h and 1 for g = h ,
+##        sigma^2_eta,g = vbar_y (1 - G_g^2) ,   y_1 ~ N_K(0, vbar_y R_rho) .
+##
+##     The innovation variance is tied to G so that every regime has the same
+##     stationary variance vbar_y: a scenario that separates the regimes on G
+##     then separates them on persistence alone, not on the amplitude of the
+##     signal.
+##
+## (5) Measurement error.  When all regimes share (sigma^2_eps, sigma^2_omega,
+##     theta) and force_block is FALSE, ONE global field:
+##
+##        e_t ~ N_n(0, Sigma) ,  Sigma = sigma^2_eps I_n + sigma^2_omega exp(-theta h),
+##
+##     independent over t. Otherwise one field per regime, independent across
+##     regimes:
+##
+##        e_{t,I_g} ~ N_{n_g}(0, Sigma_g) ,
+##        Sigma_g = sigma^2_eps,g I_{n_g} + sigma^2_omega,g exp(-theta_g h_{I_g,I_g}) .
+##
+## (6) Response.
+##
+##        z_ti = beta_0,g_i + beta_1,g_i x_ti + y_t,g_i + e_ti .
+##
+##     This is the STEM measurement equation with loading matrix K_g = 1_{n_g}
+##     within each regime, which is what SCSTEM_Estim() fits.
+##
+## PSEUDOCODE
+##
+##   input  n, T, K, omega, balance, scenario s, level l, rho, replication r
+##   1  n_1..n_K  <- sizes(n, K, balance)          ; g <- labels(n_1..n_K)
+##   2  mu        <- centres(K, omega)
+##   3  for i in 1..n:  s_i <- mu_{g_i} + N_2(0, nu_sp I)      ; map to lon/lat
+##   4  h         <- geodesic distances between the s_i
+##   5  C_x       <- exp(-h / rho_x)  ;  L_x <- chol(C_x)
+##      x_1 <- L_x' N(0, I) ;  for t in 2..T:  x_t <- a x_{t-1} + sqrt(1-a^2) L_x' N(0,I)
+##      x   <- (x - mean(x)) / sd(x)
+##   6  Psi_1..Psi_K <- parameters(s, l, K)        ; regime g at fraction (g-1)/(K-1)
+##   7  Sigma_eta <- D R_rho D  ;  L_eta <- chol(Sigma_eta)
+##      y_1 <- sqrt(vbar_y) chol(R_rho)' N(0,I)
+##      for t in 2..T:  y_t <- diag(G) y_{t-1} + L_eta' N(0, I)
+##   8  if the regimes share the covariance and not force_block:
+##         L <- chol(Sigma) ;  for t in 1..T:  e_t <- L' N(0, I)
+##      else for g in 1..K:
+##         L_g <- chol(Sigma_g) ;  for t in 1..T:  e_{t,I_g} <- L_g' N(0, I)
+##   9  for t in 1..T, i in 1..n:
+##         z_ti <- beta_0,g_i + beta_1,g_i x_ti + y_t,g_i + e_ti
+##   output z (T x n), X = [1, vec(x)], coordinates, g, Psi_1..Psi_K
+##
+## Seeds are derived from the replication index, so a cell is reproducible on
+## its own and the same replication uses the same geometry across scenarios.
+## ---------------------------------------------------------------------------
+
 NU_SP   <- 0.4          # variance of each coordinate within a cluster
 UNIT_KM <- 100          # kilometres per abstract unit of the overlap design
 LON0    <- 9.5          # centre of the geographic box, Po Valley
 LAT0    <- 45.5
+## The smallest regime the design allows. The package itself refuses fewer than
+## r + 2 units, but the binding constraint is spatial rather than parametric: a
+## regime estimates a range from its own pairwise distances, and six locations
+## already give fifteen of them. Below that the range is not identified in any
+## practical sense and a failure to recover the partition would be a failure to
+## fit, not a failure to separate.
+N_MIN   <- 6L
+## The smallest ratio of largest to smallest regime that still counts as an
+## unbalanced design. Below it the correction for N_MIN has flattened the
+## allocation back to nearly equal sizes, and the cell would be a duplicate of
+## the balanced one under a different name.
+IMB_MIN <- 1.5
 
 ## ---------------------------------------------------------------------------
 ## Geometry
@@ -95,33 +198,85 @@ dgp_centres <- function(K, d) {
   stop("K must be 1, 2, 3 or 4")
 }
 
-## Labels. `balanced = TRUE` gives exactly equal regime sizes, the remainder
-## spread over the first regimes; `balanced = FALSE` draws them with equal
-## probabilities, as in the source design. The balanced version is the default
-## because SC-STEM carries a minimum regime size, and an unlucky multinomial
-## draw at n = 20 produces a regime the model cannot fit -- which would confound
-## the recovery of the partition with the feasibility of the fit.
-dgp_labels <- function(n, K, balanced = TRUE) {
-  if (balanced) {
-    g <- rep(seq_len(K), length.out = n)
-    return(sort(g))
+## Mean per-coordinate variance of the K centres. With K = 1 the design has no
+## between-cluster spread, so the WITHIN-cluster dispersion is inflated by this
+## amount: the pooled configuration then covers the same area as the clustered
+## one at the same overlap, and the selection rule is not handed a free
+## geometric cue for telling k = 1 from k > 1.
+dgp_centre_var <- function(K, d) {
+  mu <- dgp_centres(K, d)
+  if (K == 1L) return(0)
+  mean(apply(mu, 2, function(v) mean((v - mean(v))^2)))
+}
+
+## Regime sizes.
+##
+##   "balanced"    exactly equal, the remainder spread over the first regimes
+##   "unbalanced"  sizes proportional to 1 : 2 : ... : K, so the largest regime
+##                 is K times the smallest, then corrected so that no regime
+##                 falls below n_min, the excess being taken from the largest
+##
+## The correction is what makes the unbalanced case usable: SC-STEM fits a full
+## STEM model inside every regime, so a regime with fewer units than the r + 6
+## parameters it has to estimate is not a hard case, it is an infeasible one,
+## and a design that produced those would confound the recovery of the partition
+## with the feasibility of the fit. `dgp_feasible()` says whether a cell admits
+## the requested imbalance at all.
+dgp_sizes <- function(n, K, balance = c("balanced", "unbalanced"),
+                      n_min = N_MIN) {
+  balance <- match.arg(balance)
+  if (K == 1L) return(n)
+  if (balance == "balanced") {
+    s <- rep(n %/% K, K)
+    if (n %% K) s[seq_len(n %% K)] <- s[seq_len(n %% K)] + 1L
+    return(as.integer(s))
   }
-  sample.int(K, n, replace = TRUE)
+  w <- seq_len(K) / sum(seq_len(K))
+  s <- pmax(1L, as.integer(round(n * w)))
+  s[K] <- n - sum(s[-K])
+  short <- pmax(0L, n_min - s)
+  if (any(short)) {
+    s <- pmax(s, n_min)
+    s[K] <- n - sum(s[-K])
+  }
+  as.integer(s)
+}
+
+## TRUE when the cell can carry K regimes of at least n_min units each AND, for
+## an unbalanced design, when the imbalance survives that constraint
+dgp_feasible <- function(n, K, balance = "balanced", n_min = N_MIN,
+                         imb_min = IMB_MIN) {
+  s <- dgp_sizes(n, K, balance, n_min)
+  ok <- all(s >= n_min) && sum(s) == n
+  if (ok && K > 1L && balance == "unbalanced") ok <- max(s) / min(s) >= imb_min
+  ok
+}
+
+dgp_labels <- function(n, K, balance = "balanced", n_min = N_MIN) {
+  rep(seq_len(K), times = dgp_sizes(n, K, balance, n_min))
 }
 
 ## Locations: the abstract cloud of the overlap design, mapped to longitude and
 ## latitude so that distances are kilometres and the covariance parameters keep
 ## their meaning.
-dgp_locations <- function(n, K, d, nu_sp = NU_SP, balanced = TRUE, seed = 1) {
+##
+##   s_i | g_i = g  ~  N_2( mu_g , nu_sp I_2 )
+##
+## with mu_g = dgp_centres(K, d). For K = 1 the dispersion is nu_sp + the
+## between-centre variance the design would have had at the same overlap, so
+## that the pooled case is not simply a smaller map.
+dgp_locations <- function(n, K, d, nu_sp = NU_SP, balance = "balanced",
+                          seed = 1, k_ref = 2L) {
   set.seed(seed)
   mu <- dgp_centres(K, d)
-  g  <- dgp_labels(n, K, balanced)
-  xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sqrt(nu_sp)),
-              mu[g, 2] + stats::rnorm(n, sd = sqrt(nu_sp)))
+  g  <- dgp_labels(n, K, balance)
+  sd_i <- sqrt(if (K == 1L) nu_sp + dgp_centre_var(k_ref, d) else nu_sp)
+  xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sd_i),
+              mu[g, 2] + stats::rnorm(n, sd = sd_i))
   coords <- cbind(
     lon = LON0 + xy[, 1] * UNIT_KM / (111.320 * cos(LAT0 * pi / 180)),
     lat = LAT0 + xy[, 2] * UNIT_KM / 110.574)
-  list(coords = coords, labels = g, xy = xy, mu = mu)
+  list(coords = coords, labels = g, xy = xy, mu = mu, sizes = tabulate(g, K))
 }
 
 ## ---------------------------------------------------------------------------
@@ -331,23 +486,26 @@ dgp_scenarios <- function() {
 ## one, 200 and 400 a national or multi-regional one.
 ## ---------------------------------------------------------------------------
 dgp_dims <- function() {
-  list(TN = c(60L, 120L, 365L, 730L),
-       n  = c(20L, 40L, 60L, 100L, 200L, 400L),
-       K  = c(2L, 3L),
-       d  = c(0, 1/3, 2/3, 1))
+  list(TN      = c(60L, 120L, 365L),
+       n       = c(20L, 40L, 60L, 100L, 200L, 400L),
+       K       = c(1L, 2L, 3L),
+       d       = c(0, 1/3, 2/3, 1),
+       balance = c("balanced", "unbalanced"))
 }
 
 ## ---------------------------------------------------------------------------
 ## One complete data set of the design, ready for STEM_Model()
 ## ---------------------------------------------------------------------------
-dgp_draw <- function(n, TN, K, d, scenario_row, rep = 1L, balanced = TRUE) {
+dgp_draw <- function(n, TN, K, d, scenario_row, rep = 1L,
+                     balance = "balanced") {
   seed <- 1000L * rep + 1L
-  loc  <- dgp_locations(n, K, d, balanced = balanced, seed = seed)
+  loc  <- dgp_locations(n, K, d, balance = balance, seed = seed)
   x    <- dgp_covariate(loc$coords, TN, seed = seed + 1L)
   psi  <- dgp_psi(scenario_row$scenario, scenario_row$level, K = K)
   z    <- dgp_simulate(loc$labels, psi, x, loc$coords,
                        rho = scenario_row$rho, seed = seed + 2L,
                        force_block = scenario_row$force_block)
   list(z = z, covariates = dgp_design(x), coordinates = loc$coords,
-       labels = loc$labels, psi = psi)
+       labels = loc$labels, psi = psi, sizes = loc$sizes,
+       latent = attr(z, "latent"), x = x)
 }
