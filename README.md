@@ -12,7 +12,9 @@ extension.**
 using Kalman filtering and smoothing inside an EM algorithm. Version 2.0.0 adds
 the **spatially-clustered STEM (SC-STEM)** family, in which regression
 coefficients, variance components and latent dynamics are allowed to differ
-across spatial regimes that are estimated from the data rather than imposed.
+across spatial regimes that are estimated from the data rather than imposed, and
+an optional **ridge, lasso or elastic-net penalty** on the regression
+coefficients for the collinear designs environmental data usually produce.
 
 ## The models
 
@@ -117,6 +119,112 @@ large $\phi$ gives contiguous and rigid regimes. Setting $k = 1$ returns the
 pooled model, which stays available as the reference against which any clustered
 fit must justify itself.
 
+### Ridge, lasso and elastic net on the coefficients
+
+Environmental covariates are collinear by construction: meteorological drivers
+are measured on overlapping supports and chemical species share sources. The
+variance of $\hat\beta$ is governed by the inverse of
+
+```math
+M = \sum_{t} X_t^{\top} \Sigma_e^{-1} X_t
+```
+
+and it is that inverse a penalty stabilizes. The argument bites hardest in
+SC-STEM, where each regime fits a complete model on a *subset* of the network:
+collinearity that a 200-station network absorbs, a regime of twelve does not,
+and the smallest regime that can still be fitted is in practice what caps the
+number of regimes worth entertaining.
+
+`STEM_Fit()` adds an elastic net on the regression coefficients, in the
+parameterization of `glmnet`:
+
+```math
+\ell_\pi(\psi) = \ell(\psi) - \lambda \left\{ \alpha \lVert D\beta \rVert_1 + \frac{1-\alpha}{2} \beta^{\top} D \beta \right\}
+```
+
+with $D$ the diagonal indicator of the penalized coordinates. So $\alpha = 0$ is
+**ridge**, $\alpha = 1$ the **lasso**, and anything in between the **elastic
+net**. Only $\beta$ is penalized: the variance components, the range, the
+transition matrix and the initial state keep their maximum likelihood values,
+because they describe the error process rather than the mean.
+
+**The E-step does not change.** The penalty is a function of $\beta$ alone and
+does not involve the latent states, so it passes through the conditional
+expectation untouched and the usual argument still gives an EM algorithm that
+increases the *penalized* likelihood at every iteration. The Kalman filter and
+smoother -- the expensive part -- are not touched at all; only the point
+returned by the M-step differs. Under a ridge that point keeps a closed form,
+
+```math
+\hat\beta = (M + \lambda D)^{-1} v , \qquad v = \sum_t X_t^{\top} \Sigma_e^{-1} v_t
+```
+
+one added diagonal on a matrix already assembled; under a lasso or an elastic
+net it is found by cyclic coordinate descent, which converges to the *exact*
+maximizer because the objective is convex and the penalty separable.
+
+Three points are specific to this model and worth knowing before choosing
+$\lambda$.
+
+- **The metric is not Euclidean.** $M$ is a *generalized* least squares
+  cross-product: it carries an estimated $\Sigma_e^{-1}$. Standardizing the
+  columns of $X$ the usual way is therefore not what makes $\lambda$ comparable
+  across covariates here. The scaling that does is the one putting the diagonal
+  of $M$ at one, and the package applies it internally, returning coefficients
+  on the original scale. In SC-STEM this is also what makes a single $\lambda$
+  mean the same thing in regimes of different size.
+- **The intercept is not penalized**, and not merely by convention: the model
+  already carries a latent process whose initial mean $m_0$ absorbs the level,
+  so shrinking $\beta_0$ would not shrink "the level" but move it into $m_0$ at
+  a rate depending on $G$.
+- **The criteria count effective parameters.** With a penalty in force the
+  nominal $r$ overstates the flexibility of the fit, so AIC, BIC and KIC use
+  $\mathrm{tr}( M (M + \lambda D)^{-1} )$ for a ridge, the number of active
+  coefficients for a lasso, and the corresponding trace on the active set for an
+  elastic net. At $\lambda = 0$ this reduces to $r$ and nothing changes.
+
+`STEM_Fit()` is the single entry point for all four estimators, and which one
+runs is decided by two arguments and nothing else:
+
+| `k` | `lambda` | what is fitted |
+|---|---|---|
+| `1` | `0` | the pooled STEM model |
+| `> 1` | `0` | the spatially-clustered model |
+| `1` | `> 0` | the pooled model with an elastic net on $\beta$ |
+| `> 1` | `> 0` | the clustered model, penalized within each regime |
+
+The defaults `k = 1`, `alpha = 0`, `lambda = 0` reproduce `STEM_Estimation()`
+bit for bit, which the test suite asserts on the whole parameter vector and on
+the log-likelihood.
+
+```r
+fit0 <- STEM_Fit(mod)                                  # classical STEM
+fitr <- STEM_Fit(mod, alpha = 0,   lambda = 2)         # ridge
+fitl <- STEM_Fit(mod, alpha = 1,   lambda = 2)         # lasso
+fite <- STEM_Fit(mod, alpha = 0.5, lambda = 2)         # elastic net
+fitc <- STEM_Fit(mod, k = 3, phi_penalty = 0.5,        # SC-STEM, ridge per regime
+                 alpha = 0, lambda = 2)
+```
+
+$\lambda$ and $\alpha$ are hyperparameters like $k$ and $\phi$ and are chosen
+the same way: by an information criterion computed with the effective degrees of
+freedom, or -- the honest route -- by spatio-temporal cross-validation with
+blocking that respects both dependencies (Otto, Fasso and Maranzano 2024).
+`SCSTEM_Infocrit()` accepts `alpha` and `lambda` and returns criteria already
+corrected for the effective degrees of freedom, so a grid over all four
+hyperparameters is a loop over $(\alpha, \lambda)$ around the $(k, \phi)$ grid
+it already traverses; the two-step rule of `SCSTEM_Select()` still arbitrates
+$(k, \phi)$ only. One caveat: if $\lambda$ is selected from the data, the parametric
+bootstrap must repeat the selection on every draw, exactly as
+`SCSTEM_Bootstrap()` repeats the clustering; and with $\alpha > 0$ the estimator
+is not smooth, so intervals for a coefficient at the boundary do not have their
+usual coverage interpretation.
+
+The derivation -- the penalized EM and its monotonicity, both forms of the
+M-step, the GLS metric, the degrees of freedom and what is still open -- is a
+standalone document at
+[`dev/regularization/stem-elastic-net.tex`](dev/regularization/stem-elastic-net.tex).
+
 ### Statistical features and scope
 
 What the model class covers, and what it does not. Every entry below reflects
@@ -154,8 +262,8 @@ the current implementation, not the model on paper.
 > log-likelihood, so the sufficient statistics are completed rather than
 > truncated: a missing value enters through its conditional expectation given
 > everything observed, and its conditional variance is added back as a
-> correction. That conditional expectation is *not* the signal alone — which
-> would be exact only for a diagonal covariance — because the spatial covariance
+> correction. That conditional expectation is *not* the signal alone -- which
+> would be exact only for a diagonal covariance -- because the spatial covariance
 > couples the locations, so the missing block of the measurement error is
 > predicted from the observed one by the same algebra as kriging at a fixed time
 > point. The divisor of the variance update stays the complete-data count, for
@@ -215,11 +323,19 @@ mod <- STEM_Model(z = povalley[["z"]][seq_len(Tn), ],
                   coordinates = povalley[["coords"]],
                   phi = phi, K = matrix(1, d, 1))
 
+# one entry point for every estimator: k chooses pooled or clustered,
+# lambda chooses penalized or not
+fit <- STEM_Fit(mod, distance = "geo")                 # classical STEM
+
 # explore the grid and let the two-step rule choose k and phi
 ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = seq(0, 1, by = 0.25),
                        distance = "geo")
 sel <- SCSTEM_Select(ic, band = c(0.25, 1))
 sel
+
+# the same clustered model with a ridge on the coefficients of every regime
+fitr <- STEM_Fit(mod, k = sel[["k_selected"]], phi_penalty = sel[["phi_selected"]],
+                 alpha = 0, lambda = 2, distance = "geo")
 
 # uncertainty, with the partition re-estimated at every draw
 boot <- SCSTEM_Bootstrap(sel[["fit"]], B = 200, seed = 1)
@@ -228,8 +344,9 @@ SCSTEM_BootInference(boot)
 
 ## Design notes
 
-Three points make SC-STEM behave sensibly in practice, and are documented in
-detail in `?SCSTEM_Estim`.
+Four points make the implementation behave sensibly in practice. The first three
+concern SC-STEM and are documented in detail in `?SCSTEM_Estim`; the fourth is
+what makes a large network fittable at all.
 
 **Labels are updated sequentially (ICM).** Each location maximizes its own
 penalized contribution given the current labels of all the others, so a sweep
@@ -369,6 +486,37 @@ indicators. *arXiv:2608.13638*. <https://arxiv.org/abs/2608.13638>
 > number of regimes and the penalty, and the refit-with-clustering parametric
 > bootstrap. SC-STEM adapts those devices to the point-referenced
 > spatio-temporal setting.
+
+### Regularization
+
+**Zou, H. and Hastie, T. (2005).** Regularization and variable selection via the
+elastic net. *JRSS-B*, 67, 301-320.
+<https://doi.org/10.1111/j.1467-9868.2005.00503.x>
+> The `(alpha, lambda)` parameterization `STEM_Fit()` follows, and the argument
+> for the mixed penalty when the covariates are correlated in groups - which is
+> what environmental drivers are.
+
+**Zou, H., Hastie, T. and Tibshirani, R. (2007).** On the degrees of freedom of
+the lasso. *The Annals of Statistics*, 35, 2173-2192.
+<https://doi.org/10.1214/009053607000000127>
+> Why the number of active coefficients is the right count to put into an
+> information criterion, which is what the package uses once a penalty is in
+> force.
+
+**Friedman, J., Hastie, T. and Tibshirani, R. (2010).** Regularization paths for
+generalized linear models via coordinate descent. *Journal of Statistical
+Software*, 33, 1-22. <https://doi.org/10.18637/jss.v033.i01>
+> The coordinate-descent scheme the M-step uses when `alpha > 0`. The objective
+> here is the expected complete-data log-likelihood rather than a residual sum
+> of squares, but it is a quadratic with a separable penalty and the update is
+> the same soft-thresholding.
+
+**Otto, P., Fasso, A. and Maranzano, P. (2024).** A review of regularised
+estimation methods and cross-validation in spatiotemporal statistics.
+*Statistics Surveys*, 18, 299-340. <https://doi.org/10.1214/24-SS150>
+> Regularization and cross-validation in exactly this setting, including why
+> random K-fold is anti-conservative when the residuals are correlated in space
+> and time, and which blocking schemes to use instead when selecting `lambda`.
 
 ## Authors
 
