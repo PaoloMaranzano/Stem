@@ -46,7 +46,14 @@ Two datasets ship with the package: `pm10`, the small 22-station example, and
 calls `kalman()`, which does the real work:
 
 * `filtering()` / `filterstep()` - the forward Kalman recursions, which also
-  accumulate the log-likelihood through `mvtnorm::dmvnorm()`;
+  accumulate the log-likelihood. They never form the $d \times d$ predictive
+  covariance $Q_t$: the Woodbury identity turns each step into $p \times p$
+  algebra against a Cholesky factor of $\Sigma_\varepsilon$ that is computed
+  once per pass, and the log-density is evaluated directly rather than as the
+  logarithm of a density that would underflow on a large network;
+* `stem_obs_index()`, `stem_blocks_cache()`, `stem_missing_blocks()` - the
+  missing-data bookkeeping: which locations are observed at each time point,
+  and the Gaussian conditioning blocks that complete the sufficient statistics;
 * `smoothing()` / `smootherstep()` / `smootherstep.uni()` - the backward
   recursions producing the smoothed latent states;
 * `Q_function_addendo1/2/3()` - the three pieces of the expected complete-data
@@ -54,7 +61,7 @@ calls `kalman()`, which does the real work:
 * `d1_Q()`, `d2_Q()`, `d12_Q()` and the `d1/d2_Sigmastar_*()` derivatives - the
   gradient and Hessian of the Newton-Raphson step that updates $\theta$ and
   $\log b = \log(\sigma^2_\varepsilon / \sigma^2_\omega)$;
-* `Sigmastar.exp()`, `B_function()`, `cov_lagone()`, `sumMatrices()` and
+* `Sigmastar.exp()`, `B_function()`, `cov_lagone()` and
   `changedimension_covariates()` - matrix utilities.
 
 Closed-form M-steps update $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and
@@ -65,6 +72,10 @@ $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
 * `STEM_Simulation()` draws a new dataset from a `STEM_Model` at the parameter
   values held in its skeleton. It is the generator behind both bootstraps.
 * `STEM_Kriging()` predicts at unobserved locations through `spatial.pred()`.
+* `STEM_Fitted()` returns $E[z \mid z_{obs}]$ at the observed locations, so a
+  gap in the response is filled by the model rather than left as `NA`; it is
+  the object a cross-validation exercise scores. `SCSTEM_Fitted()` does the
+  same regime by regime and reassembles the network.
 * `STEM_Bootstrap()` repeats *simulate, then re-estimate* through
   `STEM_Bootstrap.fn()`, giving the sampling distribution of the parameters of a
   single pooled model.

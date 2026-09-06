@@ -223,24 +223,53 @@ test_that("a fully missing time point falls back on the signal", {
   signal <- as.numeric(XX[, , 11] %*% b) + ysm[11]
   expect_equal(as.numeric(zhat[11, ]), signal)
 })
+### ---------------------------------------------------------------------------
+### The Woodbury form of the filter, against a direct reference
+### ---------------------------------------------------------------------------
 
-test_that("the two filtering engines agree to machine precision", {
-  s <- po_subset(Tn = 60L, d = 12L)
-  mod <- STEM_Model(z = s$z, covariates = s$covariates,
-                    coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+test_that("filtering() reproduces a direct O(d^3) reference", {
+  ### A deliberately naive implementation: form Q_t and invert it, exactly as
+  ### the superseded code did. The Woodbury version must agree with it.
+  naive <- function(ss) {
+    m <- matrix(NA_real_, ss$n, ss$p); C <- vector("list", ss$n); ll <- 0
+    mx <- ss$m0; Cx <- ss$C0
+    Z <- t(ss$Fmat)
+    for (tt in seq_len(ss$n)) {
+      a <- ss$Gmat %*% t(mx)
+      R <- ss$Gmat %*% Cx %*% t(ss$Gmat) + ss$Wmat
+      Q <- Z %*% R %*% t(Z) + ss$Vmat
+      mu <- Z %*% a + ss$XXX[, , tt] %*% ss$beta
+      e <- matrix(as.numeric(ss$z[tt, ]), ncol = 1) - mu
+      A <- R %*% t(Z) %*% solve(Q)
+      m[tt, ] <- a + A %*% e
+      C[[tt]] <- R - A %*% Q %*% t(A)
+      ll <- ll + mvtnorm::dmvnorm(as.numeric(ss$z[tt, ]), as.numeric(mu), Q,
+                                  log = TRUE)
+      mx <- matrix(m[tt, ], nrow = 1); Cx <- C[[tt]]
+    }
+    list(m = m, C = C, loglik = ll)
+  }
 
-  a <- STEM_Estimation(mod, precision = 0.05, max.iter = 5, engine = "R")
-  b <- STEM_Estimation(mod, precision = 0.05, max.iter = 5, engine = "fast")
+  s <- po_subset(Tn = 40L, d = 7L)
+  ph <- po_phi()
+  dm <- as.matrix(stats::dist(s$coordinates, diag = TRUE))
+  ss <- list(z = s$z, Fmat = t(matrix(1, s$d, 1)), Gmat = ph$G,
+             Vmat = ph$sigma2eps * diag(s$d) +
+                    ph$sigma2omega * exp(-ph$theta * dm),
+             Wmat = ph$Sigmaeta, m0 = t(ph$m0), C0 = ph$C0,
+             XXX = Stem:::changedimension_covariates(s$covariates, s$d, 3L, 40L),
+             beta = ph$beta, flag.cov = TRUE, n = 40L, p = 1L, d = s$d,
+             m = NA, C = NA, loglik = NA)
 
-  pa <- unlist(a$estimates$phi.hat)
-  pb <- unlist(b$estimates$phi.hat)
-  expect_equal(pa, pb, tolerance = 1e-8)
-  expect_equal(a$estimates$loglik, b$estimates$loglik, tolerance = 1e-8)
-  expect_equal(a$estimates$y.smoothed, b$estimates$y.smoothed, tolerance = 1e-8)
+  ref <- naive(ss)
+  got <- Stem:::filtering(ss)
+
+  expect_equal(as.numeric(got$m), as.numeric(ref$m), tolerance = 1e-10)
+  expect_equal(unlist(got$C), unlist(ref$C), tolerance = 1e-10)
+  expect_equal(as.numeric(got$loglik), as.numeric(ref$loglik), tolerance = 1e-10)
 })
 
-test_that("the fast engine handles gaps and empty time points", {
+test_that("the filter handles gaps and an empty time point", {
   s <- po_subset(Tn = 50L, d = 10L)
   set.seed(202)
   z_na <- s$z
@@ -251,19 +280,16 @@ test_that("the fast engine handles gaps and empty time points", {
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
                     phi = po_phi(), K = matrix(1, s$d, 1))
+  fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
 
-  a <- STEM_Estimation(mod, precision = 0.5, max.iter = 3, engine = "R")
-  b <- STEM_Estimation(mod, precision = 0.5, max.iter = 3, engine = "fast")
-
-  expect_equal(unlist(a$estimates$phi.hat), unlist(b$estimates$phi.hat),
-               tolerance = 1e-8)
-  expect_true(is.finite(b$estimates$loglik))
+  expect_true(is.finite(fit$estimates$loglik))
+  expect_true(all(is.finite(unlist(fit$estimates$phi.hat))))
 })
 
 test_that("the log-density does not underflow on a large network", {
   ### log(dmvnorm(x)) returns -Inf once the density falls below the smallest
-  ### representable double, which happens for a few hundred locations; the
-  ### logarithm has to be taken inside.
+  ### representable double, which happens for a few hundred locations. The
+  ### filter now evaluates the log-density directly and cannot underflow.
   set.seed(9)
   d <- 400
   x <- stats::rnorm(d)

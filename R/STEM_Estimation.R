@@ -28,6 +28,55 @@
 #'
 #'
 #' @details This function estimates the vector parameter \code{phi} of the hierarchical spatio-temporal model of class \dQuote{STEM_Model} using Kalman filtering and EM algorithm.
+#'
+#' @section Computational form of the filter:
+#' The forward pass does not build the \eqn{d \times d} matrix
+#' \eqn{Q_t = Z R_t Z' + \Sigma_e} that the prediction step nominally requires,
+#' and does not invert it. Two facts make that avoidable. The measurement
+#' covariance \eqn{\Sigma_e} does not depend on \eqn{t}: it is rebuilt once per
+#' EM iteration. And \eqn{Z R_t Z'} has rank \eqn{p}, the dimension of the
+#' latent state, which is usually one. The Woodbury identity therefore gives
+#' \deqn{Q_t^{-1} = \Sigma_e^{-1} - U (R_t^{-1} + Z' \Sigma_e^{-1} Z)^{-1} U',
+#'       \qquad U = \Sigma_e^{-1} Z,}
+#' and the matrix determinant lemma gives
+#' \deqn{\log|Q_t| = \log|\Sigma_e| + \log|R_t| +
+#'       \log|R_t^{-1} + Z' \Sigma_e^{-1} Z|.}
+#' Here \eqn{U}, \eqn{Z' \Sigma_e^{-1} Z}, the Cholesky factor of
+#' \eqn{\Sigma_e} and \eqn{\log|\Sigma_e|} are constants of the pass and are
+#' computed once. Every quantity the recursion needs -- the gain applied to the
+#' innovation, the updated state variance, the quadratic form of the
+#' log-likelihood -- then reduces to \eqn{p} by \eqn{p} algebra plus one
+#' triangular solve, so the cost per time point falls from \eqn{O(d^3)} to
+#' \eqn{O(d^2)} and the cost of a pass from \eqn{O(T d^3)} to
+#' \eqn{O(d^3 + T d^2)}. The two forms are algebraically identical and agree to
+#' floating point. The identity holds for any \eqn{p}, and needs only that
+#' \eqn{\Sigma_e} and \eqn{R_t} be invertible, which positive definiteness
+#' already guarantees; the gain is largest when \eqn{p} is small relative to
+#' \eqn{d}, which is the regime the model is written for.
+#'
+#' With missing values the constants depend on which rows are observed, so they
+#' are computed once per distinct missingness pattern and cached.
+#'
+#' The log-density is evaluated directly rather than as the logarithm of the
+#' density. On \eqn{d} observations the Gaussian density is of order
+#' \eqn{e^{-d}}, so on a network of a few hundred locations it falls below the
+#' smallest representable double and taking its logarithm afterwards returns
+#' \code{-Inf}.
+#'
+#' @section Computational form of the M-step:
+#' The sums the M-step accumulates over time are written as matrix products
+#' rather than as loops over \eqn{t}. Because the loading matrix does not depend
+#' on time, the second moment of the measurement error collapses to
+#' \deqn{\sum_t \{ Z C^s_t Z' + r_t r_t' \} =
+#'       Z (\sum_t C^s_t) Z' + R'R,}
+#' with \eqn{R} the \eqn{T} by \eqn{d} matrix of residuals, so one cross-product
+#' replaces \eqn{T} outer products and the \eqn{T} matrices of size \eqn{d} by
+#' \eqn{d} that used to be held at once. The three sums of outer products of the
+#' smoothed states are cross-products of the \eqn{T} by \eqn{p} matrix of those
+#' states, and the two accumulations entering the update of \eqn{\beta} are
+#' cross-products of the design blocks stacked by period. Finally, every trace
+#' of a matrix product is evaluated as \eqn{tr(AB) = \sum_{ij} A_{ij} B_{ji}},
+#' which costs \eqn{O(d^2)} instead of forming the product.
 #' The algorithm details and formulas are given in Fasso' and Cameletti (2007, 2009). Note that some parameters (\code{beta}, \code{sigma2omega},
 #'   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
 #'
@@ -124,10 +173,8 @@
 
 
 STEM_Estimation <-
-function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, engine = c("R", "fast"))
+function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE)
 {
-
-engine <- match.arg(engine)
 
 z 		=  StemModel$data$z
 
@@ -181,8 +228,7 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
 			cov.spat		= cov.spat,
 			distance = distance,
 			regularization=regularization,
-			verbose = verbose,
-			engine = engine
+			verbose = verbose
 	)
 
 	iterNR[n_iter_EM] 	= step$n_iter_NR

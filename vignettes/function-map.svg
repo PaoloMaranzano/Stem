@@ -61,6 +61,8 @@
   <text x="350" y="348.83" text-anchor="middle" font-size="11.5" fill="#3d4753">d1_Q, d2_Q, d12_Q</text>
   <rect class="internal" x="250" y="370" width="200" height="30"/>
   <text x="350" y="388.83" text-anchor="middle" font-size="11.5" fill="#3d4753">B_function, cov_lagone</text>
+  <rect class="internal" x="480" y="290" width="250" height="30"/>
+  <text x="605" y="308.5" text-anchor="middle" font-size="10.5" fill="#3d4753">stem_obs_index, stem_blocks_cache</text>
   <rect class="internal" x="480" y="330" width="250" height="30"/>
   <text x="605" y="348.83" text-anchor="middle" font-size="11.5" fill="#3d4753">d1/d2_Sigmastar_logb.exp</text>
   <rect class="internal" x="480" y="370" width="250" height="30"/>
@@ -68,7 +70,7 @@
   <rect class="internal" x="760" y="290" width="160" height="30"/>
   <text x="840" y="308.83" text-anchor="middle" font-size="11.5" fill="#3d4753">Sigmastar.exp</text>
   <rect class="internal" x="760" y="330" width="160" height="30"/>
-  <text x="840" y="348.83" text-anchor="middle" font-size="11.5" fill="#3d4753">sumMatrices</text>
+  <text x="840" y="348.17" text-anchor="middle" font-size="9.5" fill="#3d4753">stem_missing_blocks</text>
   <rect class="internal" x="760" y="370" width="160" height="30"/>
   <text x="840" y="388.17" text-anchor="middle" font-size="9.5" fill="#3d4753">changedimension_covariates</text>
   <rect class="exported" x="44" y="472" width="150" height="34"/>
@@ -81,6 +83,10 @@
   <text x="495" y="493.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">STEM_Bootstrap</text>
   <rect class="internal" x="420" y="515" width="150" height="30"/>
   <text x="495" y="533.83" text-anchor="middle" font-size="11.5" fill="#3d4753">STEM_Bootstrap.fn</text>
+  <rect class="exported" x="608" y="472" width="140" height="34"/>
+  <text x="678" y="493.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">STEM_Fitted</text>
+  <rect class="exported" x="778" y="472" width="142" height="34"/>
+  <text x="849" y="492.83" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1b2430">SCSTEM_Fitted</text>
   <rect class="exported" x="44" y="612" width="160" height="38"/>
   <text x="124" y="635.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">SCSTEM_Estim</text>
   <rect class="exported" x="44" y="676" width="160" height="34"/>
@@ -121,9 +127,12 @@
   <path class="edge" d="M 305 360 L 305 364"/>
   <path class="edge" d="M 450 345 L 474 345"/>
   <path class="edge" d="M 450 385 L 474 385"/>
-  <path class="edge" d="M 730 345 L 754 345"/>
+  <path class="edge" d="M 350 251 C 430 252 468 305 476 305"/>
+  <path class="edge" d="M 734 310 L 754 338"/>
   <path class="edge" d="M 300 506 L 300 509"/>
   <path class="edge" d="M 495 506 L 495 509"/>
+  <path class="edge" d="M 774 489 L 754 489"/>
+  <path class="edge" d="M 690 468 C 700 440 780 425 830 404"/>
   <path class="edge" d="M 419 530 L 200 500" stroke-dasharray="4 3"/>
   <path class="edge" d="M 445 515 L 160 258" stroke-dasharray="4 3"/>
   <path class="edgeA" d="M 124 710 L 124 726"/>
@@ -135,8 +144,8 @@
   <path class="edge" d="M 204 636 L 244 650"/>
   <path class="edge" d="M 204 748 C 380 748 400 726 464 716"/>
   <path class="edge" d="M 435 800 C 560 800 640 746 700 728"/>
-  <path class="edgeA" d="M 60 612 C 40 560 40 300 110 254"/>
-  <path class="edge" d="M 124 788 C 124 770 130 560 119 512" stroke-dasharray="4 3"/>
+  <path class="edgeA" d="M 60 612 C 30 560 30 300 110 254"/>
+  <path class="edge" d="M 196 786 C 235 700 235 540 150 510" stroke-dasharray="4 3"/>
 
   <text x="8" y="662" class="note" transform="rotate(-90 8 662)">grid</text>
   <text x="26" y="470" class="note" transform="rotate(-90 26 470)">one STEM fit per regime</text>

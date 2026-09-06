@@ -54,11 +54,11 @@ Depends: R (>= 4.1.0)
 Imports:
     geodist,
     MASS,
-    mvtnorm,
     spdep,
     stats
 Suggests:
     knitr,
+    mvtnorm,
     rmarkdown,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr

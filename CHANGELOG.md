@@ -16,6 +16,101 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-06
+
+**The Kalman filter no longer forms or inverts the `d x d` predictive
+covariance.** The forward pass used to build
+
+```
+Q_t = Z R_t Z' + Sigma_e
+```
+
+at every time point and hand it to `solve()`. That is `O(d^3)` per step and
+`O(T d^3)` over a pass, and on anything past a few dozen locations it was
+essentially the whole running time of the package: SC-STEM fits one STEM model
+per regime, on a grid of `(k, phi)`, on every bootstrap draw, so the cubic term
+is paid thousands of times.
+
+Two facts make it avoidable. `Sigma_e` does not depend on `t` -- it is rebuilt
+once per EM iteration -- and `Z R_t Z'` has rank `p`, the dimension of the
+latent state, which is one in the default specification. So the Woodbury
+identity gives
+
+```
+Q_t^-1 = Sigma_e^-1 - U (R_t^-1 + Z' Sigma_e^-1 Z)^-1 U',   U = Sigma_e^-1 Z
+```
+
+and the matrix determinant lemma gives
+
+```
+log|Q_t| = log|Sigma_e| + log|R_t| + log|R_t^-1 + Z' Sigma_e^-1 Z| .
+```
+
+`U`, `Z' Sigma_e^-1 Z`, the Cholesky factor of `Sigma_e` and `log|Sigma_e|` are
+constants of the pass, so `filtering()` computes them once and `filterstep()`
+completes each step with `p x p` algebra plus one triangular solve. A pass costs
+`O(d^3 + T d^2)`. The recursion never needs `Q_t` itself: the gain enters only
+through `Z' Q^-1 Z` and `Z' Q^-1 e`, which are `p x p` and `p x 1`. With missing
+values the constants depend on which rows are observed, so they are cached per
+distinct missingness pattern; in a monitoring network a station is out of
+service for a stretch of consecutive days, so the cache almost always hits.
+
+**The log density is evaluated directly.** `log(mvtnorm::dmvnorm(...))` was not
+only slower -- `dmvnorm` re-checks the symmetry of `Q` with `all.equal` at every
+step, about a seventh of the running time on a 36-station network -- but wrong
+on a large network. The Gaussian density on `d` observations is of order
+`exp(-d)`, so past roughly 300 locations it falls below the smallest
+representable double and its logarithm is `-Inf`. The previous code could not
+fit a 400-station network at all; this is not a speed-up but a correctness fix.
+
+**The M-step accumulations are matrix products rather than loops.** Three loops
+built lists of `T` matrices and then summed them. Because the loading matrix
+does not depend on time,
+
+```
+SUM_t { Z C_t Z' + r_t r_t' } = Z (SUM_t C_t) Z' + R'R
+```
+
+with `R` the `T x d` matrix of residuals, so one cross-product replaces `T`
+outer products and the `T` matrices of size `d x d` that had to be held at once.
+The three sums of outer products of the smoothed states are cross-products of
+the `T x p` matrix of those states; the two accumulations entering the update of
+`beta` are cross-products of the design blocks stacked by period. Every trace of
+a matrix product is now evaluated as `tr(AB) = SUM_ij A_ij B_ji`, which is
+`O(d^2)` instead of forming the product, and the derivative helpers `d1_Q`,
+`d2_Q`, `d12_Q` and `Q_function_addendo1` receive the inverse of the scaled
+covariance and its product with `B` from the caller instead of recomputing
+`solve()` up to seven times each. `Q_function_addendo1` also takes the log
+determinant through `determinant(., logarithm = TRUE)`, which does not overflow
+at large `d`.
+
+Measured against the state of the code at commit `7d0b094`, ten EM iterations
+on a synthetic network generated from the model itself:
+
+```
+   d     T | before (s)  after (s)  speedup | max rel. diff
+  36   365 |        2.1        0.9     2.3x | 1.18e-13
+  60   365 |        2.1        0.6     3.3x | 7.96e-14
+ 100   365 |        5.9        1.2     5.0x | 1.17e-13
+ 200   365 |       15.5        1.6     9.8x | 2.85e-13
+ 400   200 |     FAILED       10.8        - | reference underflows to -Inf
+```
+
+Both changes are algebraic identities, so the point of the table is the last
+column, not the speed-up: the estimates coincide to floating point. The
+benchmark is `dev/paper/10-engine-benchmark.R`, which reconstructs the old
+sources from git and runs the two side by side.
+
+**Consequences elsewhere.** `sumMatrices()` was a two-line wrapper around
+`Reduce("+", .)` called only from the three loops that are gone, so it has been
+removed; it was internal and undocumented, so nothing user-facing changes.
+`mvtnorm` is no longer used by any function in `R/` and has moved from `Imports`
+to `Suggests`, where the test suite still uses it as an independent reference
+implementation of the likelihood. The function map gains the missing-data
+helpers and the two `*_Fitted()` functions, loses `sumMatrices`, and its
+generator now refuses to emit a diagram whose edges run through boxes -- which
+caught two long-standing routing defects in the diagram itself.
+
 ### 2026-09-04
 
 **Missing values in the response are now supported.**

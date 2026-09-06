@@ -224,7 +224,7 @@ Omega_t = K P_t^{t-1} K' + Sigma_e</div>
 
     <div class="callout">
       <span class="tag">In the code</span>
-      <p><code>filterstep</code> computes <code>a = G m</code>, <code>R = G C G' + W</code>, <code>f = F'a</code> and <code>Q = F'RF + V</code>, so that <code>f + X beta</code> is <code>mu_t</code> and <code>Q</code> is <code>Omega_t</code>. The term is then evaluated with <code>mvtnorm::dmvnorm</code>, and <code>filtering</code> accumulates the sum over <code>t</code>.</p>
+      <p><code>filterstep</code> computes <code>a = G m</code> and <code>R = G C G' + W</code>, so that <code>F'a + X beta</code> is <code>mu_t</code> and <code>Q = F'RF + V</code> is <code>Omega_t</code>. It never forms <code>Q</code>: since <code>V</code> is constant in <code>t</code> and <code>F'RF</code> has rank <code>p</code>, the Woodbury identity and the matrix determinant lemma give <code>Q^-1</code> and <code>log|Q|</code> from a Cholesky factor of <code>V</code> that <code>filtering</code> computes once per pass, so the step costs <code>O(d^2)</code> rather than <code>O(d^3)</code>. The log density is evaluated in closed form rather than as the logarithm of a density, which on a network of a few hundred locations would underflow to <code>-Inf</code>; <code>filtering</code> accumulates the sum over <code>t</code>.</p>
     </div>
   </section>
 

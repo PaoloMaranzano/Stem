@@ -124,6 +124,30 @@ draws out of 12 to 12 out of 12.
 * `STEM_Simulation()` called `mvrnorm()` unqualified, relying on a `NAMESPACE`
   import; it now calls `MASS::mvrnorm()`.
 
+## Larger networks
+
+* The Kalman filter no longer forms or inverts the `d x d` predictive
+  covariance. Since the measurement covariance does not depend on time and the
+  state contribution has rank `p`, the Woodbury identity and the matrix
+  determinant lemma reduce each step to `p x p` algebra against a Cholesky
+  factor computed once per pass, so a forward pass costs `O(d^3 + T d^2)`
+  instead of `O(T d^3)`. On 200 stations over 365 days an EM iteration is about
+  ten times faster; the estimates are unchanged to floating point, the two forms
+  being algebraic identities.
+* The log-likelihood term is evaluated as a log density rather than as the
+  logarithm of a density. The Gaussian density on `d` observations is of order
+  `exp(-d)`, so past roughly 300 locations it underflowed to zero and the fit
+  aborted with a non-finite log-likelihood. Networks of that size can now be
+  fitted at all.
+* The M-step accumulations are matrix products rather than loops over time, and
+  no longer hold `T` matrices of size `d x d` at once. The derivative helpers
+  receive the inverse of the scaled covariance from the caller instead of
+  recomputing it up to seven times each, and every trace of a matrix product is
+  evaluated without forming the product.
+* `mvtnorm` moves from `Imports` to `Suggests`: no function in the package uses
+  it any more, though the test suite still does, as an independent reference
+  implementation of the likelihood.
+
 ## CRAN compliance
 
 Addresses the review comments received on the previous submission:

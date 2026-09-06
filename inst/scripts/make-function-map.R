@@ -81,10 +81,11 @@ boxes <- rbind(
   box(250, 290, 200, 30, "Q_function_addendo1/2/3",       "internal"),
   box(250, 330, 200, 30, "d1_Q, d2_Q, d12_Q",             "internal"),
   box(250, 370, 200, 30, "B_function, cov_lagone",        "internal"),
+  box(480, 290, 250, 30, "stem_obs_index, stem_blocks_cache", "internal", 10.5),
   box(480, 330, 250, 30, "d1/d2_Sigmastar_logb.exp",      "internal"),
   box(480, 370, 250, 30, "d1/d2_Sigmastar_logtheta.exp",  "internal"),
   box(760, 290, 160, 30, "Sigmastar.exp",                 "internal"),
-  box(760, 330, 160, 30, "sumMatrices",                   "internal"),
+  box(760, 330, 160, 30, "stem_missing_blocks",           "internal", 9.5),
   box(760, 370, 160, 30, "changedimension_covariates",    "internal", 9.5),
   ## band 3
   box( 44, 472, 150, 34, "STEM_Simulation",               "exported"),
@@ -92,6 +93,8 @@ boxes <- rbind(
   box(230, 515, 140, 30, "spatial.pred",                  "internal"),
   box(420, 472, 150, 34, "STEM_Bootstrap",                "exported"),
   box(420, 515, 150, 30, "STEM_Bootstrap.fn",             "internal"),
+  box(608, 472, 140, 34, "STEM_Fitted",                   "exported"),
+  box(778, 472, 142, 34, "SCSTEM_Fitted",                 "exported", 11.5),
   ## band 4
   box( 44, 612, 160, 38, "SCSTEM_Estim",                  "exported"),
   box( 44, 676, 160, 34, "SCSTEM_Infocrit",               "exported"),
@@ -140,10 +143,14 @@ edges <- list(
   seg(305, 360, 305, 364),
   seg(450, 345, 474, 345),
   seg(450, 385, 474, 385),
-  seg(730, 345, 754, 345),
+  ## band 2: the missing-data bookkeeping
+  cur(350, 251, 430, 252, 468, 305, 476, 305),
+  seg(734, 310, 754, 338),
   ## band 3
   seg(300, 506, 300, 509),
   seg(495, 506, 495, 509),
+  seg(774, 489, 754, 489),
+  cur(690, 468, 700, 440, 780, 425, 830, 404),
   seg(419, 530, 200, 500, dashed = TRUE),
   seg(445, 515, 160, 258, dashed = TRUE),
   ## band 4: the pipeline
@@ -158,8 +165,8 @@ edges <- list(
   cur(204, 748, 380, 748, 400, 726, 464, 716),
   cur(435, 800, 560, 800, 640, 746, 700, 728),
   ## across the bands
-  cur( 60, 612,  40, 560,  40, 300, 110, 254, accent = TRUE),
-  cur(124, 788, 124, 770, 130, 560, 119, 512, dashed = TRUE)
+  cur( 60, 612,  30, 560,  30, 300, 110, 254, accent = TRUE),
+  cur(196, 786, 235, 700, 235, 540, 150, 510, dashed = TRUE)
 )
 
 ## ---------------------------------------------------------------------------
@@ -404,6 +411,46 @@ emit_pdf <- function(path) {
 }
 
 ## ---------------------------------------------------------------------------
+## Layout check. The coordinates above are written by hand, so a box added to a
+## band can silently land under an edge that was routed through what used to be
+## empty space. This refuses to emit anything in that case: no edge may run
+## through the interior of a box other than the one it leaves or the one it
+## enters, no two boxes may overlap, and every box must sit inside a band.
+## ---------------------------------------------------------------------------
+check_layout <- function() {
+  pad <- 2
+  bad <- character(0)
+  for (k in seq_along(edges)) {
+    p <- edge_path(edges[[k]], n = 200)
+    for (i in seq_len(nrow(boxes))) {
+      b <- boxes[i, ]
+      inside <- p[, 1] > b$x + pad & p[, 1] < b$x + b$w - pad &
+                p[, 2] > b$y + pad & p[, 2] < b$y + b$h - pad
+      j <- which(inside)
+      ## an edge is allowed to touch its own endpoints, so only the middle of
+      ## the path counts as a crossing
+      if (any(j > 0.10 * nrow(p) & j < 0.90 * nrow(p)))
+        bad <- c(bad, sprintf("edge %d crosses box '%s'", k, b$label))
+    }
+  }
+  for (i in seq_len(nrow(boxes))) for (j in seq_len(nrow(boxes))) if (i < j) {
+    a <- boxes[i, ]; b <- boxes[j, ]
+    if (a$x < b$x + b$w && b$x < a$x + a$w && a$y < b$y + b$h && b$y < a$y + a$h)
+      bad <- c(bad, sprintf("box '%s' overlaps box '%s'", a$label, b$label))
+  }
+  for (i in seq_len(nrow(boxes))) {
+    b <- boxes[i, ]
+    if (!any(bands$x <= b$x & b$x + b$w <= bands$x + bands$w &
+             bands$y <= b$y & b$y + b$h <= bands$y + bands$h))
+      bad <- c(bad, sprintf("box '%s' is outside every band", b$label))
+  }
+  if (length(bad))
+    stop("the layout is not clean:\n  ", paste(bad, collapse = "\n  "),
+         call. = FALSE)
+  invisible(TRUE)
+}
+check_layout()
+
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 svg_path <- emit_svg(file.path(out, "STEM_function_map.svg"))
 pdf_path <- emit_pdf(file.path(out, "STEM_function_map.pdf"))

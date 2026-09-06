@@ -180,12 +180,14 @@ remotes::install_github("PaoloMaranzano/Stem")
 | `STEM_Estimation()` | maximum likelihood via EM and the Kalman filter |
 | `STEM_Simulation()` | simulate from a fitted or specified model |
 | `STEM_Kriging()` | spatial prediction at unobserved locations |
+| `STEM_Fitted()` | fitted values at the observed locations, gaps filled by the model |
 | `STEM_Bootstrap()` | parametric bootstrap for the pooled model |
 | `SCSTEM_Estim()` | fit a spatially-clustered STEM model |
 | `SCSTEM_Infocrit()` | information criteria over a grid of `(k, phi)` |
 | `SCSTEM_Select()` | two-step selection of the hyperparameters |
 | `SCSTEM_Bootstrap()` | refit-with-clustering parametric bootstrap |
 | `SCSTEM_BootInference()` | standard errors, intervals and between-regime tests |
+| `SCSTEM_Fitted()` | fitted values assembled regime by regime |
 
 Two datasets ship with the package: `pm10` (22 stations, 366 days, the original
 example) and `povalley` (36 background stations of the Po Valley, daily PM2.5
@@ -241,6 +243,19 @@ swap pass restores mobility without breaking feasibility.
 **Uncertainty includes the partition.** `SCSTEM_Bootstrap()` re-runs the whole
 procedure, clustering included, on every draw, so the reported intervals are not
 conditional on a partition that is itself estimated.
+
+**The filter never inverts a $d \times d$ matrix.** The predictive covariance
+$Q_t = K P_t K' + \Sigma_\varepsilon$ has $\Sigma_\varepsilon$ constant in $t$
+and a rank-$p$ update on top of it, so the Woodbury identity and the matrix
+determinant lemma reduce each step to $p \times p$ algebra against a Cholesky
+factor of $\Sigma_\varepsilon$ that is computed once per pass. The cost of a
+forward pass is $O(d^3 + T d^2)$ instead of $O(T d^3)$, and the log density is
+evaluated in closed form rather than as the logarithm of a density, which on a
+few hundred locations underflows to `-Inf`. On a network of 200 stations over
+365 days one EM iteration is about ten times faster than the direct form, and a
+400-station network, which the direct form cannot fit at all, takes about a
+second per iteration. The two forms are algebraic identities of each other and
+agree to about $10^{-13}$ in relative terms.
 
 ## Documentation
 

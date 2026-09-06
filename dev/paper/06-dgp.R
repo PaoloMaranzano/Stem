@@ -1,27 +1,53 @@
 ## ---------------------------------------------------------------------------
 ## Data-generating processes for the simulation study. Definitions only: this
-## file is sourced by 07-simulation.R and by the calibration script, and runs
-## nothing of its own.
+## file is sourced by 07-simulation.R and runs nothing of its own.
 ##
-## WHY THIS REPLACES THE FIRST DESIGN
+## THE GEOMETRY: THE OVERLAP DESIGN
 ##
-## The first version generated each regime by calling STEM_Simulation() on its
-## own sub-network, which is what the SC-STEM model literally says: regime k has
-## its own latent process y^(k), and two locations in different regimes are
-## uncorrelated. That is faithful to the model and it is also useless as an
-## experiment, because it makes the partition identifiable from the correlation
-## structure alone, whatever the parameters. Generating with IDENTICAL
-## parameters in the two regimes and one latent path per regime recovers the
-## true partition with ARI = 1 in every replication; generating the same data
-## with one shared latent path gives ARI = 0.14. The recovery measured in that
-## design was therefore the recovery of the latent split, not of any difference
-## in Psi_k, and a design that separates the regimes only in the dynamics or
-## only in the spatial covariance was testing nothing of the sort.
+## The spatial configuration follows Morelli, Maranzano and Otto (2026), Spatial
+## Statistics 73, 100960, Section 4. There the K = 4 cluster centres sit at the
+## corners of a square of half-side d,
+##
+##   mu_sp = ((d,d), (-d,d), (d,-d), (-d,-d)),   Sigma_sp = nu_sp * I_2,
+##
+## so that d alone controls how much the clusters overlap in space: at d = 0 the
+## four Gaussians coincide and the partition has no spatial signature at all; as
+## d grows the clusters separate. Reducing the design to K = 2 and K = 3 we keep
+## the NEAREST-NEIGHBOUR centre distance at 2d rather than the radius, so that a
+## given d means the same degree of overlap whatever K:
+##
+##   K = 2   centres (-d, 0) and (d, 0)
+##   K = 3   equilateral triangle of side 2d, i.e. circumradius 2d/sqrt(3)
+##
+## The standardised separation is then 2d / sqrt(nu_sp) for every K: with
+## nu_sp = 0.4 it runs from 0 at d = 0 to 3.16 standard deviations at d = 1.
+##
+## The abstract plane is mapped onto a geographic box centred on the Po Valley,
+## one abstract unit being UNIT_KM kilometres. This is not cosmetic: it is what
+## makes the covariance parameters interpretable. With UNIT_KM = 100 and
+## nu_sp = 0.4 a cluster has a standard deviation of 63 km and, at d = 1, the
+## centres are 200 km apart, against a baseline correlation range of 123 km --
+## the regime in which a monitoring network of the Po Valley actually sits.
+##
+## WHY THE GENERATOR IS NOT STEM_Simulation() CALLED REGIME BY REGIME
+##
+## The first version of this file generated each regime by calling
+## STEM_Simulation() on its own sub-network, which is what the SC-STEM model
+## literally says: regime k has its own latent process y^(k), and two locations
+## in different regimes are uncorrelated. That is faithful to the model and it
+## is also useless as an experiment, because it makes the partition identifiable
+## from the correlation structure alone, whatever the parameters. Generating
+## with IDENTICAL parameters in the two regimes and one latent path per regime
+## recovers the true partition with ARI = 1 in every replication; generating the
+## same data with one shared latent path gives ARI = 0.14. The recovery measured
+## in that design was the recovery of the latent split, not of any difference in
+## Psi_k, and a design that separates the regimes only in the dynamics or only
+## in the spatial covariance was testing nothing of the sort.
 ##
 ## THE FIX
 ##
-## The coupling between the latent processes becomes an explicit factor of the
-## design. The innovations of the k processes are drawn with cross-correlation
+## The coupling between the latent processes is an explicit factor of the
+## design. The innovations of the K processes are drawn with cross-correlation
 ## rho:
 ##
 ##   rho = 1  the regimes share their dynamics, so the partition can be found
@@ -43,10 +69,60 @@
 ## when they are not -- in which case the block structure is intrinsic to the
 ## scenario rather than an artefact of the generator.
 ##
-## Effect sizes are expressed in interpretable units: the coefficient contrast
-## in residual standard deviations, the variance contrast as a nugget share, the
-## range in kilometers.
+## Effect sizes are in interpretable units: the coefficient contrast in residual
+## standard deviations, the variance contrast as a nugget share, the range in
+## kilometres.
 ## ---------------------------------------------------------------------------
+
+NU_SP   <- 0.4          # variance of each coordinate within a cluster
+UNIT_KM <- 100          # kilometres per abstract unit of the overlap design
+LON0    <- 9.5          # centre of the geographic box, Po Valley
+LAT0    <- 45.5
+
+## ---------------------------------------------------------------------------
+## Geometry
+## ---------------------------------------------------------------------------
+
+## centres of the K clusters at overlap d, nearest-neighbour distance 2d
+dgp_centres <- function(K, d) {
+  if (K == 1L) return(cbind(0, 0))
+  if (K == 2L) return(cbind(c(-d, d), c(0, 0)))
+  if (K == 3L) {
+    r <- 2 * d / sqrt(3); a <- c(90, 210, 330) * pi / 180
+    return(cbind(r * cos(a), r * sin(a)))
+  }
+  if (K == 4L) return(cbind(c(d, -d, d, -d), c(d, d, -d, -d)))
+  stop("K must be 1, 2, 3 or 4")
+}
+
+## Labels. `balanced = TRUE` gives exactly equal regime sizes, the remainder
+## spread over the first regimes; `balanced = FALSE` draws them with equal
+## probabilities, as in the source design. The balanced version is the default
+## because SC-STEM carries a minimum regime size, and an unlucky multinomial
+## draw at n = 20 produces a regime the model cannot fit -- which would confound
+## the recovery of the partition with the feasibility of the fit.
+dgp_labels <- function(n, K, balanced = TRUE) {
+  if (balanced) {
+    g <- rep(seq_len(K), length.out = n)
+    return(sort(g))
+  }
+  sample.int(K, n, replace = TRUE)
+}
+
+## Locations: the abstract cloud of the overlap design, mapped to longitude and
+## latitude so that distances are kilometres and the covariance parameters keep
+## their meaning.
+dgp_locations <- function(n, K, d, nu_sp = NU_SP, balanced = TRUE, seed = 1) {
+  set.seed(seed)
+  mu <- dgp_centres(K, d)
+  g  <- dgp_labels(n, K, balanced)
+  xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sqrt(nu_sp)),
+              mu[g, 2] + stats::rnorm(n, sd = sqrt(nu_sp)))
+  coords <- cbind(
+    lon = LON0 + xy[, 1] * UNIT_KM / (111.320 * cos(LAT0 * pi / 180)),
+    lat = LAT0 + xy[, 2] * UNIT_KM / 110.574)
+  list(coords = coords, labels = g, xy = xy, mu = mu)
+}
 
 ## ---------------------------------------------------------------------------
 ## Baseline parameters, from the pooled fit on the real network
@@ -91,52 +167,58 @@ dgp_covariate <- function(coords, TN, a_time = 0.7, range_km = 100, seed = 1) {
 
 ## the covariate stacked by station, as STEM_Model() expects
 dgp_design <- function(x) {
-  TN <- nrow(x); d <- ncol(x)
   cbind(intercept = 1, xcov = as.vector(x))
 }
 
 ## ---------------------------------------------------------------------------
-## Parameter sets of the two regimes
+## Parameter sets of the K regimes
 ##
-## `scenario` says which component separates them, `level` how far apart they
-## are. Regime 1 always carries the baseline.
+## `scenario` says which component separates them, `level` how far apart the two
+## EXTREME regimes are. Regime 1 always carries the baseline and regime K the
+## full contrast; with K = 3 the middle regime sits halfway, so that K = 2
+## reproduces exactly the earlier design and K = 3 extends it without changing
+## the meaning of `level`.
 ## ---------------------------------------------------------------------------
-dgp_psi <- function(scenario, level = 2L, base = dgp_base()) {
+dgp_psi <- function(scenario, level = 2L, K = 2L, base = dgp_base()) {
 
-  A <- base; B <- base
   res_sd <- sqrt(base$sigma2eps + base$sigma2omega)
+  tot    <- base$sigma2eps + base$sigma2omega
 
-  ## coefficient contrast, in residual standard deviations. The covariate is
-  ## standardised, so a contrast of delta*res_sd in beta moves the conditional
-  ## mean by delta residual standard deviations per unit of the covariate.
-  delta_beta <- c(0.25, 0.5, 1.0)[level]
-  ## persistence of the second regime
-  G2         <- c(0.80, 0.60, 0.30)[level]
-  ## nugget share of the second regime, against 0.836 in the baseline
-  share2     <- c(0.70, 0.50, 0.30)[level]
-  ## range of the second regime, in km, against 123 km in the baseline
-  range2     <- c(60, 30, 15)[level]
+  ## the contrast of the extreme regime
+  delta_beta <- c(0.25, 0.5, 1.0)[level]   # in residual standard deviations
+  G_last     <- c(0.80, 0.60, 0.30)[level] # against 0.90 in the baseline
+  share_last <- c(0.70, 0.50, 0.30)[level] # nugget share, against 0.836
+  range_last <- c(60, 30, 15)[level]       # km, against 123 km
 
-  if (scenario %in% c("S1", "S4")) {
-    B$beta <- c(base$beta[1], base$beta[2] + delta_beta * res_sd)
-  }
-  if (scenario %in% c("S2", "S4")) {
-    B$G <- G2
-  }
-  if (scenario %in% c("S3", "S4")) {
-    tot <- base$sigma2eps + base$sigma2omega
-    B$sigma2eps   <- tot * share2
-    B$sigma2omega <- tot * (1 - share2)
-    B$theta       <- 1 / (range2 * 1000)
-  }
-  list(A, B)
+  ## regime g sits at fraction w of the way from the baseline to the extreme
+  w_of <- function(g) if (K == 1L) 0 else (g - 1) / (K - 1)
+
+  lapply(seq_len(K), function(g) {
+    w <- w_of(g)
+    p <- base
+    if (scenario %in% c("S1", "S4")) {
+      p$beta <- c(base$beta[1], base$beta[2] + w * delta_beta * res_sd)
+    }
+    if (scenario %in% c("S2", "S4")) {
+      p$G <- base$G + w * (G_last - base$G)
+    }
+    if (scenario %in% c("S3", "S4")) {
+      share <- (base$sigma2eps / tot) + w * (share_last - base$sigma2eps / tot)
+      rng   <- (1 / base$theta / 1000) + w * (range_last - 1 / base$theta / 1000)
+      p$sigma2eps   <- tot * share
+      p$sigma2omega <- tot * (1 - share)
+      p$theta       <- 1 / (rng * 1000)
+    }
+    p
+  })
 }
 
-## TRUE when the two regimes share every parameter of the measurement
-## covariance, in which case the error field can be drawn globally
+## TRUE when all regimes share every parameter of the measurement covariance, in
+## which case the error field can be drawn globally
 dgp_common_field <- function(psi) {
-  isTRUE(all.equal(psi[[1]][c("sigma2eps", "sigma2omega", "theta")],
-                   psi[[2]][c("sigma2eps", "sigma2omega", "theta")]))
+  key <- function(p) unlist(p[c("sigma2eps", "sigma2omega", "theta")])
+  all(vapply(psi[-1], function(p) isTRUE(all.equal(key(p), key(psi[[1]]))),
+             logical(1)))
 }
 
 ## ---------------------------------------------------------------------------
@@ -207,7 +289,7 @@ dgp_simulate <- function(labels, psi, x, coords, rho = 1, seed = 1,
 }
 
 ## ---------------------------------------------------------------------------
-## The scenarios
+## The scenarios: what separates the regimes, and by how much
 ##
 ## rho = 1 throughout except for the reference cell S5, which reproduces the
 ## model-consistent generator of the first design so that the contribution of
@@ -237,4 +319,35 @@ dgp_scenarios <- function() {
                label = "reference: the model-consistent generator"),
     stringsAsFactors = FALSE
   )
+}
+
+## ---------------------------------------------------------------------------
+## The dimensions of the design
+##
+## T is read as a real observation window: 60 and 120 are five and ten years of
+## monthly data, 365 and 730 one and two years of daily data. n spans the sizes
+## a regional network actually takes: Northern Italy carries about 260 air
+## quality stations, so 20 and 40 are a small sub-network, 60 and 100 a regional
+## one, 200 and 400 a national or multi-regional one.
+## ---------------------------------------------------------------------------
+dgp_dims <- function() {
+  list(TN = c(60L, 120L, 365L, 730L),
+       n  = c(20L, 40L, 60L, 100L, 200L, 400L),
+       K  = c(2L, 3L),
+       d  = c(0, 1/3, 2/3, 1))
+}
+
+## ---------------------------------------------------------------------------
+## One complete data set of the design, ready for STEM_Model()
+## ---------------------------------------------------------------------------
+dgp_draw <- function(n, TN, K, d, scenario_row, rep = 1L, balanced = TRUE) {
+  seed <- 1000L * rep + 1L
+  loc  <- dgp_locations(n, K, d, balanced = balanced, seed = seed)
+  x    <- dgp_covariate(loc$coords, TN, seed = seed + 1L)
+  psi  <- dgp_psi(scenario_row$scenario, scenario_row$level, K = K)
+  z    <- dgp_simulate(loc$labels, psi, x, loc$coords,
+                       rho = scenario_row$rho, seed = seed + 2L,
+                       force_block = scenario_row$force_block)
+  list(z = z, covariates = dgp_design(x), coordinates = loc$coords,
+       labels = loc$labels, psi = psi)
 }

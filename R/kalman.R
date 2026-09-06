@@ -2,9 +2,8 @@
 #' @noRd
 
 `kalman` <-
-  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, engine = c("R", "fast")) {
+  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE) {
 
-    engine <- match.arg(engine)
 
 
     zz   = stats::ts(z)
@@ -43,10 +42,7 @@
     ####################
     ###kalman filtering and smoothing
     ####################
-    ### The two engines are algebraically identical; "fast" replaces the d x d
-    ### inversion at every time point by a Woodbury update against a cached
-    ### factorisation of Sigma_e. See R/fast-filtering.R.
-    mod1.filter   	= if (engine == "fast") filtering_fast(SSmodel) else filtering(SSmodel)
+    mod1.filter   	= filtering(SSmodel)
     mod1.smoother 	= smoothing(mod1.filter)
 
 
@@ -135,25 +131,34 @@
     Q_addendo2 = Q_function_addendo2(C0=phi_j$C0, m_0=m0_j, P_0_n=P_0_n, y_0_n=y_0_n)
 
     ###S11, S10 and S00
-    S11list = list()
-    for (tt in 1:nobs) {
-      S11list[[tt]] = t(matrix(mod1.smoother$m[tt,],nrow=1)) %*% matrix(mod1.smoother$m[tt,],nrow=1) +  mod1.smoother$C[[tt]]
-    }
-    S11 = sumMatrices(S11list)
+    ### The three sums of outer products of the smoothed states are crossprods
+    ### of the n x p matrix of those states, so each of them is one BLAS call
+    ### plus one accumulation of the p x p variances:
+    ###
+    ###   S11 = sum_t { m_t m_t' + C_t }         = M'M       + sum_t C_t
+    ###   S00 = m_0 m_0' + P_0 + sum_{t>=2} ...  = M_-'M_-   + sum_{t<n} C_t + ...
+    ###   S10 = sum_t { m_t m_{t-1}' + C*_t }    = M_+'M_-   + sum_t C*_t + ...
+    ###
+    ### The superseded version built three lists of n matrices and summed them:
+    ###
+    ###   S11list = list()
+    ###   for (tt in 1:nobs) S11list[[tt]] =
+    ###     t(matrix(mod1.smoother$m[tt,],nrow=1)) %*%
+    ###     matrix(mod1.smoother$m[tt,],nrow=1) + mod1.smoother$C[[tt]]
+    ###   S11 = sumMatrices(S11list)
+    ###   ... and likewise for S00 and S10.
+    Msm = as.matrix(mod1.smoother$m)                     # n x p
+    Csm_all = mod1.smoother$C
 
-    S00list = list()
-    S00list[[1]] = m0_j %*% t(m0_j) + P_0_n
-    for (tt in 2:nobs) {
-      S00list[[tt]] = t(matrix(mod1.smoother$m[tt-1,],nrow=1)) %*% matrix(mod1.smoother$m[tt-1,],nrow=1) +  mod1.smoother$C[[tt-1]]
-    }
-    S00 = sumMatrices(S00list)
+    S11 = crossprod(Msm) + Reduce(`+`, Csm_all)
 
-    S10list = list()
-    S10list[[1]] = t(matrix(mod1.smoother$m[1,],nrow=1)) %*% t(m0_j) + CCC[[1]]
-    for (tt in 2:nobs) {
-      S10list[[tt]] = t(matrix(mod1.smoother$m[tt,],nrow=1)) %*% matrix(mod1.smoother$m[tt-1,],nrow=1) +  CCC[[tt]]
-    }
-    S10 = sumMatrices(S10list)
+    Mlag = Msm[seq_len(nobs - 1L), , drop = FALSE]       # m_1 ... m_{n-1}
+    Mlead = Msm[-1L, , drop = FALSE]                     # m_2 ... m_n
+    S00 = m0_j %*% t(m0_j) + P_0_n +
+          crossprod(Mlag) + Reduce(`+`, Csm_all[seq_len(nobs - 1L)])
+
+    S10 = matrix(Msm[1L, ], ncol = 1) %*% t(m0_j) +
+          crossprod(Mlead, Mlag) + Reduce(`+`, CCC)
 
     ################################
     ###PARAMETER 2: Sigmaeta
@@ -207,39 +212,82 @@
     ### missing element is NOT the signal alone: that would be exact only for a
     ### diagonal Sigma_e. The completed observations zhat are kept for the beta
     ### update below.
+    ### The accumulation is written in matrix form rather than as a loop that
+    ### builds a list of T matrices of size d x d. Over the COMPLETE time points
+    ### the sum collapses, because Z does not depend on t:
+    ###
+    ###   sum_t { Z C^s_t Z' + r_t r_t' }  =  Z ( sum_t C^s_t ) Z'  +  R' R ,
+    ###
+    ### with R the T x d matrix of residuals. The first term needs one p x p
+    ### accumulation and two small products; the second is a single crossprod,
+    ### which BLAS performs in one call. Only the time points with a gap keep a
+    ### per-step treatment, and in a monitoring network there are few of them.
+    ###
+    ### Besides the arithmetic, this removes the allocation: the previous
+    ### version held T matrices of d x d simultaneously, which on a network of
+    ### 400 stations observed for 200 periods is 256 MB per EM iteration.
+    ###
+    ### The superseded loop:
+    ###
+    ###   BB_list = list()
+    ###   for (tt in 1:nobs) {
+    ###     msm = matrix(mod1.smoother$m[tt,], ncol = 1)
+    ###     Csm = mod1.smoother$C[[tt]]
+    ###     Xb  = covariates[,,tt] %*% phi_j$beta
+    ###     sig = Zmat %*% msm
+    ###     oi  = obs_ix$idx[[tt]]
+    ###     if (obs_ix$complete[tt]) {
+    ###       r_t           = matrix(zz[tt,], ncol = 1) - Xb - sig
+    ###       BB_list[[tt]] = Zmat %*% Csm %*% t(Zmat) + r_t %*% t(r_t)
+    ###       zhat[tt,]     = zz[tt,]
+    ###     } else { ... the same expression on the observed block ... }
+    ###   }
+    ###   BB = sumMatrices(BB_list)
     blocks  = stem_blocks_cache(SSmodel$Vmat, d, regularization)
     Zmat    = t(SSmodel$Fmat)                     # d x p loading matrix
-    BB_list = list()
     zhat    = matrix(NA_real_, nobs, d)
+    msm_all = as.matrix(mod1.smoother$m)          # n x p smoothed states
 
-    for (tt in 1:nobs) {
-      msm = matrix(mod1.smoother$m[tt,], ncol = 1)          # p x 1
+    ### the regression surface for every location and time, in one pass: the
+    ### covariate array is d x r x n, so each slice covariates[, j, ] is d x n
+    Xb_dn = matrix(0, d, nobs)
+    bvec  = as.numeric(phi_j$beta)
+    for (j in seq_len(r)) Xb_dn = Xb_dn + covariates[, j, ] * bvec[j]
+    sig_dn  = Zmat %*% t(msm_all)                 # d x n signal
+    mu_dn   = Xb_dn + sig_dn
+    Res_nd  = t(as.matrix(zz)) - mu_dn            # d x n residuals
+    Res_nd  = t(Res_nd)                           # n x d
+
+    cidx = which(obs_ix$complete)
+    iidx = which(!obs_ix$complete)
+
+    ### complete time points, in closed form
+    if (length(cidx)) {
+      Csum = Reduce(`+`, mod1.smoother$C[cidx])
+      Rc   = Res_nd[cidx, , drop = FALSE]
+      BB   = Zmat %*% Csum %*% t(Zmat) + crossprod(Rc)
+      zhat[cidx, ] = as.matrix(zz)[cidx, , drop = FALSE]
+    } else {
+      BB = matrix(0, d, d)
+    }
+
+    ### the time points with a gap, one at a time
+    for (tt in iidx) {
       Csm = mod1.smoother$C[[tt]]
-      Xb  = covariates[,,tt] %*% phi_j$beta                 # d x 1
-      sig = Zmat %*% msm                                    # d x 1
       oi  = obs_ix$idx[[tt]]
-
-      if (obs_ix$complete[tt]) {
-        r_t           = matrix(zz[tt,], ncol = 1) - Xb - sig
-        BB_list[[tt]] = Zmat %*% Csm %*% t(Zmat) + r_t %*% t(r_t)
-        zhat[tt,]     = zz[tt,]
+      bl  = blocks(obs_ix$key[tt], oi)
+      if (length(oi) == 0L) {
+        BB        = BB + bl$Omega
+        zhat[tt,] = mu_dn[, tt]
       } else {
-        bl = blocks(obs_ix$key[tt], oi)
-        if (length(oi) == 0L) {
-          BB_list[[tt]] = bl$Omega
-          zhat[tt,]     = Xb + sig
-        } else {
-          Zo   = Zmat[oi, , drop = FALSE]
-          r_o  = matrix(zz[tt, oi], ncol = 1) - Xb[oi, , drop = FALSE] -
-                   sig[oi, , drop = FALSE]
-          SZo  = bl$S %*% Zo
-          rhat = bl$S %*% r_o
-          BB_list[[tt]] = SZo %*% Csm %*% t(SZo) + bl$Omega + rhat %*% t(rhat)
-          zhat[tt,]     = Xb + sig + rhat
-        }
+        Zo   = Zmat[oi, , drop = FALSE]
+        r_o  = matrix(Res_nd[tt, oi], ncol = 1)
+        SZo  = bl$S %*% Zo
+        rhat = bl$S %*% r_o
+        BB   = BB + SZo %*% Csm %*% t(SZo) + bl$Omega + tcrossprod(rhat)
+        zhat[tt,] = mu_dn[, tt] + rhat
       }
     }
-    BB = sumMatrices(BB_list)
 
     D = solve(diag(regularization,nrow(cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)))+cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)) %*% BB
     #sigma2omega_j=tr(sigmaeinersa*W) in Fasso Cameletti 12
@@ -261,19 +309,41 @@
     ### element given everything observed elsewhere. The design matrix and
     ### Sigma_e stay at their full dimension, as they must, since the M-step
     ### maximizes the expected COMPLETE-data log-likelihood.
-    vvt_list = list ()
-    for (tt in 1:nobs) {
-      vt 		=  matrix(zhat[tt,],ncol=1) - t(SSmodel$Fmat) %*% mod1.smoother$m[tt,]
-      vvt_list[[tt]] 	= t(covariates[,,tt]) %*%  Sigmae_inversa  %*% vt
-    }
-    v = sumMatrices(vvt_list)
+    ### Both accumulations are sums over t of X_t' S X_t and X_t' S v_t with S
+    ### constant, and a sum of that shape IS a crossprod once the per-period
+    ### blocks are stacked: writing Xbig for the (n d) x r matrix whose rows are
+    ### the blocks X_1, ..., X_n laid one under the other,
+    ###
+    ###   sum_t X_t' S X_t = Xbig' (S X)big   and   sum_t X_t' S v_t = Xbig' (S v)big ,
+    ###
+    ### so the whole thing is one multiplication of S against every period at
+    ### once followed by two crossprods, instead of n iterations each doing two
+    ### d x d products.
+    ###
+    ### The superseded loops:
+    ###
+    ###   vvt_list = list()
+    ###   for (tt in 1:nobs) {
+    ###     vt = matrix(zhat[tt,],ncol=1) - t(SSmodel$Fmat) %*% mod1.smoother$m[tt,]
+    ###     vvt_list[[tt]] = t(covariates[,,tt]) %*% Sigmae_inversa %*% vt
+    ###   }
+    ###   v = sumMatrices(vvt_list)
+    ###   MM_list = list()
+    ###   for (tt in 1:nobs)
+    ###     MM_list[[tt]] = t(covariates[,,tt]) %*% Sigmae_inversa %*% covariates[,,tt]
+    ###   MM = sumMatrices(MM_list)
+    ###
+    ### `covariates` is d x r x n, so matrix(covariates, nrow = d) lays the
+    ### periods side by side and aperm(., c(1,3,2)) stacks them by row, with the
+    ### location index varying fastest -- the same ordering the residual vector
+    ### below uses, which is what makes the two crossprods conformable.
+    SXcat = Sigmae_inversa %*% matrix(covariates, nrow = d)      # d x (r n)
+    Xbig  = matrix(aperm(covariates, c(1, 3, 2)), d * nobs, r)
+    SXbig = matrix(aperm(array(SXcat, c(d, r, nobs)), c(1, 3, 2)), d * nobs, r)
+    MM    = crossprod(Xbig, SXbig)
 
-
-    MM_list = list()
-    for (tt in 1:nobs) {
-      MM_list[[tt]] 	= t(covariates[,,tt]) %*% Sigmae_inversa %*% covariates[,,tt]
-    }
-    MM = sumMatrices(MM_list)
+    vt_dn = t(zhat) - sig_dn                                     # d x n
+    v     = crossprod(Xbig, as.vector(Sigmae_inversa %*% vt_dn))
 
     if(det(MM) != 0) {beta_j = solve(diag(regularization,nrow(MM))+MM) %*% v}
     if(det(MM)  < 10^(-7)) {warning("Error in beta estimation! The matrix can not be inverted!!!!", call. = FALSE)}
@@ -302,42 +372,53 @@
       while(!cond.hessiana && n_iter_Hess < 30) {
         cov.spat.mat = do.call(cov.spat, list(logb=logb,d=d,logtheta=logtheta,dist=dist))
 
+        ### The five derivative evaluations below all need the inverse of the
+        ### same matrix and its product with BB. They are formed once here and
+        ### passed down, instead of each function taking its own inverse: the
+        ### superseded d2_Q() alone called solve(X) seven times.
+        Xi_cur  = solve(cov.spat.mat)
+        XiB_cur = Xi_cur %*% BB
+        d1theta = d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist)
+        d2theta = d2_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist)
+        d1logb  = d1_Sigmastar_logb.exp(logb=logb,d=d)
+        d2logb  = d2_Sigmastar_logb.exp(logb=logb,d=d)
+
         derivata_prima_logtheta 	= d1_Q(
           n	= n,
           X	= cov.spat.mat,
-          d1_X  = d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist),
+          d1_X  = d1theta,
           sigma2omega = sigma2omega_j,
-          B       = BB)
+          B       = BB, Xi = Xi_cur, XiB = XiB_cur)
         derivata_seconda_logtheta 	= d2_Q(
           n	= n,
           X      = cov.spat.mat,
-          d1_X	= d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist),
-          d2_X = d2_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist),
+          d1_X	= d1theta,
+          d2_X = d2theta,
           sigma2omega = sigma2omega_j,
-          B      = BB)
+          B      = BB, Xi = Xi_cur, XiB = XiB_cur)
 
         derivata_prima_logb    		= d1_Q(
           n	 = n,
           X       = cov.spat.mat,
-          d1_X  = d1_Sigmastar_logb.exp(logb=logb,d=d),
+          d1_X  = d1logb,
           sigma2omega = sigma2omega_j,
-          B       = BB)
+          B       = BB, Xi = Xi_cur, XiB = XiB_cur)
 
         derivata_seconda_logb    	= d2_Q(
           n	= n,
           X 	= cov.spat.mat,
-          d1_X	= d1_Sigmastar_logb.exp(logb=logb,d=d),
-          d2_X	= d2_Sigmastar_logb.exp(logb=logb,d=d),
+          d1_X	= d1logb,
+          d2_X	= d2logb,
           sigma2omega = sigma2omega_j,
-          B	= BB)
+          B	= BB, Xi = Xi_cur, XiB = XiB_cur)
 
         derivata_mista        		=  d12_Q(
           n	= n,
           X	= cov.spat.mat,
-          d1_X_theta  = d1_Sigmastar_logtheta.exp(logtheta=logtheta,dist=dist),
-          d1_X_logb   = d1_Sigmastar_logb.exp(logb=logb,d=d),
+          d1_X_theta  = d1theta,
+          d1_X_logb   = d1logb,
           sigma2omega = sigma2omega_j,
-          B	= BB)
+          B	= BB, Xi = Xi_cur, XiB = XiB_cur)
 
 
         hessiana  = matrix( c(derivata_seconda_logtheta, derivata_mista, derivata_mista, derivata_seconda_logb),2,2)
@@ -460,4 +541,3 @@
     #c.smoother = mod1.smoother$C,
     #c.filter   = mod1.filter$C))
   }
-

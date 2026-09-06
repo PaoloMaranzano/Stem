@@ -23,14 +23,19 @@ package, which other package functions appear in its body. Two edges that a
 purely static scan cannot see are added by hand and marked `[indirect]`: they go
 through `lapply()` and `do.call()`.
 
+The list below is the complete one. The diagram draws the principal edges only:
+a few helpers that are called from a single place, and would only add lines
+crossing the picture, are named here but do not get a box of their own.
+
 ## Layers
 
 | Layer | Functions |
 |---|---|
 | Data | `pm10`, `povalley` |
 | Model object | `STEM_Model`*, `STEM_Skeleton`, `STEM_Data`, `is.STEM_*` |
-| Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `B_function`, `cov_lagone`, `sumMatrices`, `changedimension_covariates` |
-| Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
+| Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `B_function`, `cov_lagone`, `changedimension_covariates` |
+| Missing-data bookkeeping | `stem_obs_index`, `stem_blocks_cache`, `stem_missing_blocks` |
+| Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Fitted`*, `SCSTEM_Fitted`*, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
 | Spatially-clustered STEM | `SCSTEM_Estim`*, `SCSTEM_Infocrit`*, `SCSTEM_Select`*, `SCSTEM_Bootstrap`*, `SCSTEM_BootInference`*, and the `scstem_*` helpers |
 
 ## Edges
@@ -55,15 +60,23 @@ kalman                   -> d1_Sigmastar_logtheta.exp
 kalman                   -> d2_Sigmastar_logtheta.exp
 kalman                   -> B_function
 kalman                   -> cov_lagone
-kalman                   -> sumMatrices
+kalman                   -> stem_obs_index
+kalman                   -> stem_blocks_cache
 filtering                -> filterstep
+filtering                -> stem_obs_index
 smoothing                -> smootherstep
 smoothing                -> smootherstep.uni
+stem_blocks_cache        -> stem_missing_blocks
 
 STEM_Simulation          -> changedimension_covariates
 STEM_Simulation          -> Sigmastar.exp
 STEM_Kriging             -> changedimension_covariates
 STEM_Kriging             -> spatial.pred
+STEM_Fitted              -> changedimension_covariates
+STEM_Fitted              -> Sigmastar.exp
+STEM_Fitted              -> stem_obs_index
+STEM_Fitted              -> stem_blocks_cache
+SCSTEM_Fitted            -> STEM_Fitted
 STEM_Bootstrap           -> STEM_Bootstrap.fn          [indirect, via lapply]
 STEM_Bootstrap.fn        -> STEM_Simulation
 STEM_Bootstrap.fn        -> STEM_Estimation
