@@ -7,6 +7,27 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 
 ## New features
 
+### Regularized regression coefficients
+
+* `STEM_Fit()` is a single entry point for the pooled and the clustered model,
+  with or without a penalty on the regression coefficients. `k = 1` fits the
+  pooled STEM model and `k > 1` the spatially-clustered one; `lambda = 0`, the
+  default, gives the ordinary maximum likelihood estimator and reproduces
+  `STEM_Estimation()` exactly.
+* `alpha` and `lambda` follow the `glmnet` parameterization: `alpha = 0` is
+  ridge, `alpha = 1` the lasso, anything between the elastic net. Only the
+  regression coefficients are penalized; the intercept is excluded by default.
+  In the clustered model the penalty acts within each regime.
+* The penalty leaves the E-step untouched, so the algorithm remains an EM on the
+  penalized likelihood: the M-step keeps a closed form under a ridge and is
+  solved exactly by coordinate descent otherwise. The design is scaled
+  internally in the generalized least squares metric the model works in, so a
+  given `lambda` means the same thing for every covariate and every regime.
+* The information criteria count the effective number of coefficients the
+  penalty leaves rather than the nominal one.
+* The theory is written up in `dev/regularization/stem-elastic-net.tex` in the
+  source repository.
+
 ### Spatially-clustered STEM models
 
 * `SCSTEM_Estim()` fits an SC-STEM model: the monitoring locations are

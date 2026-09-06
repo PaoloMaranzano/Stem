@@ -1,0 +1,143 @@
+## ---------------------------------------------------------------------------
+## Shared setup for the paper scripts.
+##
+## Everything here exists so that the scripts run from ANY working directory and
+## on any machine: the repository root is resolved from the location of the file
+## being executed, not from getwd(), and every output directory is derived from
+## it or read from an environment variable. Nothing below hard-codes a path.
+##
+## Source it at the top of a script:
+##
+##     source(file.path(dirname(sys.frame(1)$ofile), "00-setup.R"))
+##
+## or, more simply and equivalently from a script run with Rscript,
+##
+##     source("00-setup.R")            # when the working directory is dev/paper
+##     Rscript dev/paper/07-simulation.R   # from anywhere: the script finds itself
+##
+## Environment variables, all optional:
+##
+##   STEM_ROOT     the repository root, when the automatic search fails
+##   STEM_CACHE    where the result CSVs go       (default <root>/dev/paper/cache)
+##   STEM_FIGURES  where the figures and tables go (default the Overleaf folder
+##                 if it exists, otherwise <root>/dev/paper/figures)
+## ---------------------------------------------------------------------------
+
+## The path of the file currently being executed, whether by Rscript, by
+## source(), or inside RStudio.
+stem_this_file <- function() {
+  a <- commandArgs(trailingOnly = FALSE)
+  m <- grep("^--file=", a, value = TRUE)
+  if (length(m)) return(normalizePath(sub("^--file=", "", m[1]), winslash = "/"))
+  for (i in rev(seq_len(sys.nframe()))) {
+    of <- sys.frame(i)$ofile
+    if (!is.null(of)) return(normalizePath(of, winslash = "/"))
+  }
+  NULL
+}
+
+## The root of the repository: the nearest ancestor holding a DESCRIPTION file.
+stem_root <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    env <- Sys.getenv("STEM_ROOT", "")
+    if (nzchar(env) && file.exists(file.path(env, "DESCRIPTION"))) {
+      cached <<- normalizePath(env, winslash = "/"); return(cached)
+    }
+    start <- stem_this_file()
+    p <- if (is.null(start)) normalizePath(getwd(), winslash = "/") else dirname(start)
+    repeat {
+      if (file.exists(file.path(p, "DESCRIPTION"))) { cached <<- p; return(p) }
+      up <- dirname(p)
+      if (identical(up, p)) break
+      p <- up
+    }
+    stop("cannot locate the repository root: set STEM_ROOT", call. = FALSE)
+  }
+})
+
+stem_paper_dir <- function() file.path(stem_root(), "dev", "paper")
+
+stem_cache_dir <- function() {
+  p <- Sys.getenv("STEM_CACHE", file.path(stem_paper_dir(), "cache"))
+  dir.create(p, recursive = TRUE, showWarnings = FALSE)
+  normalizePath(p, winslash = "/")
+}
+
+## The figure directory. The Overleaf folder when it is there, so that a run on
+## the author's machine writes straight into the paper; a folder inside the
+## repository otherwise, so that a run on a virtual machine still produces
+## something.
+stem_fig_dir <- function() {
+  p <- Sys.getenv("STEM_FIGURES", "")
+  if (!nzchar(p)) {
+    ov <- file.path(Sys.getenv("USERPROFILE", Sys.getenv("HOME")), "Dropbox",
+                    "Applicazioni", "Overleaf", "SC-STEM package paper", "Figures")
+    p <- if (dir.exists(ov)) ov else file.path(stem_paper_dir(), "figures")
+  }
+  dir.create(p, recursive = TRUE, showWarnings = FALSE)
+  normalizePath(p, winslash = "/")
+}
+
+## Load the package from source when pkgload is available, from the library
+## otherwise. A virtual machine that has the package installed does not need the
+## development toolchain.
+stem_load <- function() {
+  if (requireNamespace("pkgload", quietly = TRUE)) {
+    suppressMessages(pkgload::load_all(stem_root(), quiet = TRUE))
+  } else {
+    library("Stem", character.only = TRUE)
+  }
+  invisible(TRUE)
+}
+
+## ---------------------------------------------------------------------------
+## Command-line overrides
+##
+## Every element of a configuration list can be overridden with --name=value on
+## the command line; a value is split on commas and coerced to the type of the
+## default, so
+##
+##     Rscript 07-simulation.R --balance=balanced --n=40,100 --nrep=25
+##
+## keeps only the balanced cells, only two network sizes, and 25 replications.
+## Passing --name= with nothing after the equals sign keeps the default.
+## ---------------------------------------------------------------------------
+stem_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
+  kv <- grep("^--[^=]+=", args, value = TRUE)
+  for (a in kv) {
+    nm  <- sub("^--([^=]+)=.*$", "\\1", a)
+    val <- sub("^--[^=]+=", "", a)
+    if (!nzchar(val)) next
+    if (!nm %in% names(defaults)) {
+      stop("unknown option --", nm, "; the options are: ",
+           paste(names(defaults), collapse = ", "), call. = FALSE)
+    }
+    parts <- trimws(strsplit(val, ",", fixed = TRUE)[[1]])
+    d <- defaults[[nm]]
+    defaults[[nm]] <-
+      if (is.logical(d))   as.logical(parts)
+      else if (is.integer(d)) as.integer(parts)
+      else if (is.numeric(d)) {
+        ## allow fractions such as 2/3 on the command line
+        vapply(parts, function(s) eval(parse(text = s)), numeric(1),
+               USE.NAMES = FALSE)
+      }
+      else parts
+    if (anyNA(defaults[[nm]])) {
+      stop("cannot read --", nm, "=", val, call. = FALSE)
+    }
+  }
+  defaults
+}
+
+stem_print_config <- function(cfg) {
+  cat("configuration\n")
+  for (nm in names(cfg)) {
+    v <- cfg[[nm]]
+    cat(sprintf("  %-10s %s\n", nm,
+                paste(if (is.numeric(v)) signif(v, 4) else v, collapse = ", ")))
+  }
+  cat("\n")
+}

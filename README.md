@@ -139,6 +139,7 @@ the current implementation, not the model on paper.
 | **Missing values in covariates or coordinates** | **not supported** | The design matrix enters the closed-form M-step and the coordinates the distance matrix. Impute before fitting. |
 | Network composition | fixed over time | A station entering or leaving the window is represented by marking the unobserved periods as `NA` in the response. |
 | Regime sizes (SC-STEM only) | bounded below | Each regime needs enough locations for its own fit, which caps the number of regimes that can be entertained on a given network. |
+| Regularization of `beta` | ridge, lasso, elastic net | Through `STEM_Fit(alpha, lambda)`, within each regime in SC-STEM. Only the regression coefficients are penalized; the variance components and the range stay at their maximum likelihood values. `lambda = 0`, the default, reproduces the classical estimator exactly. |
 
 > **On missing values in the response.** The treatment follows Durbin and
 > Koopman (2012, 2nd ed.), Sections 2.7 and 4.10. At each time point the
@@ -177,6 +178,7 @@ remotes::install_github("PaoloMaranzano/Stem")
 | Function | Purpose |
 |---|---|
 | `STEM_Model()` | build the model object from data and starting values |
+| `STEM_Fit()` | single entry point: pooled or clustered, with or without a penalty on the coefficients |
 | `STEM_Estimation()` | maximum likelihood via EM and the Kalman filter |
 | `STEM_Simulation()` | simulate from a fitted or specified model |
 | `STEM_Kriging()` | spatial prediction at unobserved locations |
@@ -260,10 +262,17 @@ agree to about $10^{-13}$ in relative terms.
 ## Documentation
 
 ```r
-vignette("getting-started", package = "Stem") # the classical STEM workflow
-vignette("SCSTEM", package = "Stem")          # spatially-clustered STEM
-vignette("function-map", package = "Stem")    # map of the package
+vignette("getting-started", package = "Stem")      # the classical STEM workflow
+vignette("SCSTEM", package = "Stem")               # spatially-clustered STEM
+vignette("function-map", package = "Stem")         # map of the package
+vignette("computational-notes", package = "Stem")  # how the engine is computed
 ```
+
+The last one explains why a forward pass costs $O(d^3 + T d^2)$ rather than
+$O(T d^3)$, what that means, and under which assumptions -- the Woodbury
+identity, the determinant lemma, the log-density, and the matrix form of the
+M-step. The theory behind the regularized estimator is kept outside the package,
+at [`dev/regularization/stem-elastic-net.tex`](dev/regularization/stem-elastic-net.tex).
 
 A reading guide mapping each equation of the papers onto the function that
 implements it ships with the package as a standalone document:

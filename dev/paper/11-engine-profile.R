@@ -9,13 +9,19 @@
 ## "self" time -- the time spent inside a function rather than in what it calls.
 ## ---------------------------------------------------------------------------
 
-PKG <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+}, envir = globalenv())
+
 a   <- commandArgs(TRUE)
 dn  <- if (length(a) >= 1) as.integer(a[1]) else 200L
 TT  <- if (length(a) >= 2) as.integer(a[2]) else 365L
 it  <- if (length(a) >= 3) as.integer(a[3]) else 10L
 
-suppressMessages(pkgload::load_all(PKG, quiet = TRUE))
+stem_load()
 
 set.seed(1)
 co <- cbind(stats::runif(dn, 7.5, 13.5), stats::runif(dn, 44.7, 46.1))

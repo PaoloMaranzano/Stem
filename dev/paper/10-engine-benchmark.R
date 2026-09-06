@@ -15,7 +15,14 @@
 ##   Rscript dev/paper/10-engine-benchmark.R [reference commit]
 ## ---------------------------------------------------------------------------
 
-PKG  <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+}, envir = globalenv())
+
+PKG  <- stem_root()
 REF  <- (function(a) if (length(a)) a[1] else "7d0b094")(commandArgs(TRUE))
 TMP  <- tempfile("stem-ref-"); dir.create(TMP)
 

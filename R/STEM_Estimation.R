@@ -12,6 +12,9 @@
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param regularization a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01
 #' @param verbose logical. If TRUE, the progress of the EM and Newton-Raphson iterations is reported through message(). Default is FALSE.
+#' @param alpha the elastic-net mixing parameter for the regression coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} is the lasso, anything in between is the elastic net. Ignored when \code{lambda} is zero. Default is 0.
+#' @param lambda the strength of the penalty on the regression coefficients. \code{0}, the default, gives the ordinary maximum likelihood estimator. See \code{\link{STEM_Fit}} for the interface that selects it.
+#' @param penalize which regression coefficients the penalty acts on: a logical vector of length \eqn{r}, an index vector, or \code{NULL} (the default) for every coefficient except the intercept.
 #'
 #'
 #' @return The function returns an object of class \dQuote{STEM_Model} which is a list given by:
@@ -173,7 +176,7 @@
 
 
 STEM_Estimation <-
-function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE)
+function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL)
 {
 
 z 		=  StemModel$data$z
@@ -228,6 +231,9 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
 			cov.spat		= cov.spat,
 			distance = distance,
 			regularization=regularization,
+			alpha = alpha,
+			lambda = lambda,
+			penalize = penalize,
 			verbose = verbose
 	)
 
@@ -310,6 +316,12 @@ convergence.par 			= list(conv.log = converged_EM_1,
 						iterEM   = n_iter_EM-1,
 						iterNR   = iterNR)
 StemModel$estimates$convergence.par = convergence.par
+### The penalty in force and the effective number of regression coefficients it
+### leaves. With lambda = 0 the second is simply r, and everything downstream --
+### the information criteria in particular -- behaves as it always has.
+StemModel$estimates$penalty = list(alpha = alpha, lambda = lambda,
+                                   penalize = penalize,
+                                   beta.df = step_last$beta_df)
 return (StemModel)
 }
 

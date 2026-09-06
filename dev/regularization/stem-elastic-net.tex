@@ -1,0 +1,469 @@
+% ---------------------------------------------------------------------------
+% Regularized estimation of the regression coefficients in spatio-temporal
+% state-space models with spatial regimes.
+%
+% This is NOT part of the SC-STEM package paper. It is a self-contained draft of
+% the theory behind STEM_Fit(alpha, lambda), kept in the repository because the
+% material is a paper of its own and does not belong in the software paper.
+%
+% Compile with pdflatex; it depends only on amsmath, amssymb, booktabs, natbib.
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=3cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\sgn}{sign}
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Se}{\Sig_{e}}
+
+\title{Regularized regression coefficients in spatio-temporal\\
+       state-space models with spatial regimes}
+\author{Draft --- not for circulation}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We add an elastic-net penalty on the regression coefficients of a hierarchical
+spatio-temporal state-space model estimated by EM, and of its
+spatially-clustered extension. The penalty leaves the E-step untouched, so the
+algorithm remains an EM on the penalized observed-data likelihood; the M-step
+for the coefficients keeps a closed form under a ridge and is solved exactly by
+coordinate descent otherwise. Two features distinguish the problem from the
+usual regularized regression. First, the relevant cross-product is a
+generalized least squares one, carrying the inverse of an estimated spatial
+covariance, so the scaling that makes the penalty comparable across covariates
+is not the Euclidean standardization. Second, in the clustered model the
+penalty operates within regimes whose size is itself a constraint of the
+procedure, which is exactly where collinearity binds.
+\end{abstract}
+
+\section{Motivation}
+
+Two things make a penalty on the regression coefficients worth having in this
+class of models, and neither is the usual high-dimensional argument.
+
+The first is that the covariates of an environmental monitoring network are
+strongly collinear by construction. Meteorological drivers are measured on
+overlapping supports, chemical species share sources, and the design matrix of a
+regional network routinely has condition numbers in the hundreds. The variance
+of the maximum likelihood estimator of $\beta$ is governed by the inverse of
+$M = \sum_t X_t'\Se^{-1}X_t$, and it is that inverse that a ridge stabilizes.
+
+The second is specific to the clustered model. A spatially-clustered STEM model
+fits a complete state-space model inside every regime; the regimes are subsets
+of the network, and their size is bounded below by the requirement that each of
+them support its own variance components and range. Collinearity that is
+tolerable on a network of two hundred stations is not tolerable on a regime of
+twelve, and the binding constraint on how many regimes may be entertained is,
+in practice, the smallest one that can still be fitted. A penalty that reduces
+the effective dimension of the regression inside a regime relaxes that
+constraint directly.
+
+\section{The model}
+
+For $t = 1,\dots,T$ and $d$ locations with coordinates $s_1,\dots,s_d$,
+\begin{align}
+  z_t &= X_t\beta + K y_t + e_t, & e_t &\sim N_d(0,\Se), \label{eq:meas}\\
+  y_t &= G\,y_{t-1} + \eta_t,    & \eta_t &\sim N_p(0,\Sig_\eta),
+  \label{eq:state}
+\end{align}
+with $X_t$ the $d\times r$ design of period $t$, $K$ a known $d\times p$
+loading matrix, $y_0 \sim N_p(m_0, C_0)$, and
+\begin{equation}
+  \Se = \sigma^2_\varepsilon I_d + \sigma^2_\omega\, C(h;\theta),
+  \qquad C(h;\theta) = \exp(-\theta h),
+  \label{eq:cov}
+\end{equation}
+$h$ the matrix of distances. Write
+$\psi = (\beta,\sigma^2_\varepsilon,\sigma^2_\omega,\theta,G,\Sig_\eta,m_0)$.
+
+The spatially-clustered model partitions the locations into $k$ regimes
+$I_1,\dots,I_k$ and gives each of them its own $\psi_g$, the partition being
+estimated jointly with the parameters by maximizing a Potts-penalized
+likelihood. Everything below applies within a regime, so we develop it for the
+pooled model and return to the clustered case in Section~\ref{sec:scstem}.
+
+\section{The penalized objective}
+
+Let $\ell(\psi)$ be the observed-data log-likelihood of \eqref{eq:meas}. We
+consider
+\begin{equation}
+  \ell_\pi(\psi) = \ell(\psi) - \pi(\beta),
+  \qquad
+  \pi(\beta) = \lambda\left\{
+    \alpha\,\lVert D\beta\rVert_1
+    + \tfrac{1-\alpha}{2}\,\beta'D\beta \right\},
+  \label{eq:pen}
+\end{equation}
+with $\lambda \ge 0$, $\alpha\in[0,1]$ and $D = \mathrm{diag}(w_1,\dots,w_r)$,
+$w_j\in\{0,1\}$, the indicator of the penalized coordinates. This is the
+parameterization of \citet{ZouHastie2005}: $\alpha=0$ is a ridge, $\alpha=1$ a
+lasso, and anything in between an elastic net.
+
+Only $\beta$ is penalized. The variance components, the range, the transition
+matrix and the initial state are left at their maximum likelihood values. That
+is a modelling decision and not a technical one: $\sigma^2_\varepsilon$,
+$\sigma^2_\omega$ and $\theta$ describe the error process rather than the mean,
+and shrinking them would change the object being estimated rather than
+stabilize its estimation.
+
+\subsection{The intercept}
+
+The default takes $w_1 = 0$ for the intercept, and here the usual convention
+carries a substantive reason. The state equation \eqref{eq:state} has an
+initial mean $m_0$ which is estimated, and the latent process it starts feeds
+into \eqref{eq:meas} additively through $K$. When $K = \mathbf{1}_d$, as it is
+in the clustered model within each regime, the intercept and the level of the
+latent process are identified only through the dynamics: a constant may be moved
+from $\beta_0$ into $m_0$ and back with a compensating change in the transient.
+Shrinking $\beta_0$ therefore does not shrink ``the level''; it moves the level
+into $m_0$, at a rate that depends on $G$. The penalty would be doing something
+other than what it appears to do.
+
+\section{EM with a penalty}
+
+Let $Q(\psi\mid\psi^{(i)}) = E_{\psi^{(i)}}[\,\ell_c(\psi)\mid z\,]$ be the
+usual expected complete-data log-likelihood, the expectation taken over the
+latent states $y_{0:T}$.
+
+\begin{proposition}[The E-step is unchanged and the algorithm is monotone]
+\label{prop:monotone}
+Define the penalized EM map by
+\begin{equation}
+  \psi^{(i+1)} = \argmax_{\psi}\;\bigl\{ Q(\psi\mid\psi^{(i)}) - \pi(\beta) \bigr\}.
+  \label{eq:mstep}
+\end{equation}
+Then $\ell_\pi(\psi^{(i+1)}) \ge \ell_\pi(\psi^{(i)})$ for every $i$.
+\end{proposition}
+
+\begin{proof}
+Write $\ell(\psi) = Q(\psi\mid\psi^{(i)}) - H(\psi\mid\psi^{(i)})$ with
+$H(\psi\mid\psi^{(i)}) = E_{\psi^{(i)}}[\log f(y_{0:T}\mid z,\psi)\mid z]$, and
+recall $H(\psi\mid\psi^{(i)}) \le H(\psi^{(i)}\mid\psi^{(i)})$ by Jensen's
+inequality. Since $\pi$ is a function of $\beta$ alone and does not involve
+$y_{0:T}$, it passes through the conditional expectation unchanged and
+\[
+  \ell_\pi(\psi) = \bigl\{Q(\psi\mid\psi^{(i)}) - \pi(\beta)\bigr\}
+                   - H(\psi\mid\psi^{(i)}).
+\]
+The first brace is maximized at $\psi^{(i+1)}$ by construction and the second
+term is minimized at $\psi^{(i)}$, so the difference cannot decrease.
+\end{proof}
+
+The proposition is the reason the whole construction is cheap: the Kalman
+filter and smoother, which are the expensive part of the algorithm, are not
+touched at all. Only the point returned by the M-step changes.
+
+\begin{remark}
+Proposition~\ref{prop:monotone} concerns the pooled model. In the clustered
+model the objective also carries the partition, which is updated by iterated
+conditional modes, and the procedure is not globally monotone for reasons
+unrelated to the penalty.
+\end{remark}
+
+\section{The M-step for the coefficients}
+
+Conditionally on the other blocks, the part of $Q$ that involves $\beta$ is
+\begin{equation}
+  Q_\beta(\beta) = -\tfrac{1}{2}\beta' M \beta + \beta' v + \mathrm{const},
+  \qquad
+  M = \sum_{t=1}^{T} X_t'\Se^{-1}X_t,
+  \quad
+  v = \sum_{t=1}^{T} X_t'\Se^{-1}\hat v_t,
+  \label{eq:Mv}
+\end{equation}
+where $\hat v_t = \hat z_t - K\hat y_t$ is the completed observation of period
+$t$ net of the smoothed latent contribution --- ``completed'' because under
+missing data $\hat z_t$ carries the conditional expectation of what was not
+observed, and the conditional variance is added back into the second moments
+elsewhere. The M-step therefore maximizes
+\begin{equation}
+  -\tfrac{1}{2}\beta'M\beta + \beta'v
+  - \lambda\alpha\lVert D\beta\rVert_1
+  - \tfrac{\lambda(1-\alpha)}{2}\beta'D\beta.
+  \label{eq:mstepbeta}
+\end{equation}
+
+\subsection{Ridge: a closed form}
+
+At $\alpha = 0$ the objective is a smooth concave quadratic and
+\begin{equation}
+  \hat\beta = \bigl( M + \lambda D \bigr)^{-1} v.
+  \label{eq:ridge}
+\end{equation}
+$M$ and $v$ are already assembled by the M-step, and $r$ is small, so the cost
+of \eqref{eq:ridge} over the unpenalized $M^{-1}v$ is one addition on a
+diagonal.
+
+\subsection{Lasso and elastic net: coordinate descent}
+
+For $\alpha > 0$ the objective \eqref{eq:mstepbeta} is concave and its
+non-smooth part is separable across coordinates, which is the setting in which
+cyclic coordinate descent converges to a global maximizer
+\citep{Tseng2001,Friedman2010}. Fixing all coordinates but the $j$th, the
+first-order condition is
+\[
+  v_j - \sum_{l \ne j} M_{jl}\beta_l - M_{jj}\beta_j
+  - \lambda(1-\alpha)w_j\beta_j
+  - \lambda\alpha w_j\,\partial|\beta_j| \ni 0,
+\]
+whose solution is the soft-thresholding
+\begin{equation}
+  \beta_j \;\leftarrow\;
+  \frac{\mathcal{S}\!\left(v_j - \sum_{l\ne j}M_{jl}\beta_l,\;
+        \lambda\alpha w_j\right)}
+       {M_{jj} + \lambda(1-\alpha)w_j},
+  \qquad
+  \mathcal{S}(x,\tau) = \sgn(x)\,(|x|-\tau)_+ .
+  \label{eq:cd}
+\end{equation}
+An unpenalized coordinate has $w_j = 0$ and \eqref{eq:cd} reduces to its
+ordinary conditional least squares update. Because the maximizer of the M-step
+is attained exactly, \eqref{eq:mstep} is a genuine EM step and not merely a
+generalized one; the cost is $O(r^2)$ per sweep on a matrix that is already
+formed.
+
+\subsection{The metric, and why the usual standardization is wrong here}
+\label{sec:metric}
+
+$M$ in \eqref{eq:Mv} is a \emph{generalized} least squares cross-product: it
+carries $\Se^{-1}$, an estimated spatial covariance that changes from one EM
+iteration to the next. The effective design is therefore
+$\Se^{-1/2}X_t$ and not $X_t$, and standardizing the columns of $X$ to unit
+Euclidean norm --- the default of every lasso implementation --- does not make
+$\lambda$ comparable across covariates.
+
+The scaling that does is the one that puts the diagonal of $M$ at one. Writing
+$s_j = M_{jj}^{1/2}$, $S = \mathrm{diag}(s)$, $\tilde M = S^{-1}MS^{-1}$ and
+$\tilde v = S^{-1}v$, the penalty is applied to $\tilde\beta = S\beta$ and the
+solution returned on the original scale. Under this convention $\lambda$ is
+measured in units of the GLS information each covariate carries, which is what
+makes a single $\lambda$ meaningful across covariates and, in the clustered
+model, across regimes of different sizes and different error covariances.
+
+\begin{remark}
+$s_j$ depends on $\Se$ and therefore changes between EM iterations. The scaling
+is recomputed at each M-step. Since it is undone before the coefficients are
+returned, the sequence of iterates is well defined; what is not constant across
+iterations is the geometry in which a fixed $\lambda$ acts, and this is the
+price of applying a penalty inside an algorithm that also estimates the metric.
+\end{remark}
+
+\section{Effective degrees of freedom and the information criteria}
+
+The information criteria used to select $k$ and the Potts penalty count free
+parameters. With a penalty in force the nominal count $r$ overstates the
+flexibility of the fit, and the effective number must replace it.
+
+For the ridge, the fitted values are linear in the response with hat matrix
+$H_\lambda = X(M+\lambda D)^{-1}X'\Se^{-1}$ in the GLS metric, so
+\begin{equation}
+  \mathrm{df}(\lambda) = \tr\!\left\{ M\,(M+\lambda D)^{-1} \right\},
+  \label{eq:dfridge}
+\end{equation}
+which decreases from $r$ at $\lambda = 0$ to the number of unpenalized
+coordinates as $\lambda\to\infty$.
+
+For the lasso, the number of non-zero coefficients is unbiased for the degrees
+of freedom \citep{ZouHastieTibshirani2007}; for the elastic net the
+corresponding quantity is \eqref{eq:dfridge} restricted to the active set
+$\mathcal{A} = \{j : \hat\beta_j \ne 0\}$, with the ridge part of the penalty
+only:
+\begin{equation}
+  \mathrm{df}(\lambda,\alpha) =
+  \tr\!\left\{ M_{\mathcal{A}}\,
+    \bigl(M_{\mathcal{A}} + \lambda(1-\alpha)D_{\mathcal{A}}\bigr)^{-1}\right\}.
+  \label{eq:dfen}
+\end{equation}
+The criteria then read, for a fit with $k$ regimes,
+\[
+  \mathrm{BIC} = -2\hat\ell + \log(N)\Bigl\{
+    \textstyle\sum_{g=1}^{k}\mathrm{df}_g(\lambda,\alpha) + k\,q \Bigr\},
+\]
+with $q$ the number of parameters of a regime other than the coefficients and
+$N$ the number of observations, and analogously for AIC and KIC.
+
+\begin{remark}
+$\hat\ell$ is the \emph{unpenalized} log-likelihood evaluated at the penalized
+estimate. Using the penalized objective in its place would double-count the
+penalty, once through the objective and once through the degrees of freedom.
+\end{remark}
+
+\section{Choosing $\lambda$ and $\alpha$}
+
+$(\lambda,\alpha)$ join $(k,\varphi)$ as hyperparameters and are selected the
+same way. Two routes are available and they do not agree in general.
+
+\paragraph{Information criteria.} Cheap, since the grid is already being
+traversed for $(k,\varphi)$, and consistent with the rest of the selection
+apparatus once \eqref{eq:dfridge}--\eqref{eq:dfen} are used. The known
+difficulty is that in-sample criteria on a model whose partition is itself
+estimated are optimistic, and the optimism grows with $k$.
+
+\paragraph{Spatio-temporal cross-validation.} The honest route, and the one we
+recommend when the computational budget allows it. The blocking scheme matters:
+random $K$-fold over the $(t,i)$ cells is anti-conservative here because the
+latent process and the spatial field make neighbouring cells nearly duplicates.
+Leave-$L$-locations-out, leave-$H$-times-out and the combined
+leave-$L$-locations-and-$H$-times-out schemes address the two dependencies
+separately and jointly; see \citet{OttoFassoMaranzano2024} for the review and
+\citet{Meyer2018} for the implementation these follow. The predictive quantity
+to score is the fitted value at held-out cells, which the package computes
+through the conditional expectation given the observed sub-vector.
+
+\section{Inference}
+
+The parametric bootstrap already available for the model generates a replicate
+from the fitted parameters and re-estimates. With a penalty two changes are
+required.
+
+First, if $(\lambda,\alpha)$ were selected from the data, the selection must be
+repeated inside every bootstrap draw. Otherwise the intervals condition on a
+tuning parameter that is itself an estimate, in exactly the way that intervals
+conditioning on an estimated partition understate the uncertainty of the
+clustered model.
+
+Second, when $\alpha > 0$ the estimator is not smooth and the sampling
+distribution of a coefficient at the boundary is not asymptotically normal; the
+percentile and bias-corrected intervals remain usable as descriptions of the
+bootstrap distribution but do not have their usual coverage interpretation.
+Post-selection inference for the active set requires the conditional machinery
+of \citet{LeeSunSunTaylor2016}, which we do not develop here. For a ridge,
+$\alpha = 0$, the estimator is smooth and this difficulty does not arise,
+though the usual bias remains.
+
+\section{The clustered model}
+\label{sec:scstem}
+
+Within a regime, everything above applies verbatim with $M_g$, $v_g$ and
+$\Se^{(g)}$ in place of their pooled counterparts. Three points are specific to
+the clustered case.
+
+\paragraph{A common $\lambda$ across regimes is meaningful only after scaling.}
+Regimes differ in size and in error covariance, so $M_g$ differs in magnitude
+between them. The scaling of Section~\ref{sec:metric} is what makes a single
+$(\lambda,\alpha)$ interpretable across the partition; without it the penalty
+would bind hardest on the smallest regime for a reason that has nothing to do
+with its collinearity.
+
+\paragraph{The penalty interacts with the minimum regime size.} The lower bound
+on $n_g$ exists because a regime must support its own parameters. A penalty
+reduces the effective number of coefficients, and with it the bound. This is the
+most substantive consequence for practice: it is what would allow finer
+partitions to be entertained on a network of a given size.
+
+\paragraph{A fused alternative.} The penalty considered here shrinks each
+$\beta_g$ towards zero independently. An alternative, arguably better matched to
+the clustered model, shrinks them towards each other,
+\[
+  \pi_{\mathrm{fused}}(\beta_1,\dots,\beta_k)
+  = \lambda \sum_{g < g'} \nu_{gg'} \lVert D(\beta_g - \beta_{g'})\rVert,
+\]
+with $\nu_{gg'}$ a weight, possibly spatial. That penalty addresses the
+smallness of the regimes rather than the collinearity of the covariates, it
+couples the M-steps of different regimes, and it makes the number of distinct
+coefficient vectors an outcome of the fit rather than a choice. It is a
+different paper.
+
+\section{Algorithm}
+
+\begin{quote}\small
+\textbf{input} data $z$, design $X$, coordinates, starting $\psi^{(0)}$,
+$(\alpha,\lambda)$, weights $w$\\[2pt]
+\textbf{repeat} for $i = 0,1,2,\dots$\\
+\hspace*{1em} 1. E-step: Kalman filter and smoother at $\psi^{(i)}$; form
+$\hat y_t$, $C^s_t$, $\hat z_t$\\
+\hspace*{1em} 2. M-step, other blocks: closed forms for $\sigma^2_\omega$,
+$G$, $\Sig_\eta$, $m_0$; Newton--Raphson for $(\theta,\sigma^2_\varepsilon)$\\
+\hspace*{1em} 3. M-step, coefficients:\\
+\hspace*{2em} (a) assemble $M$, $v$ as in \eqref{eq:Mv}\\
+\hspace*{2em} (b) $s_j \leftarrow M_{jj}^{1/2}$;
+$\tilde M \leftarrow S^{-1}MS^{-1}$, $\tilde v \leftarrow S^{-1}v$\\
+\hspace*{2em} (c) if $\alpha = 0$: $\tilde\beta \leftarrow
+(\tilde M + \lambda D)^{-1}\tilde v$\\
+\hspace*{2em} \phantom{(c)} else: cycle \eqref{eq:cd} over $j$ until
+convergence\\
+\hspace*{2em} (d) $\beta^{(i+1)} \leftarrow S^{-1}\tilde\beta$;
+record $\mathrm{df}$ from \eqref{eq:dfridge} or \eqref{eq:dfen}\\
+\textbf{until} the relative changes in $\psi$ and in $\ell_\pi$ are both below
+the tolerance
+\end{quote}
+
+The stopping rule needs one adjustment when $\alpha > 0$: the relative criterion
+on the parameter vector is undefined at a coordinate that has just become
+exactly zero, and the active set may change from one iteration to the next
+without the objective moving appreciably. The implementation floors the
+denominator and tests the objective as well as the parameters.
+
+\section{What remains to be done}
+
+\begin{enumerate}
+\item \textbf{Simulation evidence.} The design of the companion software paper
+provides the machinery: what is missing is a factor for the collinearity of the
+covariates, which is the quantity the penalty is supposed to address and which
+that design holds fixed at a single covariate.
+\item \textbf{Consistency and rates.} Under what conditions on $T$, $d$, and the
+decay of the spatial correlation is $\hat\beta(\lambda)$ consistent, and at what
+rate? The effective sample size is not $Td$: the spatial field and the latent
+process both reduce it, and the reduction depends on $\theta$ and $G$.
+\item \textbf{The degrees of freedom of \eqref{eq:dfen}} are the fixed-design
+ones. Here the metric is estimated, and whether the correction matters at
+realistic $T$ is an open question we have not examined.
+\item \textbf{Selection consistency} of the lasso part in the presence of an
+estimated spatial covariance, and whether the irrepresentable condition can be
+stated in the GLS metric.
+\item \textbf{The fused penalty} of Section~\ref{sec:scstem}, which is a
+separate development and probably the more interesting one.
+\end{enumerate}
+
+\begin{thebibliography}{9}
+\small
+\bibitem[Friedman et~al.(2010)]{Friedman2010}
+Friedman, J., Hastie, T., Tibshirani, R. (2010)
+Regularization paths for generalized linear models via coordinate descent.
+\emph{Journal of Statistical Software}, 33, 1--22.
+
+\bibitem[Lee et~al.(2016)]{LeeSunSunTaylor2016}
+Lee, J.~D., Sun, D.~L., Sun, Y., Taylor, J.~E. (2016)
+Exact post-selection inference, with application to the lasso.
+\emph{The Annals of Statistics}, 44, 907--927.
+
+\bibitem[Meyer et~al.(2018)]{Meyer2018}
+Meyer, H., Reudenbach, C., Hengl, T., Katurji, M., Nauss, T. (2018)
+Improving performance of spatio-temporal machine learning models using forward
+feature selection and target-oriented validation.
+\emph{Environmental Modelling and Software}, 101, 1--9.
+
+\bibitem[Otto et~al.(2024)]{OttoFassoMaranzano2024}
+Otto, P., Fasso, A., Maranzano, P. (2024)
+A review of regularised estimation methods and cross-validation in
+spatiotemporal statistics.
+\emph{Statistics Surveys}, 18, 299--340.
+
+\bibitem[Tseng(2001)]{Tseng2001}
+Tseng, P. (2001)
+Convergence of a block coordinate descent method for nondifferentiable
+minimization.
+\emph{Journal of Optimization Theory and Applications}, 109, 475--494.
+
+\bibitem[Zou and Hastie(2005)]{ZouHastie2005}
+Zou, H., Hastie, T. (2005)
+Regularization and variable selection via the elastic net.
+\emph{Journal of the Royal Statistical Society B}, 67, 301--320.
+
+\bibitem[Zou et~al.(2007)]{ZouHastieTibshirani2007}
+Zou, H., Hastie, T., Tibshirani, R. (2007)
+On the degrees of freedom of the lasso.
+\emph{The Annals of Statistics}, 35, 2173--2192.
+\end{thebibliography}
+
+\end{document}

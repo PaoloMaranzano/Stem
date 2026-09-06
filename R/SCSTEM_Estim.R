@@ -220,6 +220,18 @@
 #'   rely only on the objective-based criteria.
 #' @param seed integer or \code{NULL}, seed used for the initialization step so
 #'   that the fit is reproducible. Default is 123456789.
+#' @param alpha the elastic-net mixing parameter for the regression
+#'   coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} the lasso,
+#'   anything between the elastic net. The penalty acts within each regime.
+#'   Ignored when \code{lambda} is zero. Default is 0. See
+#'   \code{\link{STEM_Fit}}.
+#' @param lambda the strength of the penalty on the regression coefficients.
+#'   \code{0}, the default, gives the unpenalized estimator, and the information
+#'   criteria then count the nominal number of coefficients as before; with
+#'   \code{lambda > 0} they count the effective number the penalty leaves.
+#' @param penalize which coefficients the penalty acts on: a logical vector of
+#'   length \eqn{r}, an index vector, or \code{NULL} (the default) for every
+#'   coefficient except the intercept.
 #' @param verbose logical. If \code{TRUE}, progress information is emitted via
 #'   \code{message()}. Default is \code{FALSE}.
 #'
@@ -332,6 +344,9 @@ SCSTEM_Estim <- function(StemModel,
                          swap_pass = TRUE,
                          share2conv = 0,
                          seed = 123456789,
+                         alpha = 0,
+                         lambda = 0,
+                         penalize = NULL,
                          verbose = FALSE) {
 
   ##############################
@@ -398,13 +413,18 @@ SCSTEM_Estim <- function(StemModel,
     if (isTRUE(verbose)) message("Pooled STEM fit (k = 1) ...")
     pooled <- STEM_Estimation(StemModel, precision = precision_full_dataset,
                               distance = distance, regularization = regularization,
-                              verbose = FALSE)
+                              verbose = FALSE, alpha = alpha, lambda = lambda,
+                              penalize = penalize)
     par_names <- names(unlist(pooled$estimates$phi.hat))
     loglik <- as.numeric(pooled$estimates$loglik)
-    info <- c(loglik = loglik, k = npar_g,
-              AIC = -2 * loglik + 2 * npar_g,
-              BIC = -2 * loglik + log(Nobs) * npar_g,
-              KIC = -2 * loglik + 3 * npar_g)
+    ### effective parameter count under a penalty; see the k > 1 branch
+    df_p <- pooled$estimates$penalty$beta.df
+    npar_1 <- if (lambda > 0 && !is.null(df_p) && is.finite(df_p))
+      npar_g - ncov + df_p else npar_g
+    info <- c(loglik = loglik, k = npar_1,
+              AIC = -2 * loglik + 2 * npar_1,
+              BIC = -2 * loglik + log(Nobs) * npar_1,
+              KIC = -2 * loglik + 3 * npar_1)
     out <- list(
       phi_hat = matrix(unlist(pooled$estimates$phi.hat), nrow = 1,
                        dimnames = list("cluster 1", par_names)),
@@ -515,7 +535,8 @@ SCSTEM_Estim <- function(StemModel,
           silent = TRUE)
         fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
           STEM_Estimation(mod_g, precision = precision, distance = distance,
-                          regularization = regularization, verbose = FALSE),
+                          regularization = regularization, verbose = FALSE,
+                          alpha = alpha, lambda = lambda, penalize = penalize),
           silent = TRUE)
 
         if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
@@ -740,7 +761,8 @@ SCSTEM_Estim <- function(StemModel,
       silent = TRUE)
     fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
       STEM_Estimation(mod_g, precision = precision, distance = distance,
-                      regularization = regularization, verbose = FALSE),
+                      regularization = regularization, verbose = FALSE,
+                      alpha = alpha, lambda = lambda, penalize = penalize),
       silent = TRUE)
     if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
       fit_final[[g]] <- fit_g
@@ -770,9 +792,25 @@ SCSTEM_Estim <- function(StemModel,
   }
 
   ### Exact total log-likelihood and information criteria
+  ###
+  ### With a penalty on the regression coefficients the number of free
+  ### parameters is no longer the nominal one: what enters the criteria is the
+  ### EFFECTIVE number of coefficients the penalty leaves, which each regime
+  ### reports as estimates$penalty$beta.df. For ridge that is
+  ### tr(M (M + lambda D)^{-1}), for the lasso the number of active
+  ### coefficients, and for the elastic net the corresponding trace on the
+  ### active set. With lambda = 0 every regime returns r and this reduces to
+  ### k_eff * npar_g, the count the package has always used.
   k_eff <- sum(final_refit)
   loglik_tot <- sum(loglik_g[final_refit])
-  k_par <- k_eff * npar_g
+  k_par <- if (lambda > 0) {
+    sum(vapply(which(final_refit), function(g) {
+      df_g <- fit_final[[g]]$estimates$penalty$beta.df
+      if (is.null(df_g) || !is.finite(df_g)) ncov else df_g
+    }, numeric(1))) + k_eff * (npar_g - ncov)
+  } else {
+    k_eff * npar_g
+  }
   info <- c(loglik = loglik_tot, k = k_par,
             AIC = -2 * loglik_tot + 2 * k_par,
             BIC = -2 * loglik_tot + log(Nobs) * k_par,

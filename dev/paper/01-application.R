@@ -16,12 +16,18 @@
 ##   F  figures and tables
 ## ---------------------------------------------------------------------------
 
-suppressMessages(pkgload::load_all(
-  "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem", quiet = TRUE))
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+}, envir = globalenv())
+
+stem_load()
 
 ## ---- settings --------------------------------------------------------------
-CACHE   <- file.path("dev", "paper", "cache")
-FIGDIR  <- "C:/Users/paulm/Dropbox/Applicazioni/Overleaf/SC-STEM package paper/Figures"
+CACHE   <- stem_cache_dir()
+FIGDIR  <- stem_fig_dir()
 K_GRID  <- 1:4
 PHI_GRID <- c(0, 0.25, 0.5, 0.75, 1, 1.5, 2)
 BAND    <- c(0.25, 2)          # the moderate-penalty band of the tuning rule

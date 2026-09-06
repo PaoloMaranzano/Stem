@@ -12,16 +12,18 @@
 ##   K = 3   equilateral triangle of side 2d, i.e. radius 2d/sqrt(3)
 ##   K = 4   the square of the paper, radius d*sqrt(2)
 ##
-## The standardised separation is then 2d / sqrt(nu_sp), the same for every K:
-## with nu_sp = 0.4 it runs from 0 at d = 0 to 3.16 standard deviations at d = 1.
+## The standardised separation is then 2*omega / sqrt(nu_sp), the same for every K:
+## with nu_sp = 0.4 it runs from 0 at omega = 0 to 3.16 sd at omega = 1. The
+## overlap parameter, their d, is called omega here; see 06-dgp.R.
 
-OUT <- "C:/Users/paulm/AppData/Local/Temp/claude/C--Users-paulm-OneDrive-Documenti-GitHub/04684892-cef9-43d7-b1db-6450eb10b1ec/scratchpad"
-
-## The geometry itself lives in 06-dgp.R, which is what the simulation actually
-## generates from; the figures source it rather than restating it, so a change
-## to the design cannot leave the illustration behind.
-source(file.path("C:/Users/paulm/OneDrive/Documenti/GitHub/Stem",
-                 "dev", "paper", "06-dgp.R"))
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+}, envir = globalenv())
+source(file.path(stem_paper_dir(), "06-dgp.R"), chdir = TRUE)
+OUT <- stem_fig_dir()
 
 D_GRID <- c(0, 1/3, 2/3, 1)
 N_GRID <- c(20, 40, 60, 80, 100)

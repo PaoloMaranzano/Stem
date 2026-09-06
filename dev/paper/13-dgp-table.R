@@ -6,9 +6,14 @@
 ##   Rscript dev/paper/13-dgp-table.R
 ## ---------------------------------------------------------------------------
 
-HERE <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
-OUT  <- "C:/Users/paulm/Dropbox/Applicazioni/Overleaf/SC-STEM package paper/Figures"
-source(file.path(HERE, "dev", "paper", "06-dgp.R"))
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+}, envir = globalenv())
+source(file.path(stem_paper_dir(), "06-dgp.R"), chdir = TRUE)
+OUT <- stem_fig_dir()
 
 b    <- dgp_base()
 scen <- dgp_scenarios()
@@ -49,7 +54,7 @@ rows <- do.call(rbind, lapply(seq_len(nrow(scen)), function(i) {
 print(rows, row.names = FALSE, right = FALSE)
 
 cat("\nOVERLAP: standardised separation 2*omega/sqrt(nu_sp), the same for every K\n")
-print(round(setNames(2 * dims$d / sqrt(NU_SP), c("0", "1/3", "2/3", "1")), 2))
+print(round(setNames(2 * dims$omega / sqrt(NU_SP), c("0", "1/3", "2/3", "1")), 2))
 cat(sprintf("nu_sp = %.1f, one abstract unit = %d km, so a cluster has sd %.0f km\n",
             NU_SP, UNIT_KM, sqrt(NU_SP) * UNIT_KM))
 cat(sprintf("and at omega = 1 the centres are %d km apart\n", 2 * UNIT_KM))
@@ -74,9 +79,9 @@ cat("  (X) marks a cell that cannot carry regimes of at least ", N_MIN,
 ## The size of the experiment
 ## ---------------------------------------------------------------------------
 cells <- rbind(
-  expand.grid(n = dims$n, TN = dims$TN, K = 1L, d = 2/3, id = "S0",
+  expand.grid(n = dims$n, TN = dims$TN, K = 1L, omega = 2/3, id = "S0",
               balance = "balanced", stringsAsFactors = FALSE),
-  expand.grid(n = dims$n, TN = dims$TN, K = c(2L, 3L), d = dims$d,
+  expand.grid(n = dims$n, TN = dims$TN, K = c(2L, 3L), omega = dims$omega,
               id = scen$id, balance = dims$balance, stringsAsFactors = FALSE))
 keep <- mapply(dgp_feasible, cells$n, cells$K, cells$balance)
 cat(sprintf("\nFULL DESIGN: %d cells, of which %d feasible\n",

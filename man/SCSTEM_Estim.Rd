@@ -25,6 +25,9 @@ SCSTEM_Estim(
   swap_pass = TRUE,
   share2conv = 0,
   seed = 123456789,
+  alpha = 0,
+  lambda = 0,
+  penalize = NULL,
   verbose = FALSE
 )
 }
@@ -102,6 +105,21 @@ rely only on the objective-based criteria.}
 
 \item{seed}{integer or \code{NULL}, seed used for the initialization step so
 that the fit is reproducible. Default is 123456789.}
+
+\item{alpha}{the elastic-net mixing parameter for the regression
+coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} the lasso,
+anything between the elastic net. The penalty acts within each regime.
+Ignored when \code{lambda} is zero. Default is 0. See
+\code{\link{STEM_Fit}}.}
+
+\item{lambda}{the strength of the penalty on the regression coefficients.
+\code{0}, the default, gives the unpenalized estimator, and the information
+criteria then count the nominal number of coefficients as before; with
+\code{lambda > 0} they count the effective number the penalty leaves.}
+
+\item{penalize}{which coefficients the penalty acts on: a logical vector of
+length \eqn{r}, an index vector, or \code{NULL} (the default) for every
+coefficient except the intercept.}
 
 \item{verbose}{logical. If \code{TRUE}, progress information is emitted via
 \code{message()}. Default is \code{FALSE}.}

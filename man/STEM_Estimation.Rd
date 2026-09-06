@@ -13,7 +13,10 @@ STEM_Estimation(
   cov.spat = Sigmastar.exp,
   distance = "euclidean",
   regularization = 0.01,
-  verbose = FALSE
+  verbose = FALSE,
+  alpha = 0,
+  lambda = 0,
+  penalize = NULL
 )
 }
 \arguments{
@@ -34,6 +37,12 @@ STEM_Estimation(
 \item{regularization}{a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01}
 
 \item{verbose}{logical. If TRUE, the progress of the EM and Newton-Raphson iterations is reported through message(). Default is FALSE.}
+
+\item{alpha}{the elastic-net mixing parameter for the regression coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} is the lasso, anything in between is the elastic net. Ignored when \code{lambda} is zero. Default is 0.}
+
+\item{lambda}{the strength of the penalty on the regression coefficients. \code{0}, the default, gives the ordinary maximum likelihood estimator. See \code{\link{STEM_Fit}} for the interface that selects it.}
+
+\item{penalize}{which regression coefficients the penalty acts on: a logical vector of length \eqn{r}, an index vector, or \code{NULL} (the default) for every coefficient except the intercept.}
 }
 \value{
 The function returns an object of class \dQuote{STEM_Model} which is a list given by:

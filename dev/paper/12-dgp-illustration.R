@@ -11,9 +11,14 @@
 ##   Rscript dev/paper/12-dgp-illustration.R
 ## ---------------------------------------------------------------------------
 
-HERE <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
-OUT  <- "C:/Users/paulm/Dropbox/Applicazioni/Overleaf/SC-STEM package paper/Figures"
-source(file.path(HERE, "dev", "paper", "06-dgp.R"))
+local({
+  a <- commandArgs(trailingOnly = FALSE)
+  f <- grep("^--file=", a, value = TRUE)
+  h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
+  source(file.path(h, "00-setup.R"), chdir = TRUE)
+  source(file.path(h, "06-dgp.R"), chdir = TRUE)
+}, envir = globalenv())
+OUT <- stem_fig_dir()
 
 COL  <- c("#1f6f8b", "#e0a458", "#5b8c5a", "#a8516e")
 GREY <- "#8a939f"
@@ -23,17 +28,23 @@ scen <- dgp_scenarios()
 
 ## the rows of the figure: what varies is the number of regimes, the overlap,
 ## the balance and how far apart the parameters are
+## Rows 2 to 4 walk the overlap up at a fixed scenario; row 5 holds the overlap
+## at its largest and weakens the parameters instead, which is the case the
+## design exists to separate; row 6 adds a third regime and an unbalanced
+## allocation. omega is the d of the source paper -- see 06-dgp.R.
 rows <- list(
-  list(K = 1L, d = 2/3, id = "S0",  bal = "balanced",
-       lab = "K = 1 (pooled)",        sub = "no regime at all"),
-  list(K = 2L, d = 0,   id = "S4",  bal = "balanced",
-       lab = "K = 2, omega = 0",      sub = "regimes on top of each other in space"),
-  list(K = 2L, d = 2/3, id = "S1a", bal = "balanced",
-       lab = "K = 2, omega = 2/3",    sub = "coefficients 0.25 sd apart"),
-  list(K = 2L, d = 2/3, id = "S4",  bal = "balanced",
-       lab = "K = 2, omega = 2/3",    sub = "all three contrasts"),
-  list(K = 3L, d = 2/3, id = "S4",  bal = "unbalanced",
-       lab = "K = 3, omega = 2/3",    sub = "unbalanced regimes")
+  list(K = 1L, omega = 2/3, id = "S0",  bal = "balanced",
+       lab = "K = 1 (pooled)",     sub = "no regime at all"),
+  list(K = 2L, omega = 0,   id = "S4",  bal = "balanced",
+       lab = "K = 2, omega = 0",   sub = "all three contrasts, no spatial separation"),
+  list(K = 2L, omega = 2/3, id = "S4",  bal = "balanced",
+       lab = "K = 2, omega = 2/3", sub = "all three contrasts, 2.11 sd apart"),
+  list(K = 2L, omega = 1,   id = "S4",  bal = "balanced",
+       lab = "K = 2, omega = 1",   sub = "all three contrasts, 3.16 sd apart"),
+  list(K = 2L, omega = 1,   id = "S1a", bal = "balanced",
+       lab = "K = 2, omega = 1",   sub = "separated in space, coefficients 0.25 sd apart"),
+  list(K = 3L, omega = 1,   id = "S4",  bal = "unbalanced",
+       lab = "K = 3, omega = 1",   sub = "unbalanced regimes")
 )
 
 N  <- 60L
@@ -82,8 +93,8 @@ series_panel <- function(z, y, g, pick, ylim) {
 ## ---------------------------------------------------------------------------
 draws <- lapply(rows, function(r) {
   row <- scen[scen$id == r$id, , drop = FALSE]
-  d   <- dgp_draw(N, TN, r$K, r$d, row, rep = 1L, balance = r$bal)
-  loc <- dgp_locations(N, r$K, r$d, balance = r$bal, seed = 1000L + 1L)
+  d   <- dgp_draw(N, TN, r$K, r$omega, row, rep = 1L, balance = r$bal)
+  loc <- dgp_locations(N, r$K, r$omega, balance = r$bal, seed = 1000L + 1L)
   set.seed(11)
   pick <- unlist(lapply(seq_len(r$K), function(k)
     sample(which(d$labels == k), min(NS, sum(d$labels == k)))))
@@ -96,7 +107,7 @@ lim  <- c(-lim, lim)
 ylim <- range(unlist(lapply(draws, function(d) d$z[seq_len(WIN), d$pick])))
 
 grDevices::cairo_pdf(file.path(OUT, "fig_dgp_examples.pdf"),
-                     width = 9.2, height = 11.0)
+                     width = 9.2, height = 12.6)
 graphics::par(mfcol = c(length(rows), 2), mar = c(1.6, 1.0, 1.4, 0.6),
               oma = c(3.2, 6.4, 4.0, 1.0))
 

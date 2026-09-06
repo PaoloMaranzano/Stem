@@ -1,0 +1,219 @@
+---
+title: "4. Computational notes"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{4. Computational notes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+This vignette explains how the estimation engine is actually computed, and why
+the way it is computed is not the way the equations are written. None of it
+changes the model or the estimator: every step below is an algebraic identity,
+and the estimates it produces agree with the direct form to about $10^{-13}$ in
+relative terms. What changes is what the package can fit at all.
+
+The short version. A network of $d$ stations observed over $T$ periods used to
+cost $O(T d^3)$ per pass of the Kalman filter, and to overflow the range of
+double precision past a few hundred stations. It now costs $O(d^3 + T d^2)$ and
+does not overflow. On 200 stations over a year an EM iteration is about ten
+times faster; a 400-station network, which the direct form cannot fit at all,
+takes about a second per iteration.
+
+## 1. What "cost $O(T d^3)$" means
+
+The **cost** of an algorithm is the number of elementary floating-point
+operations it performs -- additions, multiplications, divisions. It is not a
+time: the time depends on the machine. The $O(\cdot)$ notation says how that
+work grows with the size of the problem, ignoring multiplicative constants and
+lower-order terms.
+
+**Why inverting a $d \times d$ matrix costs $O(d^3)$.** Not by cofactors, which
+would cost $d!$. By factorisation: an LU decomposition for a general matrix, a
+Cholesky decomposition for a symmetric positive definite one. Gaussian
+elimination proceeds column by column: at column $k$ it eliminates the $d-k$
+entries below the pivot, and for each of those rows it updates a row of $d-k$
+entries, which is $(d-k)^2$ operations. Summing over the columns,
+
+$$\sum_{k=1}^{d}(d-k)^2 = \sum_{j=0}^{d-1}j^2 = \frac{d(d-1)(2d-1)}{6}\approx\frac{d^3}{3}$$
+
+multiplications, and as many additions: about $\tfrac{2}{3}d^3$ operations for
+the factorisation. Cholesky, exploiting symmetry, costs half of that. Forming
+the explicit inverse then needs $d$ triangular solves at $O(d^2)$ each, so
+$O(d^3)$ again.
+
+**Where the factor $T$ comes from.** The measurement equation of the model is
+
+$$z_t = X_t\beta + K y_t + e_t, \qquad e_t \sim N_d(0, \Sigma_\varepsilon),$$
+
+and the filter needs, at every time point, the covariance of the one-step-ahead
+predictive distribution of $z_t$,
+
+$$Q_t = K P_t K' + \Sigma_\varepsilon,$$
+
+together with its inverse and its determinant. $P_t$, the predicted variance of
+the state, changes with $t$, so $Q_t$ changes with $t$, so a direct
+implementation factorises a $d\times d$ matrix $T$ times per pass.
+
+Concretely, at $d = 400$: $d^3 = 6.4\times 10^{7}$, so about $4\times 10^{7}$
+operations per factorisation, roughly $0.04$ seconds with the reference BLAS
+that ships with R. That looks small. Multiplied by $T = 730$ it is 29 seconds
+for **one forward pass**, that is one E-step; an EM run does thirty to fifty of
+them; and `SCSTEM_Estim()` runs an EM per regime, for every point of the
+$(k,\varphi)$ grid, for every bootstrap draw. The cubic term is paid thousands
+of times.
+
+Doubling $d$ multiplies a quadratic cost by four and a cubic cost by eight.
+Going from 200 to 400 stations does not double the work; it multiplies it by
+eight. That is why the order matters more than the constant.
+
+## 2. Why the Woodbury identity helps
+
+$Q_t$ is not an arbitrary $d\times d$ matrix. Two facts about it are structural.
+
+1. $\Sigma_\varepsilon = \sigma^2_\varepsilon I_d + \sigma^2_\omega C(h;\theta)$
+   **does not depend on $t$**: it is a function of the parameters only, and is
+   rebuilt once per EM iteration.
+2. $K P_t K'$ **has rank $p$**, the dimension of the latent state, which is one
+   in the default specification. Between one time point and the next, $d^2$
+   numbers change, but with only $p(p+1)/2$ degrees of freedom.
+
+The Woodbury identity says that the inverse of an invertible matrix plus a
+low-rank update is the inverse of the first plus a low-rank correction:
+
+$$(A + UCV)^{-1} = A^{-1} - A^{-1}U\,(C^{-1} + VA^{-1}U)^{-1}\,VA^{-1}.$$
+
+With $A = \Sigma_\varepsilon$, $U = K$, $C = P_t$ and $V = K'$,
+
+$$Q_t^{-1} = \Sigma_\varepsilon^{-1} - \Sigma_\varepsilon^{-1}K\,
+             (P_t^{-1} + K'\Sigma_\varepsilon^{-1}K)^{-1}\,
+             K'\Sigma_\varepsilon^{-1}.$$
+
+The only inverse that depends on $t$ is that of
+$P_t^{-1} + K'\Sigma_\varepsilon^{-1}K$, which is $p\times p$: with $p = 1$ it
+is a division. Everything else -- the Cholesky factor of $\Sigma_\varepsilon$,
+the product $K'\Sigma_\varepsilon^{-1}K$, the matrix
+$\Sigma_\varepsilon^{-1}K$ -- is constant over the pass and computed once.
+
+The determinant, needed for the log-likelihood, comes from the matrix
+determinant lemma, which is the same statement about $\det$:
+
+$$\log|Q_t| = \log|\Sigma_\varepsilon| + \log|P_t| +
+              \log|P_t^{-1} + K'\Sigma_\varepsilon^{-1}K|,$$
+
+again with only a $p\times p$ piece depending on $t$.
+
+**And $Q_t$ itself is never needed.** The recursion uses only
+
+- $K'Q_t^{-1}K$, which is $p\times p$,
+- $K'Q_t^{-1}e_t$, which is $p\times 1$,
+- the quadratic form $e_t'Q_t^{-1}e_t$, a scalar, obtained from one triangular
+  solve against the cached Cholesky factor of $\Sigma_\varepsilon$ at $O(d^2)$,
+  corrected by a $p\times p$ term.
+
+So a pass costs $O(d^3)$ **once**, for the factorisation of
+$\Sigma_\varepsilon$, plus $O(d^2)$ per time point: $O(d^3 + T d^2)$ in place
+of $O(T d^3)$.
+
+## 3. Under what conditions
+
+| Assumption | Status in this model |
+|---|---|
+| $\Sigma_\varepsilon$ does not depend on $t$ | **Holds.** It is $\sigma^2_\varepsilon I + \sigma^2_\omega\exp(-\theta h)$, a function of the parameters alone. Time-varying heteroskedasticity would destroy the gain. |
+| The update has low rank, $p \ll d$ | **Holds.** $p = 1$ by default. The cost per step goes from $O(d^3)$ to $O(d^2 p + p^3)$, so at $p = d$ there is nothing to gain. |
+| $\Sigma_\varepsilon$ and $P_t$ are invertible | **Automatic.** Both are positive definite by construction: the nugget $\sigma^2_\varepsilon > 0$ bounds the first away from singularity, and $P_t = G C_{t-1}G' + \Sigma_\eta$ inherits it from $\Sigma_\eta$. This is not an approximation: the identity is exact. |
+| Numerical stability | Woodbury can be worse than a direct inverse when $A$ is ill-conditioned and the low-rank correction nearly cancels it. Here the nugget keeps the condition number bounded, and $\Sigma_\varepsilon^{-1}$ is never formed explicitly: the code carries the Cholesky factor and uses triangular solves. |
+| Missing values | The constants depend on **which rows are observed**, so they are recomputed once per *distinct missingness pattern* rather than once per $t$. In a monitoring network a station is out of service for a stretch of consecutive days, so the distinct patterns are few and the cache almost always hits. A record in which every period had a different pattern would return to $O(T d^3)$. |
+
+## 4. The log-density, which is a different problem
+
+The likelihood term of period $t$ is the log of a Gaussian density on $d$
+observations,
+
+$$-\tfrac{1}{2}\left\{ d\log 2\pi + \log|Q_t| + e_t'Q_t^{-1}e_t \right\}.$$
+
+Evaluating the **density** and taking its logarithm afterwards is not a matter
+of speed. A Gaussian density on $d$ observations is of order $e^{-d}$; the
+smallest positive normalised double is $2.2\times10^{-308} = e^{-708}$. Past a
+few hundred stations the density underflows to exactly zero, its logarithm is
+`-Inf`, and the EM algorithm stops. Computing the log-density directly never
+touches the small number.
+
+There is a speed argument as well, but it is secondary: `mvtnorm::dmvnorm()`
+re-checks the symmetry of $Q$ with `all.equal()` on every call, which on a
+36-station network was about a seventh of the total running time.
+
+## 5. The M-step, written as matrix products
+
+The sums the M-step accumulates over time are cross-products, not loops. Because
+the loading matrix does not depend on time, the second moment of the measurement
+error collapses to
+
+$$\sum_t \left\{ K C^s_t K' + r_t r_t' \right\} = K\Big(\sum_t C^s_t\Big)K' + R'R,$$
+
+with $R$ the $T\times d$ matrix of residuals: one cross-product in place of $T$
+outer products, and no need to hold $T$ matrices of size $d\times d$ at once.
+The three sums of outer products of the smoothed states are cross-products of
+the $T\times p$ matrix of those states, and the two accumulations entering the
+update of $\beta$,
+
+$$M = \sum_t X_t'\Sigma_e^{-1}X_t, \qquad v = \sum_t X_t'\Sigma_e^{-1}v_t,$$
+
+are cross-products of the design blocks stacked by period.
+
+Finally, every trace of a matrix product is evaluated as
+
+$$\operatorname{tr}(AB) = \sum_{i}\sum_{j} A_{ij}B_{ji},$$
+
+which costs $O(d^2)$ and does not form the $O(d^3)$ product whose diagonal would
+otherwise be read and discarded.
+
+## 6. What it is worth
+
+Ten EM iterations on a synthetic network generated from the model itself,
+measured against the state of the code before these changes:
+
+| $d$ | $T$ | before (s) | after (s) | speed-up | max relative difference |
+|---:|---:|---:|---:|---:|---|
+| 36 | 365 | 2.1 | 0.9 | 2.3x | 1.18e-13 |
+| 60 | 365 | 2.1 | 0.6 | 3.3x | 7.96e-14 |
+| 100 | 365 | 5.9 | 1.2 | 5.0x | 1.17e-13 |
+| 200 | 365 | 15.5 | 1.6 | 9.8x | 2.85e-13 |
+| 400 | 200 | *fails* | 10.8 | -- | reference underflows to `-Inf` |
+
+The column that matters is the last one. Both changes are algebraic identities,
+so the estimates coincide to floating point; the speed-up is the consequence,
+not the claim. The benchmark is `dev/paper/10-engine-benchmark.R` in the
+repository, which reconstructs the previous sources from git and runs the two
+side by side; `dev/paper/11-engine-profile.R` profiles the current one.
+
+## 7. Where to look in the sources
+
+| File | What it holds |
+|---|---|
+| `R/filterstep.R` | one step of the filter in Woodbury form, with the algebra and the superseded code in the header |
+| `R/filtering.R` | the pass, and the cache of pattern constants |
+| `R/kalman.R` | the E-step and the M-step, with the cross-product accumulations |
+| `R/d1_Q.R`, `R/d2_Q.R`, `R/d12_Q.R` | the derivatives of the objective, with the shared products |
+| `R/Stem-02-internal.R` | the structured products used when a derivative is a multiple of the identity |
+| `R/stem-penalty.R` | the regularised update of the coefficients, a separate matter |
+
+Every one of them keeps the expression it replaced, commented, immediately above
+the expression that replaced it.
+
+## References
+
+Durbin, J., Koopman, S. J. (2012) *Time Series Analysis by State Space
+Methods*, 2nd edition. Oxford University Press. Sections 2.7, 4.10 and 7.3 for
+the treatment of missing observations.
+
+Golub, G. H., Van Loan, C. F. (2013) *Matrix Computations*, 4th edition. Johns
+Hopkins University Press. Chapters 2 and 4 for the operation counts and the
+stability of the factorisations.
+
+Henderson, H. V., Searle, S. R. (1981) *On deriving the inverse of a sum of
+matrices*. SIAM Review, 23, 53--60. The history of the identity.

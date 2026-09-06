@@ -2,7 +2,7 @@
 #' @noRd
 
 `kalman` <-
-  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE) {
+  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL) {
 
 
 
@@ -25,6 +25,11 @@
     ### on. It enters the measurement covariance, the update of sigma2omega and
     ### the update of beta, and was being rebuilt for each of them.
     Sigmastar_j = cov.spat(d=d , logb=phi_j$logb , logtheta=phi_j$logtheta , dist=dist)
+
+    ### Which regression coefficients the elastic net acts on. The default
+    ### leaves the intercept alone; see R/stem-penalty.R for why that is not
+    ### merely conventional here.
+    pen_w = stem_penalized_index(r, penalize)
 
     ####################
     ###Model definition
@@ -371,8 +376,18 @@
     vt_dn = t(zhat) - sig_dn                                     # d x n
     v     = crossprod(Xbig, as.vector(Sigmae_inversa %*% vt_dn))
 
-    if(det(MM) != 0) {beta_j = solve(diag(regularization,nrow(MM))+MM) %*% v}
+    ### The update of beta, ordinary or regularized. With lambda = 0 this is
+    ### exactly solve(diag(regularization, r) + MM) %*% v, the estimator the
+    ### package has always computed; with lambda > 0 it is the elastic net of
+    ### R/stem-penalty.R, closed form for ridge and coordinate descent otherwise.
+    ### `beta_df` is the effective number of coefficients, which the information
+    ### criteria need in place of r once a penalty is in force.
     if(det(MM)  < 10^(-7)) {warning("Error in beta estimation! The matrix can not be inverted!!!!", call. = FALSE)}
+    beta_upd = stem_beta_update(M = MM, v = v, alpha = alpha, lambda = lambda,
+                                w = pen_w, beta0 = phi_j$beta,
+                                ridge_reg = regularization)
+    beta_j  = matrix(beta_upd$beta, ncol = 1)
+    beta_df = beta_upd$df
 
     #############################
     ###PARAMETER 6: theta e logb
@@ -581,6 +596,7 @@
                 Q_prev = Q_prev,
                 Q_new  = Q_new,
                 n_iter_NR =  n_iter_NR - 1,
+                beta_df = beta_df,
                 m.smoother = mod1.smoother$m))
     #m.filter   = mod1.filter$m,
     #c.smoother = mod1.smoother$C,

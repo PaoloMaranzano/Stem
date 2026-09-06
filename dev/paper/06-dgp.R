@@ -5,29 +5,37 @@
 ## THE GEOMETRY: THE OVERLAP DESIGN
 ##
 ## The spatial configuration follows Morelli, Maranzano and Otto (2026), Spatial
-## Statistics 73, 100960, Section 4. There the K = 4 cluster centres sit at the
-## corners of a square of half-side d,
+## Statistics 73, 100960, Section 4. THE OVERLAP PARAMETER IS THEIR d, WHICH IS
+## CALLED omega THROUGHOUT THIS DESIGN: in the package "d" already means the
+## number of locations, and carrying two meanings for one letter through the
+## simulation code and the paper was a defect waiting to happen.
 ##
-##   mu_sp = ((d,d), (-d,d), (d,-d), (-d,-d)),   Sigma_sp = nu_sp * I_2,
+## In the source design the K = 4 cluster centres sit at the corners of a square
+## of half-side omega,
 ##
-## so that d alone controls how much the clusters overlap in space: at d = 0 the
-## four Gaussians coincide and the partition has no spatial signature at all; as
-## d grows the clusters separate. Reducing the design to K = 2 and K = 3 we keep
-## the NEAREST-NEIGHBOUR centre distance at 2d rather than the radius, so that a
-## given d means the same degree of overlap whatever K:
+##   mu_sp = ((w,w), (-w,w), (w,-w), (-w,-w)),   Sigma_sp = nu_sp * I_2,
 ##
-##   K = 2   centres (-d, 0) and (d, 0)
-##   K = 3   equilateral triangle of side 2d, i.e. circumradius 2d/sqrt(3)
+## so that omega alone controls how much the clusters overlap in space: at
+## omega = 0 the Gaussians coincide and the partition has no spatial signature
+## at all; as omega grows the clusters separate. Reducing the design to K = 2
+## and K = 3 we keep the NEAREST-NEIGHBOUR centre distance at 2*omega rather
+## than the radius, so that a given omega means the same degree of overlap
+## whatever K:
 ##
-## The standardised separation is then 2d / sqrt(nu_sp) for every K: with
-## nu_sp = 0.4 it runs from 0 at d = 0 to 3.16 standard deviations at d = 1.
+##   K = 2   centres (-omega, 0) and (omega, 0)
+##   K = 3   equilateral triangle of side 2*omega, circumradius 2*omega/sqrt(3)
+##   K = 4   the square of the source paper, radius omega*sqrt(2)
+##
+## The standardised separation is then 2*omega / sqrt(nu_sp) for every K: with
+## nu_sp = 0.4 it runs from 0 at omega = 0 to 3.16 standard deviations at
+## omega = 1.
 ##
 ## The abstract plane is mapped onto a geographic box centred on the Po Valley,
 ## one abstract unit being UNIT_KM kilometres. This is not cosmetic: it is what
 ## makes the covariance parameters interpretable. With UNIT_KM = 100 and
-## nu_sp = 0.4 a cluster has a standard deviation of 63 km and, at d = 1, the
-## centres are 200 km apart, against a baseline correlation range of 123 km --
-## the regime in which a monitoring network of the Po Valley actually sits.
+## nu_sp = 0.4 a cluster has a standard deviation of 63 km and, at omega = 1,
+## the centres are 200 km apart, against a baseline correlation range of 123 km
+## -- the regime in which a monitoring network of the Po Valley actually sits.
 ##
 ## WHY THE GENERATOR IS NOT STEM_Simulation() CALLED REGIME BY REGIME
 ##
@@ -186,15 +194,15 @@ IMB_MIN <- 1.5
 ## Geometry
 ## ---------------------------------------------------------------------------
 
-## centres of the K clusters at overlap d, nearest-neighbour distance 2d
-dgp_centres <- function(K, d) {
+## centres of the K clusters at overlap omega, nearest-neighbour distance 2*omega
+dgp_centres <- function(K, omega) {
   if (K == 1L) return(cbind(0, 0))
-  if (K == 2L) return(cbind(c(-d, d), c(0, 0)))
+  if (K == 2L) return(cbind(c(-omega, omega), c(0, 0)))
   if (K == 3L) {
-    r <- 2 * d / sqrt(3); a <- c(90, 210, 330) * pi / 180
+    r <- 2 * omega / sqrt(3); a <- c(90, 210, 330) * pi / 180
     return(cbind(r * cos(a), r * sin(a)))
   }
-  if (K == 4L) return(cbind(c(d, -d, d, -d), c(d, d, -d, -d)))
+  if (K == 4L) return(cbind(c(omega, -omega, omega, -omega), c(omega, omega, -omega, -omega)))
   stop("K must be 1, 2, 3 or 4")
 }
 
@@ -203,8 +211,8 @@ dgp_centres <- function(K, d) {
 ## amount: the pooled configuration then covers the same area as the clustered
 ## one at the same overlap, and the selection rule is not handed a free
 ## geometric cue for telling k = 1 from k > 1.
-dgp_centre_var <- function(K, d) {
-  mu <- dgp_centres(K, d)
+dgp_centre_var <- function(K, omega) {
+  mu <- dgp_centres(K, omega)
   if (K == 1L) return(0)
   mean(apply(mu, 2, function(v) mean((v - mean(v))^2)))
 }
@@ -262,15 +270,15 @@ dgp_labels <- function(n, K, balance = "balanced", n_min = N_MIN) {
 ##
 ##   s_i | g_i = g  ~  N_2( mu_g , nu_sp I_2 )
 ##
-## with mu_g = dgp_centres(K, d). For K = 1 the dispersion is nu_sp + the
+## with mu_g = dgp_centres(K, omega). For K = 1 the dispersion is nu_sp + the
 ## between-centre variance the design would have had at the same overlap, so
 ## that the pooled case is not simply a smaller map.
-dgp_locations <- function(n, K, d, nu_sp = NU_SP, balance = "balanced",
+dgp_locations <- function(n, K, omega, nu_sp = NU_SP, balance = "balanced",
                           seed = 1, k_ref = 2L) {
   set.seed(seed)
-  mu <- dgp_centres(K, d)
+  mu <- dgp_centres(K, omega)
   g  <- dgp_labels(n, K, balance)
-  sd_i <- sqrt(if (K == 1L) nu_sp + dgp_centre_var(k_ref, d) else nu_sp)
+  sd_i <- sqrt(if (K == 1L) nu_sp + dgp_centre_var(k_ref, omega) else nu_sp)
   xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sd_i),
               mu[g, 2] + stats::rnorm(n, sd = sd_i))
   coords <- cbind(
@@ -489,17 +497,17 @@ dgp_dims <- function() {
   list(TN      = c(60L, 120L, 365L),
        n       = c(20L, 40L, 60L, 100L, 200L, 400L),
        K       = c(1L, 2L, 3L),
-       d       = c(0, 1/3, 2/3, 1),
+       omega   = c(0, 1/3, 2/3, 1),
        balance = c("balanced", "unbalanced"))
 }
 
 ## ---------------------------------------------------------------------------
 ## One complete data set of the design, ready for STEM_Model()
 ## ---------------------------------------------------------------------------
-dgp_draw <- function(n, TN, K, d, scenario_row, rep = 1L,
+dgp_draw <- function(n, TN, K, omega, scenario_row, rep = 1L,
                      balance = "balanced") {
   seed <- 1000L * rep + 1L
-  loc  <- dgp_locations(n, K, d, balance = balance, seed = seed)
+  loc  <- dgp_locations(n, K, omega, balance = balance, seed = seed)
   x    <- dgp_covariate(loc$coords, TN, seed = seed + 1L)
   psi  <- dgp_psi(scenario_row$scenario, scenario_row$level, K = K)
   z    <- dgp_simulate(loc$labels, psi, x, loc$coords,

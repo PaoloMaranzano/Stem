@@ -34,8 +34,10 @@ crossing the picture, are named here but do not get a box of their own.
 | Data | `pm10`, `povalley` |
 | Model object | `STEM_Model`*, `STEM_Skeleton`, `STEM_Data`, `is.STEM_*` |
 | Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `B_function`, `cov_lagone`, `changedimension_covariates` |
+| Entry point | `STEM_Fit`* |
 | Missing-data bookkeeping | `stem_obs_index`, `stem_blocks_cache`, `stem_missing_blocks` |
 | Structured linear algebra | `stem_xprod`, `stem_xtrace` |
+| Regularization | `stem_beta_update`, `stem_soft`, `stem_penalized_index` |
 | Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Fitted`*, `SCSTEM_Fitted`*, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
 | Spatially-clustered STEM | `SCSTEM_Estim`*, `SCSTEM_Infocrit`*, `SCSTEM_Select`*, `SCSTEM_Bootstrap`*, `SCSTEM_BootInference`*, and the `scstem_*` helpers |
 
@@ -44,6 +46,9 @@ crossing the picture, are named here but do not get a box of their own.
 ```
 STEM_Model               -> STEM_Skeleton
 STEM_Model               -> STEM_Data
+
+STEM_Fit                 -> STEM_Estimation            [when k = 1]
+STEM_Fit                 -> SCSTEM_Estim               [when k > 1]
 
 STEM_Estimation          -> kalman
 STEM_Estimation          -> changedimension_covariates
@@ -73,6 +78,9 @@ d1_Q                     -> stem_xtrace
 d2_Q                     -> stem_xprod
 d2_Q                     -> stem_xtrace
 d12_Q                    -> stem_xprod
+kalman                   -> stem_penalized_index
+kalman                   -> stem_beta_update
+stem_beta_update         -> stem_soft
 
 STEM_Simulation          -> changedimension_covariates
 STEM_Simulation          -> Sigmastar.exp

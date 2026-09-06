@@ -16,6 +16,86 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-07
+
+**Ridge, lasso and elastic net on the regression coefficients.** `STEM_Fit()`
+is a single entry point for the four estimators the package now provides, and
+what runs is decided by two arguments and nothing else: `k = 1` or `k > 1`
+chooses between the pooled and the clustered model, `lambda = 0` or `lambda > 0`
+between the ordinary and the penalized one. The defaults `k = 1`, `alpha = 0`,
+`lambda = 0` reproduce `STEM_Estimation()` bit for bit, which the test suite
+asserts with `expect_identical()` on the whole parameter vector and on the
+log-likelihood.
+
+In the parameterization of `glmnet` the objective subtracts
+`lambda { alpha ||D beta||_1 + (1-alpha)/2 beta' D beta }`, so `alpha = 0` is
+ridge, `alpha = 1` the lasso and anything between the elastic net. Only the
+regression coefficients are penalized: the variance components, the range, the
+transition matrix and the initial state stay at their maximum likelihood values.
+
+Three things made this cheap and one made it subtle.
+
+*The E-step does not change.* The penalty is a function of `beta` alone and does
+not involve the latent states, so it passes through the conditional expectation
+unchanged and the usual Jensen argument applies verbatim to `Q - pen`. The EM
+algorithm therefore still increases the PENALIZED observed-data log-likelihood
+at every iteration, and the Kalman filter and smoother -- the expensive part --
+are untouched. Only the point returned by the M-step differs.
+
+*The M-step keeps a closed form under a ridge.* `beta = (M + lambda D)^{-1} v`
+with `M` and `v` already assembled: one addition on a diagonal.
+
+*The lasso and the elastic net are solved exactly.* The M-step objective is a
+quadratic plus a separable penalty, which is the setting in which cyclic
+coordinate descent converges to the global maximizer, so each step is soft
+thresholding and the result is a genuine EM step rather than a generalized one.
+The implementation is checked against the KKT conditions of the problem it
+claims to solve, not against another implementation.
+
+*The metric is the subtle part.* `M = sum_t X_t' Sigma_e^{-1} X_t` is a
+GENERALIZED least squares cross-product: it carries an estimated spatial
+covariance. Standardizing the columns of X in the usual Euclidean sense --- what
+every lasso implementation does --- is therefore not the normalization that
+makes `lambda` mean the same thing for every covariate here. The scaling that
+does is the one putting the diagonal of `M` at one, and that is what the code
+applies internally, returning the coefficients on the original scale. In the
+clustered model this is also what makes a single `lambda` comparable across
+regimes of different sizes and different error covariances.
+
+The intercept is left unpenalized by default, and not merely by convention: the
+model already carries a latent process whose initial mean absorbs the level, so
+shrinking the intercept would not shrink "the level" but move it into `m0` at a
+rate depending on `G`.
+
+**The information criteria count effective parameters.** With a penalty in force
+the nominal `r` overstates the flexibility of the fit. `SCSTEM_Estim()` now sums
+the effective count each regime reports: `tr(M (M + lambda D)^{-1})` for a
+ridge, the number of active coefficients for a lasso, and the corresponding
+trace on the active set for an elastic net. With `lambda = 0` every regime
+returns `r` and the count reduces to the one the package has always used.
+
+The derivation -- the penalized EM and its monotonicity, both forms of the
+M-step, the GLS metric, the degrees of freedom, and what is still open -- is in
+`dev/regularization/stem-elastic-net.tex`. It is deliberately outside the
+package: the material is a study of its own and not documentation of software.
+
+**A vignette on how the engine is computed.** `vignette("computational-notes")`
+explains what a cost of `O(T d^3)` means, why inverting a `d x d` matrix costs
+`O(d^3)`, how the Woodbury identity and the matrix determinant lemma bring a
+forward pass down to `O(d^3 + T d^2)`, under exactly which assumptions, and why
+evaluating the log-density directly is a correctness fix rather than a speed-up.
+This material is deliberately kept out of the paper.
+
+**The simulation design.** The overlap parameter is now called `omega`
+throughout rather than `d`, which already means the number of locations; the
+design gains a pooled cell `K = 1` and an unbalanced allocation of the regime
+sizes; `T = 730` is dropped, which removes 42 per cent of the running time of
+the whole design. Every factor of `dev/paper/07-simulation.R` is a command-line
+option, so a run can be narrowed to the margins actually reported, and every
+paper script now resolves the repository from its own location and reads its
+output directories from environment variables, so they run from any working
+directory and on a virtual machine.
+
 ### 2026-09-06 (later)
 
 **The Newton-Raphson step no longer rebuilds what it already has.** With the

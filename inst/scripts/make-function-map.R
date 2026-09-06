@@ -71,6 +71,7 @@ boxes <- rbind(
   box(330, 100, 140, 34, "STEM_Model",                    "exported"),
   box(530, 100, 130, 34, "STEM_Skeleton",                 "internal"),
   box(686, 100, 130, 34, "STEM_Data",                     "internal"),
+  box(826, 100, 100, 34, "STEM_Fit",                      "exported"),
   ## band 2
   box( 44, 215, 150, 36, "STEM_Estimation",               "exported"),
   box(250, 215, 110, 36, "kalman",                        "internal"),
@@ -133,6 +134,7 @@ edges <- list(
   seg(470, 117, 524, 117),
   seg(660, 117, 680, 117),
   ## band 2
+  cur(876, 138, 968, 330, 520, 282, 130, 255, accent = TRUE),
   seg(194, 233, 244, 233, accent = TRUE),
   seg(360, 226, 414, 213),
   seg(532, 211, 564, 211),
@@ -181,7 +183,9 @@ titles <- list(
 
 footnotes <- list(
   list(x = 24, y = 856, text = "SCSTEM_Bootstrap regenerates the data regime by regime and re-runs"),
-  list(x = 24, y = 872, text = "the whole SC-STEM procedure, clustering included, on every draw.")
+  list(x = 24, y = 872, text = "the whole SC-STEM procedure, clustering included, on every draw."),
+  list(x = 470, y = 856, text = "STEM_Fit is the single entry point: it dispatches to STEM_Estimation"),
+  list(x = 470, y = 872, text = "when k = 1 and to SCSTEM_Estim when k > 1, with or without a penalty on beta.")
 )
 
 ## Labels set along a vertical edge, rotated a quarter turn counterclockwise.
