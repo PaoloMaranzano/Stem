@@ -124,8 +124,10 @@
 
 
 STEM_Estimation <-
-function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance='euclidean',regularization=0.01, verbose = FALSE)
+function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, engine = c("R", "fast"))
 {
+
+engine <- match.arg(engine)
 
 z 		=  StemModel$data$z
 
@@ -179,7 +181,8 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
 			cov.spat		= cov.spat,
 			distance = distance,
 			regularization=regularization,
-			verbose = verbose
+			verbose = verbose,
+			engine = engine
 	)
 
 	iterNR[n_iter_EM] 	= step$n_iter_NR

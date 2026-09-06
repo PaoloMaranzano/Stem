@@ -2,7 +2,9 @@
 #' @noRd
 
 `kalman` <-
-  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE) {
+  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, engine = c("R", "fast")) {
+
+    engine <- match.arg(engine)
 
 
     zz   = stats::ts(z)
@@ -41,7 +43,10 @@
     ####################
     ###kalman filtering and smoothing
     ####################
-    mod1.filter   	= filtering(SSmodel)
+    ### The two engines are algebraically identical; "fast" replaces the d x d
+    ### inversion at every time point by a Woodbury update against a cached
+    ### factorisation of Sigma_e. See R/fast-filtering.R.
+    mod1.filter   	= if (engine == "fast") filtering_fast(SSmodel) else filtering(SSmodel)
     mod1.smoother 	= smoothing(mod1.filter)
 
 

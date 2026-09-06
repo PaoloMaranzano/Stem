@@ -223,3 +223,50 @@ test_that("a fully missing time point falls back on the signal", {
   signal <- as.numeric(XX[, , 11] %*% b) + ysm[11]
   expect_equal(as.numeric(zhat[11, ]), signal)
 })
+
+test_that("the two filtering engines agree to machine precision", {
+  s <- po_subset(Tn = 60L, d = 12L)
+  mod <- STEM_Model(z = s$z, covariates = s$covariates,
+                    coordinates = s$coordinates,
+                    phi = po_phi(), K = matrix(1, s$d, 1))
+
+  a <- STEM_Estimation(mod, precision = 0.05, max.iter = 5, engine = "R")
+  b <- STEM_Estimation(mod, precision = 0.05, max.iter = 5, engine = "fast")
+
+  pa <- unlist(a$estimates$phi.hat)
+  pb <- unlist(b$estimates$phi.hat)
+  expect_equal(pa, pb, tolerance = 1e-8)
+  expect_equal(a$estimates$loglik, b$estimates$loglik, tolerance = 1e-8)
+  expect_equal(a$estimates$y.smoothed, b$estimates$y.smoothed, tolerance = 1e-8)
+})
+
+test_that("the fast engine handles gaps and empty time points", {
+  s <- po_subset(Tn = 50L, d = 10L)
+  set.seed(202)
+  z_na <- s$z
+  z_na[sample(length(z_na), round(0.10 * length(z_na)))] <- NA
+  z_na[9, ] <- NA
+  for (j in seq_len(ncol(z_na))) if (all(is.na(z_na[, j]))) z_na[1, j] <- s$z[1, j]
+
+  mod <- STEM_Model(z = z_na, covariates = s$covariates,
+                    coordinates = s$coordinates,
+                    phi = po_phi(), K = matrix(1, s$d, 1))
+
+  a <- STEM_Estimation(mod, precision = 0.5, max.iter = 3, engine = "R")
+  b <- STEM_Estimation(mod, precision = 0.5, max.iter = 3, engine = "fast")
+
+  expect_equal(unlist(a$estimates$phi.hat), unlist(b$estimates$phi.hat),
+               tolerance = 1e-8)
+  expect_true(is.finite(b$estimates$loglik))
+})
+
+test_that("the log-density does not underflow on a large network", {
+  ### log(dmvnorm(x)) returns -Inf once the density falls below the smallest
+  ### representable double, which happens for a few hundred locations; the
+  ### logarithm has to be taken inside.
+  set.seed(9)
+  d <- 400
+  x <- stats::rnorm(d)
+  expect_true(is.infinite(log(mvtnorm::dmvnorm(x, rep(0, d), diag(d) * 0.05))))
+  expect_true(is.finite(mvtnorm::dmvnorm(x, rep(0, d), diag(d) * 0.05, log = TRUE)))
+})

@@ -49,8 +49,14 @@ function(z,Fmat,Gmat,Vt,Wt,mx,Cx,XXXcov,betacov,flag)
     m <- a + A%*%e
     C <- R - A%*%Q%*%t(A)
 
-    if (length(z)>1  &&  flag==TRUE)  loglikterm <-log(mvtnorm::dmvnorm(as.numeric(z),as.numeric(f+(XXXcov %*% betacov)),Q))
-    if (length(z)>1  &&  flag==FALSE)  loglikterm <-log(mvtnorm::dmvnorm(as.numeric(z),as.numeric(f),Q))
+    ### The density has to be evaluated on the log scale directly. Taking the
+    ### logarithm of the density itself underflows: with d observations the
+    ### Gaussian density is of order exp(-d), and for a network of a few hundred
+    ### locations it falls below the smallest representable double, so that
+    ### log(dmvnorm(...)) returns -Inf and the EM algorithm breaks. The switch
+    ### costs nothing and makes large networks estimable.
+    if (length(z)>1  &&  flag==TRUE)  loglikterm <-mvtnorm::dmvnorm(as.numeric(z),as.numeric(f+(XXXcov %*% betacov)),Q,log=TRUE)
+    if (length(z)>1  &&  flag==FALSE)  loglikterm <-mvtnorm::dmvnorm(as.numeric(z),as.numeric(f),Q,log=TRUE)
     ### The mean of the one-step-ahead predictive distribution is
     ### mu_t = X_t beta + K y_t^{t-1} (Fasso and Cameletti 2010, Eq. 9), so the
     ### regression term ADDS to f. The univariate branch subtracted it, which

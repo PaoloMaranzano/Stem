@@ -13,7 +13,8 @@ STEM_Estimation(
   cov.spat = Sigmastar.exp,
   distance = "euclidean",
   regularization = 0.01,
-  verbose = FALSE
+  verbose = FALSE,
+  engine = c("R", "fast")
 )
 }
 \arguments{
