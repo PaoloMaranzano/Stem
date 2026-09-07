@@ -283,21 +283,43 @@ remotes::install_github("PaoloMaranzano/Stem")
 
 ## What is in the package
 
+Two functions are all a first session needs: `STEM_Model()` to build the object,
+`STEM_Fit()` to estimate it. Everything else is either a layer above (selection,
+uncertainty, prediction) or an engine below.
+
+**Build and fit**
+
 | Function | Purpose |
 |---|---|
-| `STEM_Model()` | build the model object from data and starting values |
-| `STEM_Fit()` | single entry point: pooled or clustered, with or without a penalty on the coefficients |
-| `STEM_Estimation()` | maximum likelihood via EM and the Kalman filter |
-| `STEM_Simulation()` | simulate from a fitted or specified model |
+| `STEM_Model()` | build the model object from data, coordinates and starting values |
+| `STEM_Fit()` | **the entry point.** Data and hyperparameters in, one fitted model out. `k` chooses pooled or clustered, `(alpha, lambda)` unpenalized or penalized |
+
+**Choosing the hyperparameters**
+
+| Function | Purpose |
+|---|---|
+| `SCSTEM_Infocrit()` | fit a grid of `(k, phi)` and return the criteria, with the effective degrees of freedom when a penalty is in force |
+| `SCSTEM_Select()` | the two-step rule: `k` by the modal criterion in a band, `phi` by the stability plateau |
+
+**After the fit**
+
+| Function | Purpose |
+|---|---|
+| `STEM_Fitted()`, `SCSTEM_Fitted()` | fitted values at the observed locations, gaps filled by the model |
 | `STEM_Kriging()` | spatial prediction at unobserved locations |
-| `STEM_Fitted()` | fitted values at the observed locations, gaps filled by the model |
+| `STEM_Simulation()` | simulate from a fitted or specified model |
 | `STEM_Bootstrap()` | parametric bootstrap for the pooled model |
-| `SCSTEM_Estim()` | fit a spatially-clustered STEM model |
-| `SCSTEM_Infocrit()` | information criteria over a grid of `(k, phi)` |
-| `SCSTEM_Select()` | two-step selection of the hyperparameters |
-| `SCSTEM_Bootstrap()` | refit-with-clustering parametric bootstrap |
+| `SCSTEM_Bootstrap()` | refit-with-clustering bootstrap: the partition is re-estimated on every draw |
 | `SCSTEM_BootInference()` | standard errors, intervals and between-regime tests |
-| `SCSTEM_Fitted()` | fitted values assembled regime by regime |
+
+**The two engines**, which `STEM_Fit()` dispatches to. Call them directly only
+if you want to bypass the dispatch; the arguments and the return values are the
+same either way, and the historical API is preserved.
+
+| Function | Purpose |
+|---|---|
+| `STEM_Estimation()` | the pooled fit: EM with Kalman filtering and smoothing |
+| `SCSTEM_Estim()` | the clustered fit: `STEM_Estimation()` per regime, alternated with an ICM sweep on the labels |
 
 Two datasets ship with the package: `pm10` (22 stations, 366 days, the original
 example) and `povalley` (36 background stations of the Po Valley, daily PM2.5

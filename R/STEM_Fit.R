@@ -64,6 +64,51 @@
 #' at \code{dev/regularization/stem-elastic-net.tex}, since the material is a
 #' study of its own rather than documentation of the software.
 #'
+#' @section How the penalty and the clustering interact:
+#' With \code{k > 1} the objective carries two penalties doing different things:
+#' \code{phi_penalty} penalizes disagreement between the labels of neighboring
+#' locations, \code{lambda} penalizes the size of the coefficients within a
+#' regime. They are not applied one after the other. The algorithm alternates
+#'
+#' \enumerate{
+#'   \item a \emph{parameter step}, in which the penalized EM runs inside each
+#'     regime, so that \eqn{\hat\Psi_g} is the penalized estimate; and
+#'   \item a \emph{label step}, an ICM sweep in which each location takes the
+#'     label maximizing its own contribution plus the Potts term.
+#' }
+#'
+#' The penalty \eqn{\sum_g \mathrm{pen}(\beta_g)} is constant with respect to
+#' the labels at fixed parameters, so it drops out of the arg-max of the label
+#' step: the form of that step is exactly what it was without a penalty. The
+#' penalty reaches the clustering only \emph{through the parameters the labels
+#' are scored against} -- which is enough to move the partition, since shrinking
+#' the coefficients makes regimes look more alike.
+#'
+#' Three consequences are worth knowing before choosing the four
+#' hyperparameters.
+#'
+#' \strong{They are not separable.} The \code{lambda} minimizing predictive risk
+#' grows with \code{k}, because a regime of \eqn{d/k} locations carries less
+#' information than the pooled network; and the \code{k} a criterion selects
+#' grows with \code{lambda}, because shrinkage lowers the effective number of
+#' coefficients and so makes an extra regime cheaper. Fixing \code{lambda} once
+#' on the pooled fit and only then selecting \code{k} under-shrinks precisely
+#' where shrinkage is needed.
+#'
+#' \strong{The automatic scale of the Potts penalty moves with lambda.} With
+#' \code{phi_scale = "auto"} the multiplier is calibrated from the spread of the
+#' per-location log-likelihood contributions across regimes, and that spread
+#' narrows as \code{lambda} grows. A given \code{phi_penalty} therefore does not
+#' mean the same thing at two different values of \code{lambda}; use
+#' \code{phi_scale = "raw"} when a fixed meaning is needed across a grid.
+#'
+#' \strong{The criteria use the unpenalized log-likelihood.}
+#' \code{\link{SCSTEM_Infocrit}} reports the exact log-likelihood evaluated at
+#' the penalized estimate, charged with the \emph{effective} number of
+#' coefficients. Subtracting the penalty from the log-likelihood as well would
+#' charge for it twice, once through the objective and once through the degrees
+#' of freedom.
+#'
 #' @param StemModel an object of class \dQuote{STEM_Model}, from
 #'   \code{\link{STEM_Model}}.
 #' @param k number of spatial regimes. \code{1}, the default, fits the pooled

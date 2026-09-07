@@ -59,6 +59,13 @@ Newton-Raphson iterations for each EM algorithm iteration.
 }
 \description{
 The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
+
+This is one of the two estimation engines of the package. The entry point is
+\code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
+\code{\link{SCSTEM_Estim}} when \code{k > 1}, and which takes the same
+arguments and returns the same object. Call \code{STEM_Estimation} directly
+only to bypass the dispatch; it is the historical interface of the package
+and is kept unchanged.
 }
 \details{
 This function estimates the vector parameter \code{phi} of the hierarchical spatio-temporal model of class \dQuote{STEM_Model} using Kalman filtering and EM algorithm.
@@ -202,7 +209,7 @@ Planning, 137, 567--588.
 See Also \code{\link{STEM_Model}} and \code{\link{pm10}}
 }
 \author{
-Michela Cameletti  < michela.cameletti@unibg.it >
+Michela Cameletti  < michela.cameletti@unibg.it>
 }
 \keyword{models}
 \keyword{spatial}

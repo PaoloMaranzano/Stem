@@ -9,6 +9,12 @@
 #' cluster-specific. The partition and the parameters are estimated jointly by
 #' alternating optimization of a Potts-penalized log-likelihood.
 #'
+#' This is one of the two estimation engines of the package. The entry point is
+#' \code{\link{STEM_Fit}}, which calls this function when \code{k > 1} and
+#' \code{\link{STEM_Estimation}} when \code{k = 1}, and which takes the same
+#' arguments and returns the same object. Call \code{SCSTEM_Estim} directly only
+#' to bypass the dispatch.
+#'
 #' @details
 #' \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
 #' \eqn{k}, the SC-STEM model is the cluster-specific STEM model

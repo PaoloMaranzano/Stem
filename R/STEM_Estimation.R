@@ -3,6 +3,13 @@
 #'
 #' @description The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
 #'
+#' This is one of the two estimation engines of the package. The entry point is
+#' \code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
+#' \code{\link{SCSTEM_Estim}} when \code{k > 1}, and which takes the same
+#' arguments and returns the same object. Call \code{STEM_Estimation} directly
+#' only to bypass the dispatch; it is the historical interface of the package
+#' and is kept unchanged.
+#'
 #' @param StemModel an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.
 #' @param precision  a small positive number used for the algorithm convergence. Default is equal to 0.01. See \code{DETAILS} below.
 #' @param max.iter maximum number of iterations for the EM algorithm. Default is equal to 50.
@@ -100,7 +107,7 @@
 #'
 #'
 #'
-#' @author Michela Cameletti  < michela.cameletti@unibg.it >
+#' @author Michela Cameletti  < michela.cameletti@unibg.it>
 #'
 #' @references
 #' The model estimated by this function, its EM algorithm and the
