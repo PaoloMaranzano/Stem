@@ -108,7 +108,7 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   phi = phi, K = matrix(1, d, 1))
 
 \donttest{
-fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
 boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 inf <- SCSTEM_BootInference(boot)
 inf
@@ -124,7 +124,7 @@ Efron, B., Tibshirani, R.J. (1993) \emph{An Introduction to the Bootstrap}.
 Chapman and Hall, New York.
 }
 \seealso{
-\code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Estim}}
+\code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Estimation}}
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com}

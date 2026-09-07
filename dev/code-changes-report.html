@@ -163,7 +163,7 @@
 
   <section>
     <h2>Defects in the cluster assignment score</h2>
-    <p class="kicker">SCSTEM_Estim, before 2.0.0</p>
+    <p class="kicker">SCSTEM_Estimation, before 2.0.0</p>
 
     <p class="lede">The score deciding which cluster a location belongs to contained four defects. None produced an error: they silently produced the wrong partition, and therefore the wrong cluster-wise coefficients.</p>
 
@@ -248,8 +248,8 @@
         <tbody>
           <tr>
             <td><code>SCSTEM_Bootstrap</code></td>
-            <td>The arguments of the refits were rebuilt from a settings list stored in the fitted object. When an argument was later removed from <code>SCSTEM_Estim</code>, every draw failed with <em>&ldquo;unused argument&rdquo;</em> &mdash; reported only as a lost replicate, so the bootstrap silently returned nothing usable.</td>
-            <td>The forwarded list is now filtered against <code>formals(SCSTEM_Estim)</code>, and a regression test asserts the invariant.</td>
+            <td>The arguments of the refits were rebuilt from a settings list stored in the fitted object. When an argument was later removed from <code>SCSTEM_Estimation</code>, every draw failed with <em>&ldquo;unused argument&rdquo;</em> &mdash; reported only as a lost replicate, so the bootstrap silently returned nothing usable.</td>
+            <td>The forwarded list is now filtered against <code>formals(SCSTEM_Estimation)</code>, and a regression test asserts the invariant.</td>
           </tr>
           <tr>
             <td><code>STEM_Simulation</code></td>
@@ -299,7 +299,7 @@
     <div class="callout">
       <span class="tag">A property worth knowing</span>
       <p>A test written against the cross-sectional intuition failed, and it was right to: <b>the alternation is not globally monotone</b>. In the STEM measurement equation the spatial covariance couples the locations, so the exact marginal likelihood does not factorize and the assignment score must be a pseudo-likelihood, while the parameter step maximizes the exact within-cluster likelihood. A parameter update can therefore lower the penalized objective while raising the exact likelihood.</p>
-      <p>This is a property of the spatio-temporal specification. The implementation copes by always returning the best partition visited, reporting both <code>best_objective</code> and <code>last_objective</code>; it is documented in <code>?SCSTEM_Estim</code> and in the SC-STEM vignette.</p>
+      <p>This is a property of the spatio-temporal specification. The implementation copes by always returning the best partition visited, reporting both <code>best_objective</code> and <code>last_objective</code>; it is documented in <code>?SCSTEM_Estimation</code> and in the SC-STEM vignette.</p>
     </div>
 
     <h3>The scale of the penalty</h3>
@@ -351,7 +351,7 @@
       <li>the neighbor graph is symmetric with a zero diagonal;</li>
       <li>the ICM sweep is monotone at fixed parameters, and the swap pass preserves cluster sizes;</li>
       <li>estimation leaves the caller's RNG state untouched;</li>
-      <li>the bootstrap is reproducible under a fixed seed, produces usable draws, and forwards only arguments that <code>SCSTEM_Estim</code> accepts.</li>
+      <li>the bootstrap is reproducible under a fixed seed, produces usable draws, and forwards only arguments that <code>SCSTEM_Estimation</code> accepts.</li>
     </ul>
 
     <p>43 assertions, all passing. <code>R CMD check --as-cran</code> reports <code>Status: OK</code> with no errors, warnings or notes.</p>

@@ -98,7 +98,7 @@ Coordinates are longitude and latitude, so every call below uses
 ## Fitting an SC-STEM model
 
 ```{r fit}
-fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = "geo",
                     precision = 0.05)
 fit
 ```
@@ -118,7 +118,7 @@ locations and the exact marginal likelihood does not factorize across them,
 while the parameter step maximizes the exact within-cluster likelihood through
 the EM algorithm. A parameter update can therefore lower $Q$ while raising the
 exact likelihood. This is a property of the spatio-temporal specification, not
-a numerical artefact. To keep the answer well defined, `SCSTEM_Estim()` always
+a numerical artefact. To keep the answer well defined, `SCSTEM_Estimation()` always
 returns the best partition visited, and reports both objectives
 (`best_objective`, `last_objective`).
 

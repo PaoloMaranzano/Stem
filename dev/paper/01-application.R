@@ -103,7 +103,7 @@ sel <- cached("selection", {
 ## SCSTEM_Select() carries the selected fit itself, taken from the grid without
 ## refitting, so there is nothing to look up.
 best <- sel$fit
-stopifnot(inherits(best, "SCSTEM_Estim"))
+stopifnot(inherits(best, "SCSTEM_Estimation"))
 
 ## The bootstrap is the expensive stage, so it can be held back until the
 ## selected configuration has been inspected:

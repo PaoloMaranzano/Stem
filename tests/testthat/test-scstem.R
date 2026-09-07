@@ -1,19 +1,19 @@
 test_that("the pooled SC-STEM fit reproduces STEM_Estimation", {
   mod <- po_model(Tn = 60L)
   pooled <- STEM_Estimation(mod, precision = 0.05, distance = "geo")
-  sc <- SCSTEM_Estim(mod, k = 1, phi_penalty = 0, distance = "geo",
+  sc <- SCSTEM_Estimation(mod, k = 1, phi_penalty = 0, distance = "geo",
                      precision_full_dataset = 0.05)
 
-  expect_s3_class(sc, "SCSTEM_Estim")
+  expect_s3_class(sc, "SCSTEM_Estimation")
   expect_equal(sc$group, rep(1L, ncol(mod$data$z)))
   expect_equal(unname(sc$info_crit[["loglik"]]),
                as.numeric(pooled$estimates$loglik))
 })
 
 
-test_that("SCSTEM_Estim returns an admissible partition and a monotone objective", {
+test_that("SCSTEM_Estimation returns an admissible partition and a monotone objective", {
   mod <- po_model(Tn = 90L)
-  fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   sizes <- tabulate(fit$group, nbins = 3)
@@ -34,7 +34,7 @@ test_that("SCSTEM_Estim returns an admissible partition and a monotone objective
 
 test_that("the returned partition attains the best visited objective", {
   mod <- po_model(Tn = 90L)
-  fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   ### the reported objective must be the maximum seen along the trace, and the
@@ -69,7 +69,7 @@ test_that("the ICM sweep is monotone at fixed parameters", {
 
 test_that("the information criteria use the exact parameter count", {
   mod <- po_model(Tn = 60L)
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   ncov <- ncol(mod$data$covariates)
@@ -89,9 +89,9 @@ test_that("a stronger spatial penalty does not reduce spatial cohesion", {
   mod <- po_model(Tn = 90L)
   nb <- Stem:::scstem_neighbors(mod$data$coordinates, knn = 5)
 
-  f0 <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0, distance = "geo",
+  f0 <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0, distance = "geo",
                      precision = 0.05)
-  f1 <- SCSTEM_Estim(mod, k = 3, phi_penalty = 2, distance = "geo",
+  f1 <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 2, distance = "geo",
                      precision = 0.05)
 
   expect_gte(Stem:::scstem_potts_pairs(f1$group, nb$nb),
@@ -129,7 +129,7 @@ test_that("the estimation does not modify the RNG state of the caller", {
   mod <- po_model(Tn = 45L)
   set.seed(99)
   before <- .Random.seed
-  invisible(SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  invisible(SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                          precision = 0.05, seed = 12345))
   expect_identical(.Random.seed, before)
 })

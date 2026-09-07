@@ -97,7 +97,7 @@ boxes <- rbind(
   box(608, 472, 140, 34, "STEM_Fitted",                   "exported"),
   box(778, 472, 142, 34, "SCSTEM_Fitted",                 "exported", 11.5),
   ## band 4
-  box( 44, 612, 160, 38, "SCSTEM_Estim",                  "exported"),
+  box( 44, 612, 160, 38, "SCSTEM_Estimation",                  "exported"),
   box( 44, 676, 160, 34, "SCSTEM_Infocrit",               "exported"),
   box( 44, 732, 160, 34, "SCSTEM_Select",                 "exported"),
   box( 44, 788, 160, 34, "SCSTEM_Bootstrap",              "exported", 11.5),
@@ -185,7 +185,7 @@ footnotes <- list(
   list(x = 24, y = 856, text = "SCSTEM_Bootstrap regenerates the data regime by regime and re-runs"),
   list(x = 24, y = 872, text = "the whole SC-STEM procedure, clustering included, on every draw."),
   list(x = 470, y = 856, text = "STEM_Fit is the single entry point: it dispatches to STEM_Estimation"),
-  list(x = 470, y = 872, text = "when k = 1 and to SCSTEM_Estim when k > 1, with or without a penalty on beta.")
+  list(x = 470, y = 872, text = "when k = 1 and to SCSTEM_Estimation when k > 1, with or without a penalty on beta.")
 )
 
 ## Labels set along a vertical edge, rotated a quarter turn counterclockwise.

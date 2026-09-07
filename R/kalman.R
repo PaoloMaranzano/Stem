@@ -2,7 +2,7 @@
 #' @noRd
 
 `kalman` <-
-  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL) {
+  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL, lambda_scale = "relative", latent = TRUE, spatial = TRUE) {
 
 
 
@@ -20,6 +20,14 @@
     ### kernel it would otherwise rebuild; checked once rather than per
     ### Newton-Raphson iteration
     cov.spat.takes.E = "E" %in% names(formals(cov.spat))
+
+    ### Switching off the latent process. With K = 0 the state contributes
+    ### nothing to the measurement equation, the filter gain is zero and the
+    ### smoothed states are the prior propagated forward; G, Sigma_eta and m0
+    ### are then unidentified, so they are held at their input values rather
+    ### than updated (see below). This is what reduces the model to a
+    ### regression with a spatially correlated error.
+    if (!latent) phi_j$K = matrix(0, p, d)   # phi_j$K is p x d, see STEM_Estimation
 
     ### The spatial correlation at the parameter values this E-step conditions
     ### on. It enters the measurement covariance, the update of sigma2omega and
@@ -141,6 +149,8 @@
     ###PARAMETER 1: m0=y_0_n
     y_0_n = t(SSmodel$m0) + B0 %*% (t(matrix(mod1.smoother$m[1,],nrow=1))- SSmodel$Gmat %*% t(SSmodel$m0))
     m0_j  = y_0_n
+    ### unidentified without a latent process: held at the input value
+    if (!latent) m0_j = t(phi_j$m0)
 
     ####Q element n.2 (NB: y0_n=m0)
     Q_addendo2 = Q_function_addendo2(C0=phi_j$C0, m_0=m0_j, P_0_n=P_0_n, y_0_n=y_0_n)
@@ -199,6 +209,13 @@
       for (i in 1:p) { G_j[i,i] = num[i,i] / den[i,i]  }
     }
 
+    ### With K = 0 nothing in the data speaks about the latent process, so the
+    ### three parameters that describe it are held where they started instead of
+    ### chasing a likelihood that is flat in them.
+    if (!latent) {
+      Sigmaeta_j = phi_j$Sigmaeta
+      G_j        = phi_j$G
+    }
 
     ###Q element n.3
     Q_addendo3 = Q_function_addendo3(Sigmaeta=Sigmaeta_j, G=G_j, n=n, S11=S11, S00=S00, S10=S10)
@@ -385,6 +402,7 @@
     if(det(MM)  < 10^(-7)) {warning("Error in beta estimation! The matrix can not be inverted!!!!", call. = FALSE)}
     beta_upd = stem_beta_update(M = MM, v = v, alpha = alpha, lambda = lambda,
                                 w = pen_w, beta0 = phi_j$beta,
+                                lambda_scale = lambda_scale,
                                 ridge_reg = regularization)
     beta_j  = matrix(beta_upd$beta, ncol = 1)
     beta_df = beta_upd$df
@@ -394,9 +412,20 @@
     ##exponential spatial covariance function
     ##Newton raphson algorithm
     #############################
+    ### With spatial = FALSE the correlation function is the identity, so the
+    ### range has nothing to estimate and only the SUM of the two variances is
+    ### identified. The Newton-Raphson step is skipped rather than left to
+    ### wander over a flat surface, and the objective it would have recomputed
+    ### is evaluated once here.
     n_iter_NR = 1
     n_iter_Hess.list = c()
-    convergence_NR = FALSE
+    convergence_NR = !spatial
+    if (!spatial) {
+      Q_prev = Q_function_addendo1(sigma2omega = sigma2omega_j, n = n,
+                 Sigmastar = cov.spat(d = d, logb = phi_j$logb,
+                                      logtheta = phi_j$logtheta, dist = dist),
+                 B = BB) + Q_addendo2 + Q_addendo3
+    }
 
     logb     = phi_j$logb
     logtheta = phi_j$logtheta
@@ -597,6 +626,8 @@
                 Q_new  = Q_new,
                 n_iter_NR =  n_iter_NR - 1,
                 beta_df = beta_df,
+                lambda_ref = beta_upd$lambda_ref,
+                lambda_eff = beta_upd$lambda_eff,
                 m.smoother = mod1.smoother$m))
     #m.filter   = mod1.filter$m,
     #c.smoother = mod1.smoother$C,

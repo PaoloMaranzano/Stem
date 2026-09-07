@@ -7,8 +7,8 @@
 SCSTEM_Fitted(SCSTEM)
 }
 \arguments{
-\item{SCSTEM}{an object of class \dQuote{SCSTEM_Estim} returned by
-\code{\link{SCSTEM_Estim}}.}
+\item{SCSTEM}{an object of class \dQuote{SCSTEM_Estimation} returned by
+\code{\link{SCSTEM_Estimation}}.}
 }
 \value{
 A \eqn{T} by \eqn{d} numeric matrix.
@@ -30,7 +30,7 @@ Locations belonging to a regime that could not be re-estimated are returned
 unchanged, that is with their missing entries still missing.
 }
 \seealso{
-\code{\link{STEM_Fitted}}, \code{\link{SCSTEM_Estim}}
+\code{\link{STEM_Fitted}}, \code{\link{SCSTEM_Estimation}}
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com}

@@ -1,14 +1,14 @@
 test_that("the bootstrap refits accept every argument it forwards", {
   ### Regression test. SCSTEM_Bootstrap() rebuilds the argument list of the
   ### refits from the settings stored in the fitted object, so a change in the
-  ### signature of SCSTEM_Estim() used to make every draw fail at run time with
+  ### signature of SCSTEM_Estimation() used to make every draw fail at run time with
   ### an "unused argument" error, which the tryCatch() reported only as a lost
   ### replicate. The forwarded names must be a subset of the formals.
   mod <- po_model(Tn = 45L)
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
   stored <- names(fit$input_args)
-  formals_sc <- names(formals(SCSTEM_Estim))
+  formals_sc <- names(formals(SCSTEM_Estimation))
   ### every stored setting that shares a name with a formal must be passable
   common <- intersect(stored, formals_sc)
   expect_true(length(common) > 10)
@@ -19,7 +19,7 @@ test_that("the parametric bootstrap produces usable draws", {
   skip_on_cran()
 
   mod <- po_model(Tn = 60L)
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
   boot <- SCSTEM_Bootstrap(fit, B = 5, seed = 7)
 
@@ -36,7 +36,7 @@ test_that("the bootstrap is reproducible under a fixed seed", {
   skip_on_cran()
 
   mod <- po_model(Tn = 45L)
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
   b1 <- SCSTEM_Bootstrap(fit, B = 3, seed = 42)
   b2 <- SCSTEM_Bootstrap(fit, B = 3, seed = 42)
@@ -50,7 +50,7 @@ test_that("the bootstrap inference aligns labels and returns coherent intervals"
   skip_on_cran()
 
   mod <- po_model(Tn = 60L)
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
   boot <- SCSTEM_Bootstrap(fit, B = 8, seed = 3)
   inf <- SCSTEM_BootInference(boot)

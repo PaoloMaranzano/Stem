@@ -7,7 +7,7 @@
 #' \tabular{lll}{
 #'   \strong{k} \tab \strong{lambda} \tab \strong{what is fitted} \cr
 #'   \code{1}   \tab \code{0}        \tab the pooled STEM model, \code{\link{STEM_Estimation}} \cr
-#'   \code{> 1} \tab \code{0}        \tab the spatially-clustered model, \code{\link{SCSTEM_Estim}} \cr
+#'   \code{> 1} \tab \code{0}        \tab the spatially-clustered model, \code{\link{SCSTEM_Estimation}} \cr
 #'   \code{1}   \tab \code{> 0}      \tab the pooled model with an elastic net on \eqn{\beta} \cr
 #'   \code{> 1} \tab \code{> 0}      \tab the clustered model with an elastic net on \eqn{\beta} within each regime
 #' }
@@ -63,6 +63,30 @@
 #' and what is still open -- is kept as a standalone document in the repository,
 #' at \code{dev/regularization/stem-elastic-net.tex}, since the material is a
 #' study of its own rather than documentation of the software.
+#'
+#' @section Penalized linear regression as a special case:
+#' Two switches take the model down to an ordinary regression. \code{latent =
+#' FALSE} sets the loading matrix to zero, so the state contributes nothing and
+#' \eqn{G}, \eqn{\Sigma_\eta} and \eqn{m_0}, which are then unidentified, are
+#' held where they started. \code{spatial = FALSE} replaces the exponential
+#' correlation by the identity, so \eqn{\Sigma_e = \sigma^2 I} and the
+#' Newton-Raphson step, which would be estimating a range that has nothing to
+#' estimate, is skipped. What is left is
+#' \deqn{z_{ti} = x_{ti}'\beta + e_{ti}, \qquad e \sim N(0, \sigma^2 I),}
+#' estimated by penalized least squares. Set \code{regularization = 0} as well
+#' -- the small ridge the package adds for conditioning is otherwise the only
+#' thing separating the two, and on a collinear design it is not negligible.
+#'
+#' \preformatted{
+#'   fit <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3,
+#'                   latent = FALSE, spatial = FALSE, regularization = 0)
+#' }
+#'
+#' On a design with a deliberately collinear pair this agrees with the
+#' elastic net computed directly on \eqn{X'X} and \eqn{X'y} to between
+#' \eqn{10^{-14}} and \eqn{10^{-11}}, for the ridge, the lasso, the elastic net
+#' and the unpenalized case alike. With \code{k > 1} the same switches give
+#' clusterwise penalized regression, the partition still estimated.
 #'
 #' @section How the penalty and the clustering interact:
 #' With \code{k > 1} the objective carries two penalties doing different things:
@@ -121,22 +145,39 @@
 #' @param penalize which coefficients the penalty acts on: a logical vector of
 #'   length \eqn{r}, an index vector, or \code{NULL} (the default) for every
 #'   coefficient except the intercept.
+#' @param lambda_scale how \code{lambda} is measured. \dQuote{relative}, the
+#'   default, puts the L1 part of the penalty on the scale of the largest
+#'   partial gradient, so \code{lambda} is free of the units of the response and
+#'   \code{lambda * alpha >= 1} zeroes every penalized coefficient, as in
+#'   \code{glmnet}. \dQuote{absolute} applies it to the scaled normal equations
+#'   directly. The L2 part is unaffected either way: it multiplies a curvature
+#'   whose diagonal the internal scaling has already set to one, so a ridge is
+#'   scale free by construction and rescaling it would only break that.
+#' @param lambda_by how the penalty is spread over the regimes when
+#'   \code{k > 1}: \dQuote{common} (the default) or \dQuote{size}. See
+#'   \code{\link{SCSTEM_Estimation}}. Both keep \code{lambda} a single
+#'   hyperparameter.
+#' @param latent logical. \code{FALSE} switches the latent process off.
+#' @param spatial logical. \code{FALSE} replaces the exponential correlation by
+#'   the identity. Together with \code{latent = FALSE} and
+#'   \code{regularization = 0} this reduces the model exactly to penalized
+#'   linear regression -- see the section below.
 #' @param phi_penalty the strength of the Potts penalty on the partition, passed
-#'   to \code{\link{SCSTEM_Estim}}. Ignored when \code{k = 1}.
+#'   to \code{\link{SCSTEM_Estimation}}. Ignored when \code{k = 1}.
 #' @param distance \dQuote{geo} or \dQuote{euclidean}. Default is
 #'   \dQuote{euclidean} for the pooled model and \dQuote{geo} for the clustered
 #'   one, which are the defaults of the two functions being called.
 #' @param verbose logical, passed on.
 #' @param ... further arguments passed to \code{\link{STEM_Estimation}} when
-#'   \code{k = 1} and to \code{\link{SCSTEM_Estim}} when \code{k > 1}.
+#'   \code{k = 1} and to \code{\link{SCSTEM_Estimation}} when \code{k > 1}.
 #'
 #' @return The object the underlying function returns: of class
-#'   \dQuote{STEM_Model} when \code{k = 1}, of class \dQuote{SCSTEM_Estim} when
+#'   \dQuote{STEM_Model} when \code{k = 1}, of class \dQuote{SCSTEM_Estimation} when
 #'   \code{k > 1}. In both cases the penalty in force and the effective number
 #'   of coefficients are recorded, under \code{estimates$penalty} and inside
 #'   each regime's fit respectively.
 #'
-#' @seealso \code{\link{STEM_Estimation}}, \code{\link{SCSTEM_Estim}},
+#' @seealso \code{\link{STEM_Estimation}}, \code{\link{SCSTEM_Estimation}},
 #'   \code{\link{SCSTEM_Infocrit}}, \code{\link{SCSTEM_Select}}
 #'
 #' @references
@@ -178,11 +219,16 @@
 #'
 #' @export
 STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
+                     lambda_scale = c("relative", "absolute"),
+                     lambda_by = c("common", "size"),
+                     latent = TRUE, spatial = TRUE,
                      phi_penalty = 1, distance = NULL, verbose = FALSE, ...) {
 
   if (!inherits(StemModel, "STEM_Model")) {
     stop("'StemModel' must be an object of class 'STEM_Model'.", call. = FALSE)
   }
+  lambda_scale <- match.arg(lambda_scale)
+  lambda_by <- match.arg(lambda_by)
   k <- as.integer(k)
   if (length(k) != 1L || is.na(k) || k < 1L) {
     stop("'k' must be a single integer of at least one.", call. = FALSE)
@@ -196,14 +242,18 @@ STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
 
   if (k == 1L) {
     args <- list(StemModel = StemModel, alpha = alpha, lambda = lambda,
-                 penalize = penalize, verbose = verbose, ...)
+                 lambda_scale = lambda_scale,
+                 penalize = penalize, latent = latent, spatial = spatial,
+                 verbose = verbose, ...)
     if (!is.null(distance)) args$distance <- distance
     return(do.call(STEM_Estimation, args))
   }
 
   args <- list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
+               lambda_scale = lambda_scale, lambda_by = lambda_by,
                alpha = alpha, lambda = lambda, penalize = penalize,
+               latent = latent, spatial = spatial,
                verbose = verbose, ...)
   if (!is.null(distance)) args$distance <- distance
-  do.call(SCSTEM_Estim, args)
+  do.call(SCSTEM_Estimation, args)
 }

@@ -33,13 +33,13 @@ crossing the picture, are named here but do not get a box of their own.
 |---|---|
 | Data | `pm10`, `povalley` |
 | Model object | `STEM_Model`*, `STEM_Skeleton`, `STEM_Data`, `is.STEM_*` |
-| Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `B_function`, `cov_lagone`, `changedimension_covariates` |
+| Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `Sigmastar.nugget`, `B_function`, `cov_lagone`, `changedimension_covariates` |
 | Entry point | `STEM_Fit`* |
 | Missing-data bookkeeping | `stem_obs_index`, `stem_blocks_cache`, `stem_missing_blocks` |
 | Structured linear algebra | `stem_xprod`, `stem_xtrace` |
-| Regularization | `stem_beta_update`, `stem_soft`, `stem_penalized_index` |
+| Regularization | `stem_beta_update`, `stem_soft`, `stem_penalized_index`, `stem_lambda_ref` |
 | Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Fitted`*, `SCSTEM_Fitted`*, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
-| Spatially-clustered STEM | `SCSTEM_Estim`*, `SCSTEM_Infocrit`*, `SCSTEM_Select`*, `SCSTEM_Bootstrap`*, `SCSTEM_BootInference`*, and the `scstem_*` helpers |
+| Spatially-clustered STEM | `SCSTEM_Estimation`*, `SCSTEM_Infocrit`*, `SCSTEM_Select`*, `SCSTEM_Bootstrap`*, `SCSTEM_BootInference`*, and the `scstem_*` helpers |
 
 ## Edges
 
@@ -48,7 +48,7 @@ STEM_Model               -> STEM_Skeleton
 STEM_Model               -> STEM_Data
 
 STEM_Fit                 -> STEM_Estimation            [when k = 1]
-STEM_Fit                 -> SCSTEM_Estim               [when k > 1]
+STEM_Fit                 -> SCSTEM_Estimation               [when k > 1]
 
 STEM_Estimation          -> kalman
 STEM_Estimation          -> changedimension_covariates
@@ -81,6 +81,7 @@ d12_Q                    -> stem_xprod
 kalman                   -> stem_penalized_index
 kalman                   -> stem_beta_update
 stem_beta_update         -> stem_soft
+stem_beta_update         -> stem_lambda_ref
 
 STEM_Simulation          -> changedimension_covariates
 STEM_Simulation          -> Sigmastar.exp
@@ -95,26 +96,26 @@ STEM_Bootstrap           -> STEM_Bootstrap.fn          [indirect, via lapply]
 STEM_Bootstrap.fn        -> STEM_Simulation
 STEM_Bootstrap.fn        -> STEM_Estimation
 
-SCSTEM_Estim             -> STEM_Model
-SCSTEM_Estim             -> STEM_Estimation
-SCSTEM_Estim             -> scstem_neighbors
-SCSTEM_Estim             -> scstem_covariate_means
-SCSTEM_Estim             -> scstem_init
-SCSTEM_Estim             -> scstem_repair_partition
-SCSTEM_Estim             -> scstem_loglike_i
-SCSTEM_Estim             -> scstem_potts_pairs
-SCSTEM_Estim             -> scstem_swap_pass
-SCSTEM_Estim             -> scstem_npar
-SCSTEM_Estim             -> scstem_rows
-SCSTEM_Estim             -> scstem_with_seed
+SCSTEM_Estimation             -> STEM_Model
+SCSTEM_Estimation             -> STEM_Estimation
+SCSTEM_Estimation             -> scstem_neighbors
+SCSTEM_Estimation             -> scstem_covariate_means
+SCSTEM_Estimation             -> scstem_init
+SCSTEM_Estimation             -> scstem_repair_partition
+SCSTEM_Estimation             -> scstem_loglike_i
+SCSTEM_Estimation             -> scstem_potts_pairs
+SCSTEM_Estimation             -> scstem_swap_pass
+SCSTEM_Estimation             -> scstem_npar
+SCSTEM_Estimation             -> scstem_rows
+SCSTEM_Estimation             -> scstem_with_seed
 scstem_init              -> scstem_repair_partition
 scstem_swap_pass         -> scstem_pen_local
 
-SCSTEM_Infocrit          -> SCSTEM_Estim
+SCSTEM_Infocrit          -> SCSTEM_Estimation
 SCSTEM_Select            -> scstem_ari
 SCSTEM_Bootstrap         -> STEM_Model
 SCSTEM_Bootstrap         -> STEM_Simulation
-SCSTEM_Bootstrap         -> SCSTEM_Estim               [indirect, via do.call]
+SCSTEM_Bootstrap         -> SCSTEM_Estimation               [indirect, via do.call]
 SCSTEM_Bootstrap         -> scstem_with_seed
 SCSTEM_BootInference     -> scstem_align_labels
 SCSTEM_BootInference     -> scstem_ari
@@ -124,7 +125,7 @@ SCSTEM_BootInference     -> scstem_ari
 
 Three things are worth noticing.
 
-1. **The SC-STEM layer is a client of the STEM layer.** `SCSTEM_Estim()` does
+1. **The SC-STEM layer is a client of the STEM layer.** `SCSTEM_Estimation()` does
    not reimplement the estimation: it builds one `STEM_Model` per regime and
    calls `STEM_Estimation()` on it. Anything that improves the engine improves
    the clustered models for free - and, conversely, any fragility of the engine

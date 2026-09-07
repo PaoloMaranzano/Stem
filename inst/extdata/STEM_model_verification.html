@@ -204,7 +204,7 @@ Gamma(h) = |                              gamma = sigma2eps / sigma2omega
     <div class="callout">
       <span class="tag">In the code</span>
       <p><code>Sigmastar.exp(d, logb, logtheta, dist)</code> returns <code>Gamma</code> as <code>diag(exp(logb), d) + exp(-exp(logtheta) * dist)</code>. The diagonal is <code>exp(logb) + 1 = 1 + gamma</code> and the off-diagonal is <code>C_theta(h)</code>, matching the definition exactly. Everywhere the full <code>Sigma_e</code> is needed, the code multiplies this by <code>sigma2omega</code>.</p>
-      <p>A useful consequence for the clustered layer: the marginal variance of a single observation is <code>Sigma_e[i,i] = sigma2omega * (1 + gamma) = sigma2omega + sigma2eps</code>, which is the variance used by the per-location contribution in <code>SCSTEM_Estim</code>.</p>
+      <p>A useful consequence for the clustered layer: the marginal variance of a single observation is <code>Sigma_e[i,i] = sigma2omega * (1 + gamma) = sigma2omega + sigma2eps</code>, which is the variance used by the per-location contribution in <code>SCSTEM_Estimation</code>.</p>
     </div>
   </section>
 
@@ -359,7 +359,7 @@ Omega has elements Cov[z(s_i,t), u(s_0,t)] = sigma2omega * C_theta(||s_i - s_0||
       <li><code>STEM_Estimation</code> is the outer EM loop and the convergence test; <code>kalman</code> is one full E-step plus M-step.</li>
       <li>Inside <code>kalman</code>: <code>filtering</code> and <code>smoothing</code> for the recursions, <code>Q_function_addendo1/2/3</code> for the three pieces of the objective, the <code>d1_*</code>/<code>d2_*</code> family for the Newton-Raphson step.</li>
       <li><code>vignette("function-map", package = "Stem")</code> shows how these call one another.</li>
-      <li>The spatially-clustered layer sits on top and is documented separately, in <code>?SCSTEM_Estim</code> and <code>vignette("SCSTEM", package = "Stem")</code>.</li>
+      <li>The spatially-clustered layer sits on top and is documented separately, in <code>?SCSTEM_Estimation</code> and <code>vignette("SCSTEM", package = "Stem")</code>.</li>
     </ul>
 
     <p>A note on notation, worth keeping in mind when reading the sources: the papers use <code>n</code> for the number of locations and <code>T</code> for the number of time points, whereas the code uses <code>n</code> for time points and <code>d</code> for locations. The formulas are the same; only the letters differ.</p>

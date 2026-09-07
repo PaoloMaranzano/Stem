@@ -1,10 +1,23 @@
 % ---------------------------------------------------------------------------
-% Regularized estimation of the regression coefficients in spatio-temporal
-% state-space models with spatial regimes.
+% CLUSTER-SPECIFIC ELASTIC NET FOR SPATIO-TEMPORAL STATE-SPACE MODELS
 %
-% This is NOT part of the SC-STEM package paper. It is a self-contained draft of
-% the theory behind STEM_Fit(alpha, lambda), kept in the repository because the
-% material is a paper of its own and does not belong in the software paper.
+% This is the draft of the SECOND paper, and is NOT part of the SC-STEM package
+% paper for Metron. The division of labour between the two is deliberate:
+%
+%   paper 1 (Metron, in preparation)  SC-STEM, plus a POOLED RIDGE in closed
+%                                     form on the regression coefficients, to
+%                                     correct the collinearity of spatio-
+%                                     temporal covariates. One hyperparameter
+%                                     lambda, common to the regimes.
+%
+%   paper 2 (this document)           the full elastic net, CLUSTER-SPECIFIC
+%                                     (alpha_g, lambda_g), with penalised
+%                                     linear regression recovered as a special
+%                                     case. Intended co-authors: Raffaele
+%                                     Mattera and Shonosuke Sugasawa;
+%                                     authorship to confirm.
+%
+% The software implements all of it. What the first paper reports is a subset.
 %
 % Compile with pdflatex; it depends only on amsmath, amssymb, booktabs, natbib.
 % ---------------------------------------------------------------------------
@@ -12,6 +25,7 @@
 \usepackage[margin=3cm]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
+\usepackage{enumitem}
 \usepackage[round]{natbib}
 \usepackage{hyperref}
 
@@ -23,28 +37,45 @@
 \newcommand{\Sig}{\Sigma}
 \newcommand{\Se}{\Sig_{e}}
 
-\title{Regularized regression coefficients in spatio-temporal\\
+\title{Cluster-specific elastic net for spatio-temporal\\
        state-space models with spatial regimes}
-\author{Draft --- not for circulation}
+\author{Draft --- authorship to confirm\\[2pt]
+        \small intended: P. Maranzano, R. Mattera, S. Sugasawa}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-We add an elastic-net penalty on the regression coefficients of a hierarchical
-spatio-temporal state-space model estimated by EM, and of its
-spatially-clustered extension. The penalty leaves the E-step untouched, so the
+We add a \emph{cluster-specific} elastic-net penalty on the regression
+coefficients of a hierarchical spatio-temporal state-space model with spatial
+regimes, estimated by EM. The penalty leaves the E-step untouched, so the
 algorithm remains an EM on the penalized observed-data likelihood; the M-step
 for the coefficients keeps a closed form under a ridge and is solved exactly by
-coordinate descent otherwise. Two features distinguish the problem from the
+coordinate descent otherwise. Three features distinguish the problem from the
 usual regularized regression. First, the relevant cross-product is a
 generalized least squares one, carrying the inverse of an estimated spatial
 covariance, so the scaling that makes the penalty comparable across covariates
-is not the Euclidean standardization. Second, in the clustered model the
-penalty operates within regimes whose size is itself a constraint of the
-procedure, which is exactly where collinearity binds.
+is not the Euclidean standardization, and the response scale has to be removed
+from one half of the penalty and not the other. Second, the penalty operates
+within regimes whose size is itself a constraint of the procedure, which is
+exactly where collinearity binds, and letting $(\alpha_g,\lambda_g)$ vary with
+the regime turns the amount of shrinkage into something the data decide rather
+than something imposed. Third, the four hyperparameters of the procedure ---
+the number of regimes, the spatial penalty, and the two of the elastic net ---
+are not separable, and we give the analysis of what depends on what. Penalized
+linear regression is recovered as a special case by switching off the latent
+process and the spatial correlation.
 \end{abstract}
+
+\paragraph{Relation to the companion paper.} The software paper that introduces
+the SC-STEM family uses a strict subset of what follows: a \emph{pooled ridge},
+$\alpha = 0$ and a single $\lambda$ common to the regimes, in the closed form
+of Section~\ref{sec:mstep}, whose purpose there is to correct the collinearity
+of the spatio-temporal covariates in an empirical application. Everything that
+is specific to this paper --- the $L_1$ part, the cluster-specific penalty, the
+special case of Section~\ref{sec:lm} and the analysis of
+Section~\ref{sec:order} --- is developed here and not there.
 
 \section{Motivation}
 
@@ -170,7 +201,7 @@ conditional modes, and the procedure is not globally monotone for reasons
 unrelated to the penalty.
 \end{remark}
 
-\section{The M-step for the coefficients}
+\section{The M-step for the coefficients}\label{sec:mstep}
 
 Conditionally on the other blocks, the part of $Q$ that involves $\beta$ is
 \begin{equation}
@@ -258,6 +289,64 @@ iterations is the geometry in which a fixed $\lambda$ acts, and this is the
 price of applying a penalty inside an algorithm that also estimates the metric.
 \end{remark}
 
+\subsection{The second scale, which applies to one half of the penalty}
+\label{sec:scale2}
+
+Removing the units of the covariates is not enough, and it is instructive that
+the two halves of the elastic net need different treatment.
+
+After the scaling of Section~\ref{sec:metric} the diagonal of $\tilde M$ is one,
+so in the orthogonal case $\tilde M = I$ the ridge solution is
+$\tilde\beta_j = \tilde v_j / (1+\lambda)$: the coefficient is multiplied by
+$1/(1+\lambda)$ whatever the units of the response. Formally, replacing $z$ by
+$cz$ sends $v \mapsto cv$ with $M$ and hence $S$ unchanged, so
+$\tilde\beta \mapsto c\tilde\beta$ and $\beta \mapsto c\beta$, as it must;
+replacing $\Se$ by $\sigma^2\Se$ sends $M \mapsto M/\sigma^2$,
+$v \mapsto v/\sigma^2$, $s \mapsto s/\sigma$, hence $\tilde M$ unchanged,
+$\tilde v \mapsto \tilde v/\sigma$, $\tilde\beta \mapsto \tilde\beta/\sigma$
+and $\beta = S^{-1}\tilde\beta$ unchanged. \textbf{The $L_2$ part is already
+free of the scale of the response.}
+
+The $L_1$ part is not. Its parameter is a \emph{threshold} compared with the
+gradient $\tilde v$, which carries those units: under
+$\Se \mapsto \sigma^2\Se$ the soft-thresholding
+$\mathcal{S}(\tilde v_j, \lambda\alpha)$ becomes
+$\mathcal{S}(\tilde v_j/\sigma, \lambda\alpha)$, which is not
+$\mathcal{S}(\tilde v_j, \lambda\alpha)/\sigma$. The same $\lambda$ therefore
+means different things at different error variances and, in the clustered
+model, in different regimes --- precisely what one does not want from a
+hyperparameter that is to be shared.
+
+The fix is to measure the $L_1$ part, and only it, against
+\begin{equation}
+  \lambda_{\mathrm{ref}} =
+  \max_{j:\,w_j=1}\Bigl| \tilde v_j
+    - \sum_{l:\,w_l=0} \tilde M_{jl}\,\tilde\beta_l^{\,0} \Bigr| ,
+  \label{eq:lref}
+\end{equation}
+the largest partial gradient once the unpenalized coordinates have been
+profiled out, $\tilde\beta^{\,0}$ being their conditional least squares
+solution at $\tilde\beta_{\mathrm{pen}} = 0$. The M-step then applies
+\begin{equation}
+  \tau_j = \lambda\,\alpha\,\lambda_{\mathrm{ref}}\, w_j
+  \quad\text{(threshold)}, \qquad
+  \kappa_j = \lambda\,(1-\alpha)\, w_j
+  \quad\text{(curvature)} .
+  \label{eq:twoscales}
+\end{equation}
+Under \eqref{eq:twoscales} the estimator is invariant to the units of the
+response for every $\alpha$, every penalized coefficient is exactly zero as
+soon as $\lambda\alpha \ge 1$, and $\lambda \in (0,1]$ traverses the whole path
+at $\alpha = 1$ --- the convention of \citet{Friedman2010}.
+
+\begin{remark}
+Scaling \emph{both} halves by $\lambda_{\mathrm{ref}}$, which is the obvious
+thing to do and the first thing we did, breaks the ridge to fix the lasso: it
+makes $\hat\beta(\lambda)$ depend on the error variance in a case where it need
+not. On a design with a collinear pair the damage is of the order of
+$10^{-1}$ in the coefficients, which is not small.
+\end{remark}
+
 \section{Effective degrees of freedom and the information criteria}
 
 The information criteria used to select $k$ and the Potts penalty count free
@@ -298,10 +387,159 @@ estimate. Using the penalized objective in its place would double-count the
 penalty, once through the objective and once through the degrees of freedom.
 \end{remark}
 
-\section{Choosing $\lambda$ and $\alpha$}
+\section{Which step comes first: the four hyperparameters}
+\label{sec:order}
 
-$(\lambda,\alpha)$ join $(k,\varphi)$ as hyperparameters and are selected the
-same way. Two routes are available and they do not agree in general.
+The procedure carries four quantities that are not estimated but chosen: the
+number of regimes $k$, the strength $\varphi$ of the spatial penalty on the
+partition, and the two of the elastic net. A natural question, and the one
+practitioners ask first, is whether they can be selected in sequence --- fix
+$(\alpha,\lambda)$ on the pooled fit, then look for $(k,\varphi)$, or the
+reverse. They cannot, and this section says exactly why.
+
+\subsection{The objective, and where each hyperparameter enters}
+
+Write $g = (g_1,\dots,g_d)$ for the labels, $\mathcal{E}$ for the edge set of
+the neighbourhood graph and $\ell_i(h;\Psi_h)$ for the contribution of location
+$i$ under the parameters of regime $h$. The objective is
+\begin{equation}
+  \mathcal{Q}(g,\Psi;\, k,\varphi,\alpha,\lambda)
+  = \underbrace{\sum_{i=1}^{d}\ell_i(g_i;\Psi_{g_i})}_{\text{fit}}
+  + \underbrace{\varphi\,c\!\!\sum_{(i,j)\in\mathcal{E}}\!\!
+      \mathbb{1}\{g_i=g_j\}}_{\text{Potts}}
+  - \underbrace{\sum_{h=1}^{k}\pi_{\alpha,\lambda}(\beta_h)}_{\text{elastic net}} .
+  \label{eq:objall}
+\end{equation}
+Three of the four are penalty weights inside \eqref{eq:objall} and change the
+estimate; $k$ is the dimension of the model. The two penalties act on different
+arguments, and that asymmetry is the whole content of the answer.
+
+\begin{proposition}[The elastic net leaves the label step formally unchanged]
+\label{prop:labels}
+At fixed $\Psi$, the map $g \mapsto \mathcal{Q}(g,\Psi)$ differs from the
+unpenalized one by the constant $\sum_h \pi_{\alpha,\lambda}(\beta_h)$. The
+maximizer over $g$, and therefore the ICM update
+\[
+  g_i \;\leftarrow\;
+  \argmax_{h} \Bigl\{ \ell_i(h;\Psi_h)
+    + \varphi\,c \!\!\sum_{j \in \mathcal{N}(i)}\!\! \mathbb{1}\{h = g_j\} \Bigr\},
+\]
+is unaffected.
+\end{proposition}
+\begin{proof}
+Moving location $i$ from regime $h$ to regime $h'$ changes neither $\beta_h$
+nor $\beta_{h'}$, which are held fixed in the label step, so the third term of
+\eqref{eq:objall} is invariant and drops out of the arg-max.
+\end{proof}
+
+The penalty therefore reaches the partition only \emph{through} $\Psi$: the
+labels are scored against shrunken coefficients. That is not a small channel.
+Shrinkage moves every $\beta_h$ towards the same point, so the spread of
+$\ell_i(\cdot)$ across regimes narrows, and with it the evidence any single
+location carries about its own label.
+
+\subsection{Three couplings, in the direction they act}
+
+\paragraph{$\lambda$ depends on $k$.} At the optimum of predictive risk the
+ridge parameter balances squared bias against variance. For a regime of $n_h$
+locations the relevant information is $M_h = O(n_h T)$, so with $k$ balanced
+regimes $M_h = O(dT/k)$ and, in the classical fixed-design expansion, the
+risk-minimizing $\lambda$ satisfies
+\begin{equation}
+  \lambda^\star \;\asymp\;
+  \frac{r\,\sigma^2}{\|\beta\|^2}\; \asymp\; \frac{1}{n_h}
+  \;\asymp\; \frac{k}{d} .
+  \label{eq:lamk}
+\end{equation}
+The optimal shrinkage \emph{grows} with $k$, and it does so at rate $k$. A
+$\lambda$ calibrated on the pooled network is therefore too small by a factor
+of about $k$ for the regimes it will be used in: it under-shrinks precisely
+where shrinkage is needed.
+
+\paragraph{$k$ depends on $\lambda$.} The criterion that selects $k$ charges
+$\mathrm{df}(\lambda)$ per regime rather than $r$. From
+\eqref{eq:dfridge}, $\mathrm{df}$ is decreasing in $\lambda$, so the marginal
+cost of an extra regime,
+\begin{equation}
+  \Delta_k \;=\; \log(N)\bigl\{ \mathrm{df}(\lambda) + q \bigr\},
+  \label{eq:margk}
+\end{equation}
+with $q$ the number of parameters of a regime other than the coefficients, is
+\emph{decreasing} in $\lambda$ as well. Shrinkage makes an additional regime
+cheaper and pushes the selected $k$ up. The two dependencies therefore run in
+opposite directions and neither can be resolved without the other.
+
+\paragraph{$\varphi$ depends on $\lambda$, through the calibration of its
+scale.} The multiplier $c$ in \eqref{eq:objall} exists because
+$\sum_i \ell_i$ and the count of concordant pairs are not on the same scale.
+Calibrating it from the data, as the implementation does by default, sets
+\begin{equation}
+  \hat c \;=\;
+  \frac{\mathrm{med}_i\bigl\{ \max_h \ell_i(h) - \min_h \ell_i(h) \bigr\}}
+       {\overline{|\mathcal{N}|}} ,
+  \label{eq:cscale}
+\end{equation}
+the typical gain from picking the best-fitting regime, per neighbour. By the
+remark above the numerator is decreasing in $\lambda$, so $\hat c$ is too: a
+\emph{fixed} $\varphi$ buys less spatial smoothing at a larger $\lambda$. Two
+points of a grid indexed by $(\varphi,\lambda)$ are therefore not comparable in
+$\varphi$ unless $c$ is held at a constant, which is what the \texttt{raw}
+scaling of the implementation does.
+
+\subsection{What follows for the search}
+
+\begin{description}[leftmargin=1.2em,itemsep=3pt,topsep=3pt]
+  \item[\textbf{Joint.}] Traverse the full grid
+    $(k,\varphi,\alpha,\lambda)$ and select on it. Correct, and the cost is the
+    product of the four grid sizes.
+  \item[\textbf{Profiled, and what we recommend.}] For each $(k,\varphi)$,
+    select $(\alpha,\lambda)$; then compare the $(k,\varphi)$ configurations
+    \emph{each at its own} $(\hat\alpha,\hat\lambda)$. The cost is the same as
+    the joint search, but the \emph{rule} is applied hierarchically, which
+    matters because the rule for $\varphi$ is not a criterion at all: the Potts
+    partition function $Z(\varphi,k)$ is intractable, and omitting it inverts
+    the sign of the comparison, so $\varphi$ is settled by a stability argument
+    on the partition rather than by an information criterion. The
+    $(\alpha,\lambda)$ surface is flat relative to the $k$ surface, so a coarse
+    inner grid --- $\alpha \in \{0,\tfrac12,1\}$ and $\lambda$ on a logarithmic
+    scale --- suffices.
+  \item[\textbf{Sequential, and why not.}] Fixing $(\alpha,\lambda)$ on the
+    pooled fit and only then searching $(k,\varphi)$ is cheap and wrong in the
+    specific direction of \eqref{eq:lamk}: it applies the shrinkage appropriate
+    to $d$ locations inside regimes of $d/k$.
+\end{description}
+
+\subsection{Which likelihood the criterion sees}
+
+One point deserves stating on its own, because the natural guess is the wrong
+one. It is tempting to select $(k,\varphi)$ on the objective
+\eqref{eq:objall} \emph{including} the elastic-net term --- the penalized
+likelihood, augmented by the regularization. That double-counts. The effect of
+the penalty on the flexibility of the fit is already carried by
+$\mathrm{df}(\lambda,\alpha)$ in
+\eqref{eq:dfridge}--\eqref{eq:dfen}; subtracting $\pi_{\alpha,\lambda}$ from
+the log-likelihood as well charges for it twice, once through the objective and
+once through the dimension. The construction that is consistent with
+\citet{ZouHastieTibshirani2007} is
+\begin{equation}
+  \mathrm{IC} = -2\,\hat\ell\bigl(\hat\Psi(\lambda,\alpha)\bigr)
+    + \mathrm{pen}(N)\Bigl\{ \textstyle\sum_h \mathrm{df}_h(\lambda,\alpha) + kq \Bigr\},
+  \label{eq:icfinal}
+\end{equation}
+with $\hat\ell$ the \emph{unpenalized} log-likelihood evaluated at the
+\emph{penalized} estimate.
+
+The coherent alternative is Bayesian: read $\pi_{\alpha,\lambda}$ as a prior ---
+Gaussian for the ridge, Laplace for the lasso --- and select on the marginal
+likelihood. That requires the normalizing constant of the prior, which for
+those two is available in closed form. It is not available for the Potts term,
+whose constant $Z(\varphi,k)$ is the intractable one, so a procedure that
+marginalized over $\beta$ while conditioning on $\varphi$ would be applying two
+different logics to two penalties of the same objective. We do not pursue it.
+
+\section{Choosing $\lambda$ and $\alpha$ in practice}
+
+Two routes are available and they do not agree in general.
 
 \paragraph{Information criteria.} Cheap, since the grid is already being
 traversed for $(k,\varphi)$, and consistent with the rest of the selection
@@ -350,10 +588,48 @@ the clustered case.
 
 \paragraph{A common $\lambda$ across regimes is meaningful only after scaling.}
 Regimes differ in size and in error covariance, so $M_g$ differs in magnitude
-between them. The scaling of Section~\ref{sec:metric} is what makes a single
-$(\lambda,\alpha)$ interpretable across the partition; without it the penalty
-would bind hardest on the smallest regime for a reason that has nothing to do
-with its collinearity.
+between them. The scalings of Sections~\ref{sec:metric} and \ref{sec:scale2}
+are what make a single $(\lambda,\alpha)$ interpretable across the partition;
+without them the penalty would bind hardest on the smallest regime for a reason
+that has nothing to do with its collinearity.
+
+\subsection{Pooled, size-scaled, or genuinely cluster-specific}
+\label{sec:pooled}
+
+Three regimes of increasing flexibility have to be distinguished, and the
+companion paper and this one sit at opposite ends of the range.
+
+\begin{description}[leftmargin=1.2em,itemsep=3pt,topsep=3pt]
+  \item[\textbf{Pooled.}] One $(\alpha,\lambda)$ for the whole partition. Under
+    the scalings above this already means the same \emph{proportional}
+    shrinkage in every regime, because $\lambda_{\mathrm{ref}}$ in
+    \eqref{eq:lref} is computed inside each regime and therefore carries its own
+    information: a regime with half the locations has a proportionally smaller
+    reference, and the same $\lambda$ buys the same fraction of the path. This
+    is the configuration of the companion paper, and it has the decisive
+    practical advantage of adding \emph{one} number to a selection problem that
+    already has three.
+  \item[\textbf{Size-scaled.}] $\lambda_g = \lambda\,\bar n / n_g$ with
+    $\bar n = d/k$. Still one hyperparameter, but the shrinkage is deliberately
+    made stronger in the small regimes, on the argument that their coefficients
+    are noisier than proportionality alone accounts for --- which is what
+    \eqref{eq:lamk} says, with $n_h$ in place of $d/k$. This is the natural
+    middle term and is what we would try first.
+  \item[\textbf{Cluster-specific.}] $(\alpha_g,\lambda_g)$ free in every regime.
+    This is the object of the present paper, and it is not a small step: the
+    grid grows as $|\Lambda|^k$, the per-regime selection is unstable when
+    $n_g$ is small, and comparability breaks, since a regime can improve its
+    own fit by choosing less shrinkage. What makes it worth the trouble is that
+    the amount of regularization a regime needs is a feature of that regime ---
+    a dense urban sub-network and a sparse rural one do not have the same
+    collinearity --- so forcing one $\lambda$ on both is a restriction, and one
+    that the data can speak about.
+\end{description}
+
+The open questions are which of the three the selection can actually support at
+realistic $(d, T, k)$, and whether a hierarchical formulation --- $\lambda_g$
+drawn around a common $\lambda$, with one variance to select rather than $k$
+values --- recovers most of the flexibility at the cost of the pooled version.
 
 \paragraph{The penalty interacts with the minimum regime size.} The lower bound
 on $n_g$ exists because a regime must support its own parameters. A penalty
@@ -373,6 +649,52 @@ smallness of the regimes rather than the collinearity of the covariates, it
 couples the M-steps of different regimes, and it makes the number of distinct
 coefficient vectors an outcome of the fit rather than a choice. It is a
 different paper.
+
+\section{Penalized linear regression as a special case}
+\label{sec:lm}
+
+The construction contains the ordinary elastic net, and it is worth saying
+exactly how, both because it fixes the interpretation of $\lambda$ and because
+it is the check the implementation can be held to.
+
+Two components have to be switched off. Setting $K = 0$ in \eqref{eq:meas}
+removes the latent process: the filter gain is zero, the smoothed states are
+the prior propagated forward, and $G$, $\Sigma_\eta$ and $m_0$ are
+unidentified, so they are held fixed rather than updated. Replacing
+$C(h;\theta)$ by the identity in \eqref{eq:cov} removes the spatial
+correlation, leaving $\Se = \sigma^2 I_d$ with $\sigma^2 = \sigma^2_\varepsilon
++ \sigma^2_\omega$ the only identified combination, and the Newton--Raphson
+step, which would be estimating a range that has nothing to estimate, is
+skipped. What remains is
+\begin{equation}
+  z_{ti} = x_{ti}'\beta + e_{ti},
+  \qquad e \sim N(0, \sigma^2 I),
+  \label{eq:lm}
+\end{equation}
+and the M-step \eqref{eq:Mv} becomes $M = X'X/\sigma^2$, $v = X'z/\sigma^2$.
+
+The factor $\sigma^{-2}$ cancels: it divides $M$ and $v$ alike, and both
+scalings of Sections~\ref{sec:metric} and \ref{sec:scale2} are invariant to it.
+The estimator is therefore \emph{exactly} the elastic net on $X$ and $z$, and
+the EM converges in one M-step for $\beta$ given $\sigma^2$.
+
+\begin{remark}
+One detail decides whether the agreement is exact or merely close. The
+implementation adds a small ridge to the diagonal of every matrix it inverts,
+for conditioning; on a design with a collinear pair that ridge is comparable
+with the smallest eigenvalue of $X'X$ in the offending direction, and it moves
+the coefficients by an amount of order $10^{-2}$. Setting it to zero brings the
+agreement with a direct elastic net to between $10^{-14}$ and $10^{-11}$ for
+the ridge, the lasso, the elastic net and the unpenalized case alike. A
+tolerance that is invisible in a well-conditioned problem is not invisible in
+the problem the penalty exists for.
+\end{remark}
+
+With $k > 1$ and the same two switches the construction gives \emph{clusterwise}
+penalized regression, the partition still estimated from the data by the Potts
+term --- which is the cross-sectional model of the spatially-clustered
+regression literature, recovered here as the degenerate case of a
+spatio-temporal one.
 
 \section{Algorithm}
 

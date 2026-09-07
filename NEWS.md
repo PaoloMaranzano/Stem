@@ -17,7 +17,20 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 * `alpha` and `lambda` follow the `glmnet` parameterization: `alpha = 0` is
   ridge, `alpha = 1` the lasso, anything between the elastic net. Only the
   regression coefficients are penalized; the intercept is excluded by default.
-  In the clustered model the penalty acts within each regime.
+  In the clustered model the penalty acts within each regime, with one
+  `(alpha, lambda)` shared by all of them.
+* `lambda` is dimensionless. Its L1 part is measured against the largest partial
+  gradient, so `lambda` in `(0, 1]` traverses the whole lasso path and means the
+  same thing at any error variance and in any regime; its L2 part is left alone,
+  being already unit-free. `lambda_scale = "absolute"` recovers the raw
+  convention.
+* `lambda_by = "size"` spreads the penalty over the regimes in proportion to
+  `1/n_g` instead of equally, shrinking the smaller regimes more. It remains one
+  hyperparameter.
+* `latent = FALSE` switches the latent process off and `spatial = FALSE`
+  replaces the spatial correlation by the identity. Together with
+  `regularization = 0` they reduce the model exactly to penalized linear
+  regression, and with `k > 1` to clusterwise penalized regression.
 * The penalty leaves the E-step untouched, so the algorithm remains an EM on the
   penalized likelihood: the M-step keeps a closed form under a ridge and is
   solved exactly by coordinate descent otherwise. The design is scaled
@@ -30,7 +43,7 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 
 ### Spatially-clustered STEM models
 
-* `SCSTEM_Estim()` fits an SC-STEM model: the monitoring locations are
+* `SCSTEM_Estimation()` fits an SC-STEM model: the monitoring locations are
   partitioned into `k` latent spatial regimes and a separate STEM model is
   estimated within each of them, so that regression coefficients, variance
   components and latent temporal dynamics are all cluster-specific. Labels and
@@ -57,7 +70,7 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   percentile and bias-corrected confidence intervals; pairwise percentile tests
   for the differences between clusters; the co-clustering matrix; and the ARI of
   each refit against the original partition.
-* New classes `SCSTEM_Estim`, `SCSTEM_Infocrit`, `SCSTEM_Select`,
+* New classes `SCSTEM_Estimation`, `SCSTEM_Infocrit`, `SCSTEM_Select`,
   `SCSTEM_Bootstrap` and `SCSTEM_BootInference`, each with a `print()` method.
 
 ### Algorithmic changes in the SC-STEM assignment step

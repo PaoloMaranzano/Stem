@@ -106,14 +106,14 @@
 #'                   phi = phi, K = matrix(1, d, 1))
 #'
 #' \donttest{
-#' fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
 #' boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 #' inf <- SCSTEM_BootInference(boot)
 #' inf
 #' inf$summary
 #' }
 #'
-#' @seealso \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Estim}}
+#' @seealso \code{\link{SCSTEM_Bootstrap}} and \code{\link{SCSTEM_Estimation}}
 #'
 #' @keywords models spatial
 #'

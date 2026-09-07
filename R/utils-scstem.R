@@ -143,7 +143,7 @@
 ### SCDA::SC_AMKM(). That dependency has been dropped, because SCDA is not
 ### distributed on CRAN and a hard dependency on it would make this package
 ### unpublishable. Any external initialization -- AMKM included -- can still be
-### used by passing it to SCSTEM_Estim() through the `init_partition` argument.
+### used by passing it to SCSTEM_Estimation() through the `init_partition` argument.
 ###
 ### Arguments
 ###   Xmeans     d x ncov numeric, per-location averages of the covariates

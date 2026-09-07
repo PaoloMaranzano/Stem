@@ -16,7 +16,10 @@ STEM_Estimation(
   verbose = FALSE,
   alpha = 0,
   lambda = 0,
-  penalize = NULL
+  penalize = NULL,
+  lambda_scale = c("relative", "absolute"),
+  latent = TRUE,
+  spatial = TRUE
 )
 }
 \arguments{
@@ -43,6 +46,12 @@ STEM_Estimation(
 \item{lambda}{the strength of the penalty on the regression coefficients. \code{0}, the default, gives the ordinary maximum likelihood estimator. See \code{\link{STEM_Fit}} for the interface that selects it.}
 
 \item{penalize}{which regression coefficients the penalty acts on: a logical vector of length \eqn{r}, an index vector, or \code{NULL} (the default) for every coefficient except the intercept.}
+
+\item{lambda_scale}{how \code{lambda} is measured. \dQuote{relative}, the default, puts the L1 part of the penalty on the scale of the largest partial gradient, so that \code{lambda} is free of the units of the response and \code{lambda * alpha >= 1} zeroes every penalized coefficient; \dQuote{absolute} applies it to the scaled normal equations directly. The L2 part is unaffected: it multiplies a curvature whose diagonal is already one, and is scale free either way.}
+
+\item{latent}{logical. \code{FALSE} switches the latent process off, by setting the loading matrix to zero and holding \eqn{G}, \eqn{\Sigma_\eta} and \eqn{m_0} at their input values, which they are unidentified without it. Default is \code{TRUE}.}
+
+\item{spatial}{logical. \code{FALSE} replaces the exponential correlation by the identity, so that \eqn{\Sigma_e} is a single variance and the Newton-Raphson step is skipped. Only the sum \eqn{\sigma^2_\varepsilon + \sigma^2_\omega} is then identified, and the range has no meaning. Default is \code{TRUE}.}
 }
 \value{
 The function returns an object of class \dQuote{STEM_Model} which is a list given by:
@@ -62,7 +71,7 @@ The function \code{STEM_Estimation} computes the maximum likelihood estimates of
 
 This is one of the two estimation engines of the package. The entry point is
 \code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
-\code{\link{SCSTEM_Estim}} when \code{k > 1}, and which takes the same
+\code{\link{SCSTEM_Estimation}} when \code{k > 1}, and which takes the same
 arguments and returns the same object. Call \code{STEM_Estimation} directly
 only to bypass the dispatch; it is the historical interface of the package
 and is kept unchanged.

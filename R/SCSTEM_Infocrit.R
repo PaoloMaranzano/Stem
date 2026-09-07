@@ -9,7 +9,7 @@
 #' \code{\link{SCSTEM_Select}}.
 #'
 #' @details
-#' For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estim}}
+#' For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estimation}}
 #' and records the exact total log-likelihood of the final refit, the number of
 #' free parameters \eqn{k_{eff}(r + 3 + 3p)}, and
 #' \deqn{AIC = -2\ell + 2 K, \qquad BIC = -2\ell + \log(dT) K, \qquad
@@ -48,7 +48,7 @@
 #'   missing, the grid is set to \code{mink:maxk}.
 #' @param verbose logical. If \code{TRUE}, the progress over the grid is
 #'   reported via \code{message()}. Default is \code{FALSE}.
-#' @param ... further arguments passed to \code{\link{SCSTEM_Estim}}, such as
+#' @param ... further arguments passed to \code{\link{SCSTEM_Estimation}}, such as
 #'   \code{distance}, \code{knn}, \code{phi_scale}, \code{label_update},
 #'   \code{precision} or \code{min_cluster_size}.
 #'
@@ -58,7 +58,7 @@
 #'     \code{k}, \code{phi}, \code{k_eff}, \code{admissible}, \code{loglik},
 #'     \code{npar}, \code{AIC}, \code{BIC}, \code{KIC}, \code{min_size},
 #'     \code{convergence}.
-#'   \item \code{fits}: the list of \dQuote{SCSTEM_Estim} objects, named
+#'   \item \code{fits}: the list of \dQuote{SCSTEM_Estimation} objects, named
 #'     \code{"k=<k>, phi=<phi>"}, so that the selected configuration can be used
 #'     without refitting.
 #'   \item \code{groups}: matrix of the estimated partitions, one column per
@@ -112,7 +112,7 @@
 #' ic
 #' }
 #'
-#' @seealso \code{\link{SCSTEM_Estim}} and \code{\link{SCSTEM_Select}}
+#' @seealso \code{\link{SCSTEM_Estimation}} and \code{\link{SCSTEM_Select}}
 #'
 #' @keywords models spatial
 #'
@@ -173,7 +173,7 @@ SCSTEM_Infocrit <- function(StemModel,
     }
 
     fit <- tryCatch(
-      suppressWarnings(SCSTEM_Estim(StemModel = StemModel, k = kk,
+      suppressWarnings(SCSTEM_Estimation(StemModel = StemModel, k = kk,
                                     phi_penalty = pp, verbose = FALSE, ...)),
       error = function(e) e
     )

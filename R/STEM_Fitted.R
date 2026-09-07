@@ -139,22 +139,22 @@ STEM_Fitted <- function(StemModel, distance = "euclidean",
 #' Locations belonging to a regime that could not be re-estimated are returned
 #' unchanged, that is with their missing entries still missing.
 #'
-#' @param SCSTEM an object of class \dQuote{SCSTEM_Estim} returned by
-#'   \code{\link{SCSTEM_Estim}}.
+#' @param SCSTEM an object of class \dQuote{SCSTEM_Estimation} returned by
+#'   \code{\link{SCSTEM_Estimation}}.
 #'
 #' @return A \eqn{T} by \eqn{d} numeric matrix.
 #'
 #' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com}
 #'
-#' @seealso \code{\link{STEM_Fitted}}, \code{\link{SCSTEM_Estim}}
+#' @seealso \code{\link{STEM_Fitted}}, \code{\link{SCSTEM_Estimation}}
 #'
 #' @keywords models spatial
 #'
 #' @export
 SCSTEM_Fitted <- function(SCSTEM) {
 
-  if (!inherits(SCSTEM, "SCSTEM_Estim")) {
-    stop("'SCSTEM' must be an object of class 'SCSTEM_Estim' returned by SCSTEM_Estim().",
+  if (!inherits(SCSTEM, "SCSTEM_Estimation")) {
+    stop("'SCSTEM' must be an object of class 'SCSTEM_Estimation' returned by SCSTEM_Estimation().",
          call. = FALSE)
   }
 

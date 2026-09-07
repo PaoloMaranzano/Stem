@@ -72,7 +72,7 @@ plot(povalley$dates, povalley$z[, 1], type = "l",
 }
 \seealso{
 \code{\link{pm10}}, \code{\link{STEM_Model}} and
-  \code{\link{SCSTEM_Estim}}
+  \code{\link{SCSTEM_Estimation}}
 }
 \author{
 Francesco Caccia, Paolo Maranzano

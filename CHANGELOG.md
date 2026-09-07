@@ -16,6 +16,80 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-07 (later)
+
+**`SCSTEM_Estim()` is now `SCSTEM_Estimation()`.** The package exports two
+estimation engines and they were called by names of different shapes. Both stay
+exported -- the release brings the package back after its time off CRAN with a
+wider interface, and deprecating the historical `STEM_Estimation()` would buy
+nothing -- but they now read as a pair, with `STEM_Fit()` above them as the
+entry point. No alias is kept: 2.0.0 has not been released, so `SCSTEM_Estim`
+never existed for a user. The S3 class and its `print` method were renamed with
+the function, and every reference in the sources, the tests, the vignettes, the
+function map, the README and the development scripts was updated with it.
+
+**`lambda` is now dimensionless, and only half the penalty is rescaled.** The
+first version measured `lambda` against the scaled normal equations, which
+leaves it carrying the units of the response for the L1 part: the same `lambda`
+then meant different things at different error variances and, in the clustered
+model, in different regimes. The obvious repair -- rescale the whole penalty by
+the size of the gradient -- is wrong, and instructively so. After the columns of
+the design are scaled to put the diagonal of `M` at one, the L2 part is
+*already* unit-free: it multiplies a curvature that is one, so it shrinks by
+`1/(1+lambda)` whatever the units. Rescaling it as well would make a ridge
+depend on the error variance when it need not, to the tune of `1e-1` in the
+coefficients on a collinear design.
+
+So `lambda_scale = "relative"`, the new default, rescales the **L1 part only**,
+by the largest partial gradient once the unpenalized coordinates are profiled
+out -- the `lambda_max` of the lasso path. Every penalized coefficient is then
+exactly zero once `lambda * alpha >= 1`, and `lambda` in `(0, 1]` traverses the
+whole path at `alpha = 1`, which is the convention of `glmnet`.
+`lambda_scale = "absolute"` keeps the previous meaning and is what to use when
+comparing against an external implementation. The test suite asserts the
+invariance directly: scaling the response by a constant scales the coefficients
+by the same constant, and scaling the GLS information leaves them alone, for
+every `alpha`.
+
+**`latent = FALSE` and `spatial = FALSE`.** The first sets the loading matrix to
+zero, so the state contributes nothing to the measurement equation, and holds
+`G`, `Sigma_eta` and `m0` -- unidentified without it -- at their input values
+rather than letting them chase a flat likelihood. The second replaces the
+exponential correlation by the identity, so `Sigma_e` is a single variance, and
+skips the Newton-Raphson step, which would otherwise be estimating a range that
+has nothing to estimate. Together, and with `regularization = 0`, they reduce
+the model **exactly** to penalized linear regression: the agreement with an
+elastic net computed directly on `X'X` and `X'y` is between `1e-14` and `1e-11`
+for the ridge, the lasso, the elastic net and the unpenalized case alike.
+
+That last condition is not a detail. The small ridge the package adds to every
+matrix it inverts is comparable, on a collinear design, with the smallest
+eigenvalue of `X'X` in the offending direction, and it displaces the
+coefficients by about `1e-2`. A tolerance that is invisible in a well-conditioned
+problem is not invisible in the problem a penalty exists for.
+
+**`lambda_by = "size"`.** With `k > 1` the penalty can be spread over the
+regimes in two ways. `"common"`, the default, gives every regime the same
+`lambda`, which under the relative scale already means the same *proportional*
+shrinkage, since the reference is computed inside each regime. `"size"` sets
+`lambda_g = lambda * nbar / n_g` with `nbar = d/k`, shrinking a regime of half
+the average size twice as hard, on the argument that its coefficients are
+noisier than proportionality alone accounts for. Either way `lambda` stays one
+hyperparameter; genuinely cluster-specific `(alpha_g, lambda_g)` is a different
+model and is deliberately not offered.
+
+**Where the theory lives.** `dev/regularization/stem-elastic-net.tex` is
+repositioned as the draft of a second, separate paper: cluster-specific elastic
+net, with penalized linear regression as a special case. It gains a section
+deriving why the four hyperparameters are not separable -- the optimal `lambda`
+grows with `k` at rate `k`, the selected `k` grows with `lambda` because
+shrinkage lowers the effective parameter count, and the automatic scale of the
+Potts penalty moves with `lambda` because it is calibrated on a spread that
+shrinkage narrows -- and a section on why the criterion must use the
+*unpenalized* likelihood at the penalized estimate rather than the penalized
+objective, which would charge for the penalty twice. What the manuscript for
+Metron uses is a strict subset: a pooled ridge in closed form.
+
 ### 2026-09-07
 
 **Ridge, lasso and elastic net on the regression coefficients.** `STEM_Fit()`
@@ -68,7 +142,7 @@ shrinking the intercept would not shrink "the level" but move it into `m0` at a
 rate depending on `G`.
 
 **The information criteria count effective parameters.** With a penalty in force
-the nominal `r` overstates the flexibility of the fit. `SCSTEM_Estim()` now sums
+the nominal `r` overstates the flexibility of the fit. `SCSTEM_Estimation()` now sums
 the effective count each regime reports: `tr(M (M + lambda D)^{-1})` for a
 ridge, the number of active coefficients for a lasso, and the corresponding
 trace on the active set for an elastic net. With `lambda = 0` every regime
@@ -323,7 +397,7 @@ The regeneration also caught a name the diagram had missed: it still said
 American-English pass.
 
 **Documented the statistical features and the scope of the model.**
-A new section of the README, and a matching block in `?SCSTEM_Estim`, state what
+A new section of the README, and a matching block in `?SCSTEM_Estimation`, state what
 the family covers and what it does not: Gaussian response only; univariate
 response, with the multivariate part being the latent state; exponential spatial
 covariance, hence isotropic and stationary within a regime, the partition being
@@ -390,7 +464,7 @@ which carries no character hostile to HTML, is the more natural way to state a
 Potts term, and renders in every engine. The MathJax macro `\lt` would also have
 worked on GitHub but is not standard LaTeX and would break the PDF manual, so
 the edge-set notation is used in the README, in the SC-STEM vignette (GitHub
-renders `.Rmd` files too) and in the `\deqn` of `?SCSTEM_Estim`.
+renders `.Rmd` files too) and in the `\deqn` of `?SCSTEM_Estimation`.
 
 **README: parameter roles, cluster-wise equations, more references.**
 Equations returned to LaTeX, in fenced math blocks. A new table gives the role
@@ -460,7 +534,7 @@ name that cannot collide with the package name under any case folding.
 
 The full release notes are in [`NEWS.md`](NEWS.md). In summary:
 
-* **New SC-STEM layer**: `SCSTEM_Estim()`, `SCSTEM_Infocrit()`,
+* **New SC-STEM layer**: `SCSTEM_Estimation()`, `SCSTEM_Infocrit()`,
   `SCSTEM_Select()`, `SCSTEM_Bootstrap()` and `SCSTEM_BootInference()`, with
   their classes and `print()` methods.
 * **Algorithmic rewrite**: ICM label update, explicit penalized objective with

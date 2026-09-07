@@ -145,7 +145,7 @@
 ##        z_ti = beta_0,g_i + beta_1,g_i x_ti + y_t,g_i + e_ti .
 ##
 ##     This is the STEM measurement equation with loading matrix K_g = 1_{n_g}
-##     within each regime, which is what SCSTEM_Estim() fits.
+##     within each regime, which is what SCSTEM_Estimation() fits.
 ##
 ## PSEUDOCODE
 ##

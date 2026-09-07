@@ -135,7 +135,7 @@ one_rep <- function(r, design, sep, labels, do_select) {
   ## SC-STEM at the true k, over the penalty grid
   rows <- list()
   for (ph in PHI_GRID) {
-    fit <- try(SCSTEM_Estim(mod, k = 2L, phi_penalty = ph, knn = KNN,
+    fit <- try(SCSTEM_Estimation(mod, k = 2L, phi_penalty = ph, knn = KNN,
                             distance = "geo", precision = 0.1,
                             precision_full_dataset = 0.05, max_iter = 8,
                             seed = 1000L + r, verbose = FALSE), silent = TRUE)

@@ -7,8 +7,8 @@
 SCSTEM_Bootstrap(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
 }
 \arguments{
-\item{SCSTEM}{an object of class \dQuote{SCSTEM_Estim} returned by
-\code{\link{SCSTEM_Estim}}.}
+\item{SCSTEM}{an object of class \dQuote{SCSTEM_Estimation} returned by
+\code{\link{SCSTEM_Estimation}}.}
 
 \item{B}{integer, the number of bootstrap replicates. Default is 100.}
 
@@ -18,7 +18,7 @@ reproducible; the RNG stream is restored on exit. Default is \code{NULL}.}
 \item{verbose}{logical. If \code{TRUE}, progress is reported via
 \code{message()}. Default is \code{FALSE}.}
 
-\item{...}{further arguments passed to \code{\link{SCSTEM_Estim}} for the
+\item{...}{further arguments passed to \code{\link{SCSTEM_Estimation}} for the
 refits, overriding the settings of the original fit.}
 }
 \value{
@@ -33,7 +33,7 @@ An object of class \dQuote{SCSTEM_Bootstrap}, a list with
   \item \code{info}: a data frame with one row per draw reporting whether the
     refit succeeded, how many clusters it recovered, its total
     log-likelihood, the number of iterations and the convergence message.
-  \item \code{original}: the \dQuote{SCSTEM_Estim} object given in input.
+  \item \code{original}: the \dQuote{SCSTEM_Estimation} object given in input.
   \item \code{B}, \code{B_valid}: requested and usable number of draws.
 }
 }
@@ -64,7 +64,7 @@ and Sugasawa (2026+) to the spatio-temporal setting:
   \item Restore the original ordering of the locations, so that the simulated
     data are aligned with the rows of the spatial penalty graph and every
     location keeps its own neighbors.
-  \item Re-run \code{\link{SCSTEM_Estim}} on \eqn{z^{*(b)}} with the same
+  \item Re-run \code{\link{SCSTEM_Estimation}} on \eqn{z^{*(b)}} with the same
     \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
     estimates, the refit partition and the convergence diagnostics.
 }
@@ -113,7 +113,7 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   phi = phi, K = matrix(1, d, 1))
 
 \donttest{
-fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
 boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 boot
 }
@@ -133,7 +133,7 @@ area prediction}. Journal of the Royal Statistical Society, Series B, 68,
 221--238. \doi{10.1111/j.1467-9868.2006.00541.x}
 }
 \seealso{
-\code{\link{SCSTEM_Estim}}, \code{\link{SCSTEM_BootInference}} and
+\code{\link{SCSTEM_Estimation}}, \code{\link{SCSTEM_BootInference}} and
   \code{\link{STEM_Bootstrap}}
 }
 \author{

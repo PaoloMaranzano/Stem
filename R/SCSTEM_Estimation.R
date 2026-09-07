@@ -1,7 +1,7 @@
 #' Spatially-clustered STEM estimation
 #'
 #' @description
-#' \code{SCSTEM_Estim} fits a spatially-clustered spatio-temporal
+#' \code{SCSTEM_Estimation} fits a spatially-clustered spatio-temporal
 #' expectation-maximization (SC-STEM) model. The \eqn{d} monitoring locations
 #' are partitioned into \eqn{k} latent spatial regimes, and a separate
 #' \dQuote{STEM_Model} is estimated within each regime, so that regression
@@ -12,7 +12,7 @@
 #' This is one of the two estimation engines of the package. The entry point is
 #' \code{\link{STEM_Fit}}, which calls this function when \code{k > 1} and
 #' \code{\link{STEM_Estimation}} when \code{k = 1}, and which takes the same
-#' arguments and returns the same object. Call \code{SCSTEM_Estim} directly only
+#' arguments and returns the same object. Call \code{SCSTEM_Estimation} directly only
 #' to bypass the dispatch.
 #'
 #' @details
@@ -238,10 +238,25 @@
 #' @param penalize which coefficients the penalty acts on: a logical vector of
 #'   length \eqn{r}, an index vector, or \code{NULL} (the default) for every
 #'   coefficient except the intercept.
+#' @param lambda_scale how \code{lambda} is measured, \dQuote{relative} (the
+#'   default) or \dQuote{absolute}. See \code{\link{STEM_Estimation}}.
+#' @param lambda_by how the penalty is distributed over the regimes.
+#'   \dQuote{common}, the default, gives every regime the same \code{lambda},
+#'   which under the relative scale already means the same proportional
+#'   shrinkage, since the reference is computed inside each regime.
+#'   \dQuote{size} sets \eqn{\lambda_g = \lambda \bar n / n_g} with
+#'   \eqn{\bar n = d/k}, shrinking a regime of half the average size twice as
+#'   hard. Either way \code{lambda} stays ONE hyperparameter: genuinely
+#'   cluster-specific \eqn{(\alpha_g, \lambda_g)} is a different model and is
+#'   not offered here.
+#' @param latent logical, passed to \code{\link{STEM_Estimation}} within each
+#'   regime. Default is \code{TRUE}.
+#' @param spatial logical, passed to \code{\link{STEM_Estimation}} within each
+#'   regime. Default is \code{TRUE}.
 #' @param verbose logical. If \code{TRUE}, progress information is emitted via
 #'   \code{message()}. Default is \code{FALSE}.
 #'
-#' @return An object of class \dQuote{SCSTEM_Estim}, a list with components:
+#' @return An object of class \dQuote{SCSTEM_Estimation}, a list with components:
 #' \itemize{
 #'   \item \code{phi_hat}: \eqn{k} by \eqn{npar} matrix of cluster-wise
 #'     parameter estimates from the final refit.
@@ -315,7 +330,7 @@
 #'
 #' \donttest{
 #' # three spatial regimes with a moderate spatial penalty
-#' fit <- SCSTEM_Estim(mod, k = 3, phi_penalty = 0.5, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = 'geo')
 #' fit
 #'
 #' # the estimated regimes on the map
@@ -330,7 +345,7 @@
 #' @keywords models spatial
 #'
 #' @export
-SCSTEM_Estim <- function(StemModel,
+SCSTEM_Estimation <- function(StemModel,
                          k = 3,
                          phi_penalty = 1,
                          phi_scale = c("auto", "per-observation", "raw"),
@@ -353,6 +368,10 @@ SCSTEM_Estim <- function(StemModel,
                          alpha = 0,
                          lambda = 0,
                          penalize = NULL,
+                         lambda_scale = c("relative", "absolute"),
+                         lambda_by = c("common", "size"),
+                         latent = TRUE,
+                         spatial = TRUE,
                          verbose = FALSE) {
 
   ##############################
@@ -363,6 +382,30 @@ SCSTEM_Estim <- function(StemModel,
     stop("'StemModel' must be an object of class 'STEM_Model'.", call. = FALSE)
   }
   phi_scale <- match.arg(phi_scale)
+  lambda_scale <- match.arg(lambda_scale)
+  lambda_by <- match.arg(lambda_by)
+
+  ### How the penalty is distributed over the regimes.
+  ###
+  ### "common" gives every regime the same lambda. Under the default relative
+  ### scale that already means the same PROPORTIONAL shrinkage everywhere,
+  ### because the reference against which lambda is measured is computed inside
+  ### each regime and therefore carries its own information: a regime with half
+  ### the locations has a proportionally smaller reference, so the same lambda
+  ### buys the same fraction of the path. This is the pooled hyperparameter of
+  ### the manuscript, and one number to select rather than k.
+  ###
+  ### "size" departs from that on purpose, giving lambda_g = lambda * nbar / n_g
+  ### with nbar = d/k: a regime with half the average number of locations is
+  ### shrunk twice as hard. The argument for it is that small regimes carry
+  ### noisier coefficients than the proportional rule alone accounts for. It
+  ### remains ONE hyperparameter; genuinely cluster-specific (alpha_g, lambda_g)
+  ### is a different model and is not offered here.
+  lambda_of <- function(n_g) {
+    if (lambda <= 0 || lambda_by == "common") return(lambda)
+    nbar <- length(StemModel$data$z[1, ]) / k
+    lambda * nbar / max(n_g, 1)
+  }
   distance <- match.arg(distance)
   init_method <- match.arg(init_method)
   label_update <- match.arg(label_update)
@@ -419,8 +462,9 @@ SCSTEM_Estim <- function(StemModel,
     if (isTRUE(verbose)) message("Pooled STEM fit (k = 1) ...")
     pooled <- STEM_Estimation(StemModel, precision = precision_full_dataset,
                               distance = distance, regularization = regularization,
-                              verbose = FALSE, alpha = alpha, lambda = lambda,
-                              penalize = penalize)
+                              verbose = FALSE, alpha = alpha, lambda = lambda_of(d),
+                              penalize = penalize, lambda_scale = lambda_scale,
+                              latent = latent, spatial = spatial)
     par_names <- names(unlist(pooled$estimates$phi.hat))
     loglik <- as.numeric(pooled$estimates$loglik)
     ### effective parameter count under a penalty; see the k > 1 branch
@@ -459,7 +503,7 @@ SCSTEM_Estim <- function(StemModel,
                         Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                         npar_g = npar_g, Nobs = Nobs)
     )
-    class(out) <- c("SCSTEM_Estim", "list")
+    class(out) <- c("SCSTEM_Estimation", "list")
     return(out)
   }
 
@@ -542,7 +586,9 @@ SCSTEM_Estim <- function(StemModel,
         fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
           STEM_Estimation(mod_g, precision = precision, distance = distance,
                           regularization = regularization, verbose = FALSE,
-                          alpha = alpha, lambda = lambda, penalize = penalize),
+                          alpha = alpha, lambda = lambda_of(length(idx)),
+                          penalize = penalize, lambda_scale = lambda_scale,
+                          latent = latent, spatial = spatial),
           silent = TRUE)
 
         if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
@@ -718,7 +764,7 @@ SCSTEM_Estim <- function(StemModel,
     if (lab_hash %in% label_history) {
       labels <- best_labels
       convergence <- "Exited on label cycle: best visited partition returned"
-      warning("SCSTEM_Estim: label cycle detected; the best visited partition was returned.",
+      warning("SCSTEM_Estimation: label cycle detected; the best visited partition was returned.",
               call. = FALSE)
       break
     }
@@ -768,7 +814,9 @@ SCSTEM_Estim <- function(StemModel,
     fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
       STEM_Estimation(mod_g, precision = precision, distance = distance,
                       regularization = regularization, verbose = FALSE,
-                      alpha = alpha, lambda = lambda, penalize = penalize),
+                      alpha = alpha, lambda = lambda_of(length(idx_g[[g]])),
+                      penalize = penalize, lambda_scale = lambda_scale,
+                      latent = latent, spatial = spatial),
       silent = TRUE)
     if (!inherits(fit_g, "try-error") && !is.null(fit_g$estimates$phi.hat)) {
       fit_final[[g]] <- fit_g
@@ -790,7 +838,7 @@ SCSTEM_Estim <- function(StemModel,
   for (g in which(final_refit)) phi_hat[g, ] <- par_list[[g]][par_names]
 
   if (any(!final_refit)) {
-    warning("SCSTEM_Estim: cluster(s) ",
+    warning("SCSTEM_Estimation: cluster(s) ",
             paste(which(!final_refit), collapse = ", "),
             " could not be re-estimated on the final partition (size below ",
             min_cluster_size, " or failed fit). Their estimates are NA.",
@@ -857,14 +905,14 @@ SCSTEM_Estim <- function(StemModel,
                       Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
                       npar_g = npar_g, Nobs = Nobs)
   )
-  class(out) <- c("SCSTEM_Estim", "list")
+  class(out) <- c("SCSTEM_Estimation", "list")
   out
 }
 
 
 #' Print method for SC-STEM fits
 #'
-#' @param x an object of class \dQuote{SCSTEM_Estim}.
+#' @param x an object of class \dQuote{SCSTEM_Estimation}.
 #' @param digits integer, number of significant digits. Default is 4.
 #' @param ... further arguments, currently ignored.
 #'
@@ -872,7 +920,7 @@ SCSTEM_Estim <- function(StemModel,
 #'   compact summary of the fit.
 #'
 #' @export
-print.SCSTEM_Estim <- function(x, digits = 4, ...) {
+print.SCSTEM_Estimation <- function(x, digits = 4, ...) {
   cat("Spatially-clustered STEM model\n")
   cat("  clusters requested : ", x$input_args$k, "\n", sep = "")
   cat("  clusters estimated : ", sum(x$final_refit), "\n", sep = "")

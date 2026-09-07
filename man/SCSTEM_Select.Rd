@@ -31,7 +31,7 @@ An object of class \dQuote{SCSTEM_Select}, a list with
 \itemize{
   \item \code{k_selected}, \code{phi_selected}: the selected
     hyperparameters.
-  \item \code{fit}: the corresponding \dQuote{SCSTEM_Estim} object, taken
+  \item \code{fit}: the corresponding \dQuote{SCSTEM_Estimation} object, taken
     from \code{infocrit$fits} without refitting.
   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
     each penalty in the band.
@@ -134,7 +134,7 @@ concentration in Europe}. Journal of Agricultural, Biological and
 Environmental Statistics. \doi{10.1007/s13253-025-00685-7}
 }
 \seealso{
-\code{\link{SCSTEM_Infocrit}} and \code{\link{SCSTEM_Estim}}
+\code{\link{SCSTEM_Infocrit}} and \code{\link{SCSTEM_Estimation}}
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com}

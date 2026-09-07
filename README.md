@@ -109,7 +109,7 @@ where $\ell_i(k)$ is the log-likelihood contribution of location $i$ under the
 parameters of regime $k$, $E$ is the edge set of the symmetrized
 $k$-nearest-neighbor graph with each unordered pair counted once,
 $I(\cdot)$ the indicator function, and $c$ a scale factor documented in
-`?SCSTEM_Estim`.
+`?SCSTEM_Estimation`.
 
 The penalty is what makes the regimes *spatial*. The first term rewards fit and
 would happily scatter the labels; the second rewards neighboring locations
@@ -173,6 +173,25 @@ $\lambda$.
   of $M$ at one, and the package applies it internally, returning coefficients
   on the original scale. In SC-STEM this is also what makes a single $\lambda$
   mean the same thing in regimes of different size.
+- **Two scales have to be removed, and only one of them from each half.** After
+  the scaling above, the $L_2$ part is *already* free of the units of the
+  response: it multiplies a curvature whose diagonal is one, so it shrinks by
+  $1/(1+\lambda)$ whatever the units. The $L_1$ part is not, because a threshold
+  has to be compared with the gradient. `lambda_scale = "relative"`, the
+  default, therefore rescales the $L_1$ part only, by the largest partial
+  gradient: $\lambda$ is then unit-free for every $\alpha$, and every penalized
+  coefficient is exactly zero once $\lambda\alpha \ge 1$, so $\lambda \in (0,1]$
+  traverses the whole lasso path as in `glmnet`. Rescaling both halves would
+  break the ridge to fix the lasso.
+- **$\alpha$ and $\lambda$ are pooled**, one pair for the whole partition, and
+  under the scalings above that already means the same *proportional* shrinkage
+  in every regime: the reference is computed inside each regime, so a regime
+  with half the locations has a proportionally smaller reference and the same
+  $\lambda$ buys the same fraction of the path. `lambda_by = "size"` departs
+  from that on purpose, setting $\lambda_g = \lambda \bar n / n_g$ so that a
+  regime of half the average size is shrunk twice as hard. Either way $\lambda$
+  stays **one** hyperparameter; genuinely cluster-specific
+  $(\alpha_g, \lambda_g)$ is a different model and is not offered here.
 - **The intercept is not penalized**, and not merely by convention: the model
   already carries a latent process whose initial mean $m_0$ absorbs the level,
   so shrinking $\beta_0$ would not shrink "the level" but move it into $m_0$ at
@@ -199,12 +218,33 @@ the log-likelihood.
 
 ```r
 fit0 <- STEM_Fit(mod)                                  # classical STEM
-fitr <- STEM_Fit(mod, alpha = 0,   lambda = 2)         # ridge
-fitl <- STEM_Fit(mod, alpha = 1,   lambda = 2)         # lasso
-fite <- STEM_Fit(mod, alpha = 0.5, lambda = 2)         # elastic net
+fitr <- STEM_Fit(mod, alpha = 0,   lambda = 0.3)       # ridge
+fitl <- STEM_Fit(mod, alpha = 1,   lambda = 0.3)       # lasso
+fite <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3)       # elastic net
 fitc <- STEM_Fit(mod, k = 3, phi_penalty = 0.5,        # SC-STEM, ridge per regime
-                 alpha = 0, lambda = 2)
+                 alpha = 0, lambda = 0.3)
 ```
+
+**Penalized linear regression is the degenerate case.** Two switches take the
+model down to it: `latent = FALSE` sets the loading matrix to zero, so the state
+contributes nothing and the parameters describing it, now unidentified, are held
+where they started; `spatial = FALSE` replaces the exponential correlation by
+the identity, so $\Sigma_e = \sigma^2 I$ and the Newton-Raphson step is skipped.
+What is left is $z_{ti} = x_{ti}'\beta + e_{ti}$ with $e \sim N(0, \sigma^2 I)$,
+estimated by penalized least squares.
+
+```r
+fit <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3,
+                latent = FALSE, spatial = FALSE, regularization = 0)
+```
+
+Set `regularization = 0` as well: the small ridge the package adds for
+conditioning is otherwise the only thing separating the two, and on a collinear
+design it is not negligible. With that, the agreement with an elastic net
+computed directly on $X'X$ and $X'y$ is between $10^{-14}$ and $10^{-11}$ for
+the ridge, the lasso, the elastic net and the unpenalized case alike. With
+`k > 1` the same switches give clusterwise penalized regression, the partition
+still estimated.
 
 $\lambda$ and $\alpha$ are hyperparameters like $k$ and $\phi$ and are chosen
 the same way: by an information criterion computed with the effective degrees of
@@ -319,7 +359,7 @@ same either way, and the historical API is preserved.
 | Function | Purpose |
 |---|---|
 | `STEM_Estimation()` | the pooled fit: EM with Kalman filtering and smoothing |
-| `SCSTEM_Estim()` | the clustered fit: `STEM_Estimation()` per regime, alternated with an ICM sweep on the labels |
+| `SCSTEM_Estimation()` | the clustered fit: `STEM_Estimation()` per regime, alternated with an ICM sweep on the labels |
 
 Two datasets ship with the package: `pm10` (22 stations, 366 days, the original
 example) and `povalley` (36 background stations of the Po Valley, daily PM2.5
@@ -367,7 +407,7 @@ SCSTEM_BootInference(boot)
 ## Design notes
 
 Four points make the implementation behave sensibly in practice. The first three
-concern SC-STEM and are documented in detail in `?SCSTEM_Estim`; the fourth is
+concern SC-STEM and are documented in detail in `?SCSTEM_Estimation`; the fourth is
 what makes a large network fittable at all.
 
 **Labels are updated sequentially (ICM).** Each location maximizes its own

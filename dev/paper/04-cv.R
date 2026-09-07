@@ -200,7 +200,7 @@ run_fold <- function(fold, cfg) {
     zhat_keep <- STEM_Fitted(f, distance = "geo")
     fits <- list(f); grp <- rep(1L, length(keep_idx))
   } else {
-    f <- try(SCSTEM_Estim(mod, k = cfg$k, phi_penalty = cfg$phi, knn = KNN,
+    f <- try(SCSTEM_Estimation(mod, k = cfg$k, phi_penalty = cfg$phi, knn = KNN,
                           distance = "geo", precision = 0.1,
                           precision_full_dataset = 0.01, max_iter = 8,
                           seed = SEED, verbose = FALSE), silent = TRUE)

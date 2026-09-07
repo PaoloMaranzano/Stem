@@ -31,7 +31,7 @@ missing, the grid is set to \code{mink:maxk}.}
 \item{verbose}{logical. If \code{TRUE}, the progress over the grid is
 reported via \code{message()}. Default is \code{FALSE}.}
 
-\item{...}{further arguments passed to \code{\link{SCSTEM_Estim}}, such as
+\item{...}{further arguments passed to \code{\link{SCSTEM_Estimation}}, such as
 \code{distance}, \code{knn}, \code{phi_scale}, \code{label_update},
 \code{precision} or \code{min_cluster_size}.}
 }
@@ -42,7 +42,7 @@ An object of class \dQuote{SCSTEM_Infocrit}: a list with
     \code{k}, \code{phi}, \code{k_eff}, \code{admissible}, \code{loglik},
     \code{npar}, \code{AIC}, \code{BIC}, \code{KIC}, \code{min_size},
     \code{convergence}.
-  \item \code{fits}: the list of \dQuote{SCSTEM_Estim} objects, named
+  \item \code{fits}: the list of \dQuote{SCSTEM_Estimation} objects, named
     \code{"k=<k>, phi=<phi>"}, so that the selected configuration can be used
     without refitting.
   \item \code{groups}: matrix of the estimated partitions, one column per
@@ -61,7 +61,7 @@ input of the two-step tuning rule implemented in
 \code{\link{SCSTEM_Select}}.
 }
 \details{
-For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estim}}
+For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estimation}}
 and records the exact total log-likelihood of the final refit, the number of
 free parameters \eqn{k_{eff}(r + 3 + 3p)}, and
 \deqn{AIC = -2\ell + 2 K, \qquad BIC = -2\ell + \log(dT) K, \qquad
@@ -132,7 +132,7 @@ Sugasawa, S., Murakami, D. (2021) \emph{Spatially clustered regression}.
 Spatial Statistics, 44, 100525. \doi{10.1016/j.spasta.2021.100525}
 }
 \seealso{
-\code{\link{SCSTEM_Estim}} and \code{\link{SCSTEM_Select}}
+\code{\link{SCSTEM_Estimation}} and \code{\link{SCSTEM_Select}}
 }
 \author{
 Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},

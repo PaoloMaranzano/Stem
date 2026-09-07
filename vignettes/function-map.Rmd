@@ -85,7 +85,7 @@ $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
 This layer sits on top of the previous ones: every cluster-wise fit is an
 ordinary `STEM_Model` estimated by `STEM_Estimation()`.
 
-* `SCSTEM_Estim()` alternates between estimating one STEM model per regime and
+* `SCSTEM_Estimation()` alternates between estimating one STEM model per regime and
   reallocating locations by an ICM sweep on a Potts-penalized objective. Its
   helpers are `scstem_neighbors()` (symmetrized k-nearest-neighbor graph),
   `scstem_init()` and `scstem_repair_partition()` (initialization),
@@ -93,12 +93,12 @@ ordinary `STEM_Model` estimated by `STEM_Estimation()`.
   `scstem_potts_pairs()` and `scstem_pen_local()` (the penalty),
   `scstem_swap_pass()` (the size-preserving swap step) and `scstem_npar()`
   (the parameter count behind the information criteria).
-* `SCSTEM_Infocrit()` loops `SCSTEM_Estim()` over a grid of $(k, \phi)$ and
+* `SCSTEM_Infocrit()` loops `SCSTEM_Estimation()` over a grid of $(k, \phi)$ and
   collects the criteria and the admissibility flags.
 * `SCSTEM_Select()` applies the two-step tuning rule to that grid, using
   `scstem_ari()` for the stability step.
 * `SCSTEM_Bootstrap()` regenerates the data regime by regime with
-  `STEM_Simulation()` and re-runs the whole of `SCSTEM_Estim()` on every draw,
+  `STEM_Simulation()` and re-runs the whole of `SCSTEM_Estimation()` on every draw,
   so the uncertainty of the partition is propagated.
 * `SCSTEM_BootInference()` aligns the refits with `scstem_align_labels()` and
   turns the draws into standard errors, confidence intervals and between-regime

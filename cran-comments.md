@@ -21,12 +21,12 @@ All the points raised in the previous review have been addressed.
 * **"Please write TRUE and FALSE instead of T and F."**
   `T` and `F` no longer appear as values or as names anywhere in `R/` or in the
   documentation. The two manual pages named in the review,
-  `man/SCSTEM_Estim.Rd` and `man/SCSTEM_Infocrit.Rd`, are regenerated from
+  `man/SCSTEM_Estimation.Rd` and `man/SCSTEM_Infocrit.Rd`, are regenerated from
   roxygen sources that use `TRUE`/`FALSE`.
 
 * **"You write information messages to the console that cannot be easily
   suppressed."**
-  All the `print()`/`cat()` diagnostics in `R/kalman.R`, `R/SCSTEM_Estim.R`,
+  All the `print()`/`cat()` diagnostics in `R/kalman.R`, `R/SCSTEM_Estimation.R`,
   `R/STEM_Bootstrap.fn.R`, `R/STEM_Estimation.R` and `R/SCSTEM_Bootstrap.R`
   have been replaced by `message()` calls guarded by a new `verbose` argument,
   which defaults to `FALSE`. The only remaining `cat()` calls are inside

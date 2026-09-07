@@ -5,7 +5,7 @@
 #'
 #' This is one of the two estimation engines of the package. The entry point is
 #' \code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
-#' \code{\link{SCSTEM_Estim}} when \code{k > 1}, and which takes the same
+#' \code{\link{SCSTEM_Estimation}} when \code{k > 1}, and which takes the same
 #' arguments and returns the same object. Call \code{STEM_Estimation} directly
 #' only to bypass the dispatch; it is the historical interface of the package
 #' and is kept unchanged.
@@ -22,6 +22,9 @@
 #' @param alpha the elastic-net mixing parameter for the regression coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} is the lasso, anything in between is the elastic net. Ignored when \code{lambda} is zero. Default is 0.
 #' @param lambda the strength of the penalty on the regression coefficients. \code{0}, the default, gives the ordinary maximum likelihood estimator. See \code{\link{STEM_Fit}} for the interface that selects it.
 #' @param penalize which regression coefficients the penalty acts on: a logical vector of length \eqn{r}, an index vector, or \code{NULL} (the default) for every coefficient except the intercept.
+#' @param lambda_scale how \code{lambda} is measured. \dQuote{relative}, the default, puts the L1 part of the penalty on the scale of the largest partial gradient, so that \code{lambda} is free of the units of the response and \code{lambda * alpha >= 1} zeroes every penalized coefficient; \dQuote{absolute} applies it to the scaled normal equations directly. The L2 part is unaffected: it multiplies a curvature whose diagonal is already one, and is scale free either way.
+#' @param latent logical. \code{FALSE} switches the latent process off, by setting the loading matrix to zero and holding \eqn{G}, \eqn{\Sigma_\eta} and \eqn{m_0} at their input values, which they are unidentified without it. Default is \code{TRUE}.
+#' @param spatial logical. \code{FALSE} replaces the exponential correlation by the identity, so that \eqn{\Sigma_e} is a single variance and the Newton-Raphson step is skipped. Only the sum \eqn{\sigma^2_\varepsilon + \sigma^2_\omega} is then identified, and the range has no meaning. Default is \code{TRUE}.
 #'
 #'
 #' @return The function returns an object of class \dQuote{STEM_Model} which is a list given by:
@@ -183,8 +186,17 @@
 
 
 STEM_Estimation <-
-function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL)
+function(StemModel, precision=0.01, max.iter=50,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL, lambda_scale = c("relative","absolute"), latent = TRUE, spatial = TRUE)
 {
+
+lambda_scale <- match.arg(lambda_scale)
+
+### With no spatial correlation the exponential function is replaced by the
+### identity, so that Sigma_e is a single variance and the Newton-Raphson step,
+### which would be estimating a range that has nothing to estimate, is skipped.
+### Only the SUM sigma2eps + sigma2omega is then identified: the split reported
+### is whatever the starting value made it.
+if (!spatial && missing(cov.spat)) cov.spat <- Sigmastar.nugget
 
 z 		=  StemModel$data$z
 
@@ -241,6 +253,9 @@ while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM < max.iter){
 			alpha = alpha,
 			lambda = lambda,
 			penalize = penalize,
+			lambda_scale = lambda_scale,
+			latent = latent,
+			spatial = spatial,
 			verbose = verbose
 	)
 
@@ -327,8 +342,12 @@ StemModel$estimates$convergence.par = convergence.par
 ### leaves. With lambda = 0 the second is simply r, and everything downstream --
 ### the information criteria in particular -- behaves as it always has.
 StemModel$estimates$penalty = list(alpha = alpha, lambda = lambda,
+                                   lambda_scale = lambda_scale,
                                    penalize = penalize,
-                                   beta.df = step_last$beta_df)
+                                   beta.df = step_last$beta_df,
+                                   lambda.ref = step_last$lambda_ref,
+                                   lambda.eff = step_last$lambda_eff)
+StemModel$estimates$scope = list(latent = latent, spatial = spatial)
 return (StemModel)
 }
 

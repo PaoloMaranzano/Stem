@@ -60,7 +60,7 @@
 #' \itemize{
 #'   \item \code{k_selected}, \code{phi_selected}: the selected
 #'     hyperparameters.
-#'   \item \code{fit}: the corresponding \dQuote{SCSTEM_Estim} object, taken
+#'   \item \code{fit}: the corresponding \dQuote{SCSTEM_Estimation} object, taken
 #'     from \code{infocrit$fits} without refitting.
 #'   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
 #'     each penalty in the band.
@@ -118,7 +118,7 @@
 #' sel
 #' }
 #'
-#' @seealso \code{\link{SCSTEM_Infocrit}} and \code{\link{SCSTEM_Estim}}
+#' @seealso \code{\link{SCSTEM_Infocrit}} and \code{\link{SCSTEM_Estimation}}
 #'
 #' @keywords models spatial
 #'

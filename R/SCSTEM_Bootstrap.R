@@ -27,7 +27,7 @@
 #'   \item Restore the original ordering of the locations, so that the simulated
 #'     data are aligned with the rows of the spatial penalty graph and every
 #'     location keeps its own neighbors.
-#'   \item Re-run \code{\link{SCSTEM_Estim}} on \eqn{z^{*(b)}} with the same
+#'   \item Re-run \code{\link{SCSTEM_Estimation}} on \eqn{z^{*(b)}} with the same
 #'     \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
 #'     estimates, the refit partition and the convergence diagnostics.
 #' }
@@ -49,14 +49,14 @@
 #' unaligned, together with the refit partitions, so that any alternative
 #' matching can be applied afterwards.
 #'
-#' @param SCSTEM an object of class \dQuote{SCSTEM_Estim} returned by
-#'   \code{\link{SCSTEM_Estim}}.
+#' @param SCSTEM an object of class \dQuote{SCSTEM_Estimation} returned by
+#'   \code{\link{SCSTEM_Estimation}}.
 #' @param B integer, the number of bootstrap replicates. Default is 100.
 #' @param seed integer or \code{NULL}. When supplied, the draws are exactly
 #'   reproducible; the RNG stream is restored on exit. Default is \code{NULL}.
 #' @param verbose logical. If \code{TRUE}, progress is reported via
 #'   \code{message()}. Default is \code{FALSE}.
-#' @param ... further arguments passed to \code{\link{SCSTEM_Estim}} for the
+#' @param ... further arguments passed to \code{\link{SCSTEM_Estimation}} for the
 #'   refits, overriding the settings of the original fit.
 #'
 #' @return An object of class \dQuote{SCSTEM_Bootstrap}, a list with
@@ -70,7 +70,7 @@
 #'   \item \code{info}: a data frame with one row per draw reporting whether the
 #'     refit succeeded, how many clusters it recovered, its total
 #'     log-likelihood, the number of iterations and the convergence message.
-#'   \item \code{original}: the \dQuote{SCSTEM_Estim} object given in input.
+#'   \item \code{original}: the \dQuote{SCSTEM_Estimation} object given in input.
 #'   \item \code{B}, \code{B_valid}: requested and usable number of draws.
 #' }
 #'
@@ -117,12 +117,12 @@
 #'                   phi = phi, K = matrix(1, d, 1))
 #'
 #' \donttest{
-#' fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
 #' boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 #' boot
 #' }
 #'
-#' @seealso \code{\link{SCSTEM_Estim}}, \code{\link{SCSTEM_BootInference}} and
+#' @seealso \code{\link{SCSTEM_Estimation}}, \code{\link{SCSTEM_BootInference}} and
 #'   \code{\link{STEM_Bootstrap}}
 #'
 #' @keywords models spatial
@@ -130,8 +130,8 @@
 #' @export
 SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...) {
 
-  if (!inherits(SCSTEM, "SCSTEM_Estim")) {
-    stop("'SCSTEM' must be an object of class 'SCSTEM_Estim' returned by SCSTEM_Estim().",
+  if (!inherits(SCSTEM, "SCSTEM_Estimation")) {
+    stop("'SCSTEM' must be an object of class 'SCSTEM_Estimation' returned by SCSTEM_Estimation().",
          call. = FALSE)
   }
   if (length(B) != 1L || is.na(B) || B < 1 || B != round(B)) {
@@ -189,11 +189,11 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                      seed = args$seed, verbose = FALSE)
   user_args <- list(...)
   refit_args[names(user_args)] <- user_args
-  ### Keep only what SCSTEM_Estim() actually accepts. The settings are carried
+  ### Keep only what SCSTEM_Estimation() actually accepts. The settings are carried
   ### over from a stored list, so without this filter a change in the signature
-  ### of SCSTEM_Estim() would make every refit fail at run time with an
+  ### of SCSTEM_Estimation() would make every refit fail at run time with an
   ### "unused argument" error instead of being caught at build time.
-  refit_args <- refit_args[names(refit_args) %in% names(formals(SCSTEM_Estim))]
+  refit_args <- refit_args[names(refit_args) %in% names(formals(SCSTEM_Estimation))]
   refit_args <- refit_args[!vapply(refit_args, is.null, logical(1))]
 
   ### Cluster-wise generating models: the fitted STEM model of each cluster with
@@ -232,7 +232,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                            phi = base_model$skeleton$phi,
                            K = base_model$skeleton$K)
 
-    do.call(SCSTEM_Estim, c(list(StemModel = mod_star), refit_args))
+    do.call(SCSTEM_Estimation, c(list(StemModel = mod_star), refit_args))
   }
 
   ### The whole loop is evaluated under the requested seed. scstem_with_seed()

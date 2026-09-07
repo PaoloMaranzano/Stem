@@ -70,7 +70,7 @@
 #'      xlab = "", ylab = expression(PM[2.5]))
 #'
 #' @seealso \code{\link{pm10}}, \code{\link{STEM_Model}} and
-#'   \code{\link{SCSTEM_Estim}}
+#'   \code{\link{SCSTEM_Estimation}}
 #'
 #' @keywords datasets
 "povalley"

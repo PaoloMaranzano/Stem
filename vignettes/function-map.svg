@@ -90,7 +90,7 @@
   <rect class="exported" x="778" y="472" width="142" height="34"/>
   <text x="849" y="492.83" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1b2430">SCSTEM_Fitted</text>
   <rect class="exported" x="44" y="612" width="160" height="38"/>
-  <text x="124" y="635.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">SCSTEM_Estim</text>
+  <text x="124" y="635.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">SCSTEM_Estimation</text>
   <rect class="exported" x="44" y="676" width="160" height="34"/>
   <text x="124" y="697.17" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1b2430">SCSTEM_Infocrit</text>
   <rect class="exported" x="44" y="732" width="160" height="34"/>
@@ -155,5 +155,5 @@
   <text x="24" y="856" class="note">SCSTEM_Bootstrap regenerates the data regime by regime and re-runs</text>
   <text x="24" y="872" class="note">the whole SC-STEM procedure, clustering included, on every draw.</text>
   <text x="470" y="856" class="note">STEM_Fit is the single entry point: it dispatches to STEM_Estimation</text>
-  <text x="470" y="872" class="note">when k = 1 and to SCSTEM_Estim when k &gt; 1, with or without a penalty on beta.</text>
+  <text x="470" y="872" class="note">when k = 1 and to SCSTEM_Estimation when k &gt; 1, with or without a penalty on beta.</text>
 </svg>

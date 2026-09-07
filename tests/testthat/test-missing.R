@@ -167,11 +167,11 @@ test_that("SC-STEM estimation tolerates gaps in the response", {
                     coordinates = s$coordinates,
                     phi = po_phi(), K = matrix(1, s$d, 1))
 
-  fit <- SCSTEM_Estim(mod, k = 2, phi_penalty = 0.5, knn = 3,
+  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, knn = 3,
                       precision = 0.5, precision_full_dataset = 0.5,
                       max_iter = 2, seed = 1)
 
-  expect_s3_class(fit, "SCSTEM_Estim")
+  expect_s3_class(fit, "SCSTEM_Estimation")
   expect_length(fit$group, s$d)
   expect_true(all(fit$group %in% 1:2))
 })

@@ -83,7 +83,7 @@ one_rep <- function(r, dd, TT, hypothesis) {
   n <- dd * TT
   out <- list()
   for (kk in seq_len(K_MAX)) {
-    f <- try(SCSTEM_Estim(mod, k = kk, phi_penalty = 0, knn = min(5L, dd - 1L),
+    f <- try(SCSTEM_Estimation(mod, k = kk, phi_penalty = 0, knn = min(5L, dd - 1L),
                           distance = "geo", precision = 0.1,
                           precision_full_dataset = 0.05, max_iter = 6,
                           seed = 1000 + r, verbose = FALSE), silent = TRUE)

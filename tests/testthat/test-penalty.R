@@ -64,9 +64,12 @@ test_that("the lasso and elastic-net updates satisfy their optimality conditions
   w <- stem_penalized_index(r)
   s <- sqrt(diag(M)); Ms <- M / tcrossprod(s); vs <- v / s
 
+  ## on the absolute scale, which is the convention of the objective the KKT
+  ## conditions below are written for
   for (al in c(1, 0.5)) {
     lam <- 1.2
-    b  <- stem_beta_update(M, v, alpha = al, lambda = lam, w = w)$beta
+    b  <- stem_beta_update(M, v, alpha = al, lambda = lam, w = w,
+                           lambda_scale = "absolute")$beta
     bs <- b * s
     g  <- as.numeric(vs - Ms %*% bs - lam * (1 - al) * w * bs)
     kkt <- vapply(seq_len(r), function(j) {
@@ -97,4 +100,84 @@ test_that("STEM_Fit dispatches on k and validates its arguments", {
   expect_error(STEM_Fit(m, lambda = -1), "lambda")
   expect_error(STEM_Fit(m, k = 0), "k")
   expect_error(STEM_Fit(list()), "STEM_Model")
+})
+
+test_that("the relative scale makes lambda free of the units of the response", {
+  set.seed(21); r <- 5L
+  A <- matrix(stats::rnorm(80 * r), 80, r)
+  M <- crossprod(A); v <- as.numeric(crossprod(A, stats::rnorm(80)))
+  w <- stem_penalized_index(r)
+
+  ## the same problem with the response, and so the gradient, scaled by c
+  cc <- 7
+  for (al in c(0, 0.5, 1)) {
+    b1 <- stem_beta_update(M, v,      alpha = al, lambda = 0.3, w = w)$beta
+    b2 <- stem_beta_update(M, cc * v, alpha = al, lambda = 0.3, w = w)$beta
+    expect_equal(b2, cc * b1, tolerance = 1e-7)   # the coordinate descent stops at 1e-9
+  }
+  ## and the same with the information, so the GLS metric, scaled
+  for (al in c(0, 0.5, 1)) {
+    b1 <- stem_beta_update(M, v, alpha = al, lambda = 0.3, w = w)$beta
+    b2 <- stem_beta_update(M / 4, v / 4, alpha = al, lambda = 0.3, w = w)$beta
+    expect_equal(b2, b1, tolerance = 1e-7)
+  }
+})
+
+test_that("lambda * alpha >= 1 empties the model on the relative scale", {
+  set.seed(22); r <- 5L
+  A <- matrix(stats::rnorm(80 * r), 80, r)
+  M <- crossprod(A); v <- as.numeric(crossprod(A, stats::rnorm(80)))
+  w <- stem_penalized_index(r)
+  b <- stem_beta_update(M, v, alpha = 1, lambda = 1, w = w)$beta
+  expect_true(all(b[w == 1] == 0))
+  b <- stem_beta_update(M, v, alpha = 0.5, lambda = 2, w = w)$beta
+  expect_true(all(b[w == 1] == 0))
+  ## just below, something survives
+  b <- stem_beta_update(M, v, alpha = 1, lambda = 0.999, w = w)$beta
+  expect_true(any(b[w == 1] != 0))
+})
+
+test_that("latent = FALSE and spatial = FALSE give penalized linear regression", {
+  set.seed(4); d <- 24L; TT <- 60L; s2 <- 4
+  co <- cbind(stats::runif(d, 7.5, 13.5), stats::runif(d, 44.7, 46.1))
+  X  <- cbind(1, stats::rnorm(TT * d), stats::rnorm(TT * d))
+  X[, 3] <- X[, 2] + 0.05 * stats::rnorm(TT * d)          # collinear on purpose
+  z  <- matrix(as.numeric(X %*% c(1.5, 2, -0.5)) +
+               stats::rnorm(TT * d, sd = sqrt(s2)), TT, d)
+  mod <- STEM_Model(z = z, covariates = X, coordinates = co,
+    phi = list(beta = matrix(0, 3, 1), sigma2eps = 0.7 * s2,
+               sigma2omega = 0.3 * s2, theta = 1 / 100000,
+               G = matrix(0.5, 1, 1), Sigmaeta = matrix(0.2 * s2, 1, 1),
+               m0 = as.matrix(0), C0 = as.matrix(1)),
+    K = matrix(1, d, 1))
+
+  M0 <- crossprod(X); v0 <- as.numeric(crossprod(X, as.vector(z)))
+  w  <- stem_penalized_index(3L)
+
+  for (cfg in list(c(0, 0), c(0, 0.3), c(1, 0.3), c(0.5, 0.3))) {
+    fit <- STEM_Fit(mod, k = 1, alpha = cfg[1], lambda = cfg[2],
+                    latent = FALSE, spatial = FALSE, regularization = 0,
+                    precision = 1e-8, max.iter = 40, distance = "geo")
+    ref <- if (cfg[2] == 0) as.numeric(solve(M0, v0)) else
+      stem_beta_update(M0, v0, alpha = cfg[1], lambda = cfg[2], w = w)$beta
+    expect_equal(as.numeric(fit$estimates$phi.hat$beta), ref, tolerance = 1e-8)
+  }
+
+  ## the parameters that are switched off stay where they started
+  fit <- STEM_Fit(mod, k = 1, latent = FALSE, spatial = FALSE,
+                  regularization = 0, precision = 1e-8, max.iter = 20,
+                  distance = "geo")
+  expect_equal(as.numeric(fit$estimates$phi.hat$theta), 1 / 100000)
+  expect_equal(as.numeric(fit$estimates$phi.hat$G), 0.5)
+  expect_false(fit$estimates$scope$latent)
+  expect_false(fit$estimates$scope$spatial)
+})
+
+test_that("lambda_by = 'size' penalizes the smaller regimes more", {
+  ## the mapping itself, which is what the option controls
+  d <- 60L; k <- 3L; lambda <- 0.4
+  nbar <- d / k
+  sizes <- c(10L, 20L, 30L)
+  expect_equal(lambda * nbar / sizes, c(0.8, 0.4, lambda * 20 / 30))
+  expect_true(lambda * nbar / sizes[1] > lambda * nbar / sizes[3])
 })

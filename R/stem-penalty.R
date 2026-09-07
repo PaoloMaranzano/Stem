@@ -50,13 +50,46 @@
 ### separable, so the cycle converges to the exact maximizer of the M-step: this
 ### is a genuine EM, not merely a generalized one.
 ###
-### THE METRIC MATTERS. M is a GLS cross-product, not a Euclidean one: it
-### carries Sigma_e^{-1}. Standardizing the columns of X in the usual Euclidean
-### sense is therefore NOT the right normalization here. The scaling that makes
-### lambda comparable across covariates, and across regimes in SC-STEM, is the
-### one that puts the diagonal of M at one, and that is what `standardize`
+### TWO SCALES HAVE TO BE REMOVED, NOT ONE.
+###
+### The first is the scale of the COVARIATES. M is a GLS cross-product, not a
+### Euclidean one: it carries Sigma_e^{-1}. Standardizing the columns of X in
+### the usual Euclidean sense is therefore NOT the right normalization here. The
+### one that is puts the diagonal of M at one, and that is what `standardize`
 ### does -- internally, so that the coefficients returned are always on the
 ### original scale of the covariates.
+###
+### The second is the scale of the RESPONSE, and it applies to ONE HALF of the
+### penalty and not the other. The two halves are not on the same footing:
+###
+###   the L2 part multiplies the CURVATURE, whose diagonal the first scaling has
+###   already set to one, so lambda is a pure shrinkage factor -- in the
+###   orthogonal case the coefficient is multiplied by 1/(1+lambda) -- and it is
+###   already free of the units of the response. Multiplying it by the size of
+###   the gradient as well would BREAK that property, making a ridge depend on
+###   the error variance when it does not have to;
+###
+###   the L1 part is a THRESHOLD compared against the gradient, and the gradient
+###   carries the units of the response. Without a reference the same lambda
+###   means different things at different error variances and, in the clustered
+###   model, in different regimes -- exactly what one does not want from a
+###   hyperparameter.
+###
+### `lambda_scale = "relative"`, the default, therefore measures the L1 part
+### against
+###
+###     lambda_ref = max_{j penalized} | v_j - sum_{l unpenalized} M_jl beta_l | ,
+###
+### the largest partial gradient once the unpenalized coordinates have been
+### profiled out: the classical lambda_max of the lasso path. Every penalized
+### coefficient is exactly zero as soon as lambda * alpha >= 1, so lambda in
+### (0, 1] traverses the whole path at alpha = 1, which is the convention of
+### glmnet. Under it the estimator is invariant to the units of the response for
+### every alpha.
+###
+### `lambda_scale = "absolute"` applies lambda to the scaled normal equations
+### directly, which is the convention of the derivation and the one to use when
+### comparing against an external implementation.
 ###
 ### THE INTERCEPT IS NEVER PENALIZED BY DEFAULT, and not merely by convention:
 ### the model already carries a latent process whose initial mean m0 absorbs the
@@ -78,37 +111,76 @@
 	w <- rep(0, r); w[penalize] <- 1; w
 }
 
+### The reference scale of the penalty: the largest partial gradient over the
+### penalized coordinates, once the unpenalized ones have been profiled out.
+### Arguments are already on the scaled problem.
+`stem_lambda_ref` <- function(Ms, vs, w) {
+	pen <- which(w > 0)
+	if (!length(pen)) return(0)
+	free <- which(w == 0)
+	b <- rep(0, length(vs))
+	if (length(free)) {
+		Mf <- Ms[free, free, drop = FALSE]
+		b[free] <- tryCatch(solve(Mf, vs[free]),
+		                    error = function(e) rep(0, length(free)))
+	}
+	g <- vs[pen] - as.numeric(Ms[pen, , drop = FALSE] %*% b)
+	max(abs(g))
+}
+
 ### The update itself.
 ###
-###   M, v         the two accumulations of the M-step
-###   alpha        0 ridge, 1 lasso, in between elastic net
-###   lambda       the overall penalty strength; 0 returns the ordinary update
-###   w            the 0/1 weights of stem_penalized_index()
-###   beta0        the current coefficients, used to start the coordinate descent
-###   standardize  put the diagonal of M at one before penalizing
-###   ridge_reg    the small ridge the package already adds for conditioning
+###   M, v          the two accumulations of the M-step
+###   alpha         0 ridge, 1 lasso, in between elastic net
+###   lambda        the penalty strength; 0 returns the ordinary update
+###   w             the 0/1 weights of stem_penalized_index()
+###   beta0         the current coefficients, used to start the coordinate descent
+###   standardize   put the diagonal of M at one before penalizing
+###   lambda_scale  "relative" measures lambda against stem_lambda_ref(),
+###                 "absolute" applies it to the scaled normal equations directly
+###   ridge_reg     the small ridge the package already adds for conditioning
 `stem_beta_update` <- function(M, v, alpha = 0, lambda = 0, w = NULL,
                                beta0 = NULL, standardize = TRUE,
+                               lambda_scale = c("relative", "absolute"),
                                ridge_reg = 0, tol = 1e-9, maxit = 1000L) {
 
+	lambda_scale <- match.arg(lambda_scale)
 	r <- nrow(M)
 	if (is.null(w)) w <- stem_penalized_index(r)
 	v <- as.numeric(v)
 
 	### no penalty: the estimator the package has always computed
 	if (lambda <= 0) {
-		return(list(beta = solve(diag(ridge_reg, r) + M, v), df = r, iter = 0L))
+		return(list(beta = solve(diag(ridge_reg, r) + M, v), df = r, iter = 0L,
+		            lambda_ref = NA_real_, lambda_eff = 0))
 	}
 
-	### the scaling that makes lambda comparable across covariates. s_j is the
-	### GLS norm of column j; beta is solved for on the scaled design and
-	### returned on the original one.
+	### the scaling that removes the units of the covariates. s_j is the GLS
+	### norm of column j; beta is solved for on the scaled design and returned
+	### on the original one.
 	s <- if (isTRUE(standardize)) sqrt(pmax(diag(M), .Machine$double.eps)) else rep(1, r)
 	Ms <- M / tcrossprod(s)
 	vs <- v / s
 	b  <- if (is.null(beta0)) rep(0, r) else as.numeric(beta0) * s
 
-	l1 <- lambda * alpha * w
+	### The scaling that removes the units of the response, and it applies to the
+	### L1 part ONLY. The two halves of the penalty are not on the same footing:
+	###
+	###   the L2 part multiplies the CURVATURE, whose diagonal the first scaling
+	###   has already set to one, so lambda is a shrinkage factor -- in the
+	###   orthogonal case the coefficient is multiplied by 1/(1+lambda) -- and is
+	###   free of the units of the response by construction;
+	###
+	###   the L1 part is a THRESHOLD compared with the gradient, which carries
+	###   those units, and needs lambda_ref to be free of them.
+	###
+	### Scaling both would break the first to fix the second: a ridge would stop
+	### being invariant to the error variance, which is exactly the property it
+	### already has.
+	lref <- if (lambda_scale == "relative") stem_lambda_ref(Ms, vs, w) else 1
+	if (!is.finite(lref) || lref <= 0) lref <- 1
+
+	l1 <- lambda * alpha * lref * w
 	l2 <- lambda * (1 - alpha) * w + ridge_reg
 
 	### ridge: closed form
@@ -116,7 +188,8 @@
 		A  <- Ms + diag(l2, r)
 		bs <- solve(A, vs)
 		df <- sum(diag(solve(A, Ms)))
-		return(list(beta = bs / s, df = df, iter = 0L))
+		return(list(beta = bs / s, df = df, iter = 0L,
+		            lambda_ref = lref, lambda_eff = lambda * alpha * lref))
 	}
 
 	### lasso and elastic net: cyclic coordinate descent
@@ -143,5 +216,6 @@
 		sum(diag(solve(MA + diag(l2[act], length(act)), MA)))
 	}
 
-	list(beta = b / s, df = df, iter = it)
+	list(beta = b / s, df = df, iter = it, lambda_ref = lref,
+	     lambda_eff = lambda * alpha * lref)
 }

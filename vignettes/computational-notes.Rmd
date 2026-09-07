@@ -63,7 +63,7 @@ Concretely, at $d = 400$: $d^3 = 6.4\times 10^{7}$, so about $4\times 10^{7}$
 operations per factorisation, roughly $0.04$ seconds with the reference BLAS
 that ships with R. That looks small. Multiplied by $T = 730$ it is 29 seconds
 for **one forward pass**, that is one E-step; an EM run does thirty to fifty of
-them; and `SCSTEM_Estim()` runs an EM per regime, for every point of the
+them; and `SCSTEM_Estimation()` runs an EM per regime, for every point of the
 $(k,\varphi)$ grid, for every bootstrap draw. The cubic term is paid thousands
 of times.
 
