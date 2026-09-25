@@ -442,12 +442,18 @@ dgp_simulate <- function(labels, psi, x, coords, rho = 1, seed = 1,
   }
 
   ## ---- assemble ------------------------------------------------------------
-  z <- matrix(NA_real_, TN, d)
+  ## `mu` is the conditional mean given the latent path, which is what a fitted
+  ## value estimates: it is the target against which predictive accuracy is
+  ## measured, and it is not recoverable from z once the noise is added.
+  z  <- matrix(NA_real_, TN, d)
+  mu <- matrix(NA_real_, TN, d)
   for (i in seq_len(d)) {
     g <- labels[i]
-    z[, i] <- psi[[g]]$beta[1] + psi[[g]]$beta[2] * x[, i] + y[, g] + e[, i]
+    mu[, i] <- psi[[g]]$beta[1] + psi[[g]]$beta[2] * x[, i] + y[, g]
+    z[, i]  <- mu[, i] + e[, i]
   }
   attr(z, "latent") <- y
+  attr(z, "mu")     <- mu
   z
 }
 
@@ -515,5 +521,23 @@ dgp_draw <- function(n, TN, K, omega, scenario_row, rep = 1L,
                        force_block = scenario_row$force_block)
   list(z = z, covariates = dgp_design(x), coordinates = loc$coords,
        labels = loc$labels, psi = psi, sizes = loc$sizes,
-       latent = attr(z, "latent"), x = x)
+       latent = attr(z, "latent"), mu = attr(z, "mu"), x = x)
+}
+
+## ---------------------------------------------------------------------------
+## The true parameters of a regime, flattened onto the names the fitted object
+## uses, so that estimate and truth can be compared element by element. The fit
+## reports sigma2eps and sigma2omega separately, and theta rather than a range.
+## ---------------------------------------------------------------------------
+dgp_truth <- function(psi) {
+  do.call(rbind, lapply(seq_along(psi), function(g) {
+    p <- psi[[g]]
+    data.frame(
+      regime    = g,
+      parameter = c("beta1", "beta2", "sigma2eps", "sigma2omega", "theta",
+                    "G", "Sigmaeta", "m0"),
+      truth     = c(p$beta[1], p$beta[2], p$sigma2eps, p$sigma2omega, p$theta,
+                    p$G, sigma_eta_of(p$G, p$var_y), 0),
+      stringsAsFactors = FALSE)
+  }))
 }
