@@ -491,21 +491,18 @@ dgp_scenarios <- function() {
 }
 
 ## ---------------------------------------------------------------------------
-## The dimensions of the design
+## The dimensions of the design are NOT here. They live in design.R, which is
+## the single place where the factors and their levels are written down, so
+## that the driver and the table of the paper cannot disagree about what was
+## run. This file is the generator: given a cell, it produces the data.
 ##
-## T is read as a real observation window: 60 and 120 are five and ten years of
-## monthly data, 365 and 730 one and two years of daily data. n spans the sizes
-## a regional network actually takes: Northern Italy carries about 260 air
-## quality stations, so 20 and 40 are a small sub-network, 60 and 100 a regional
-## one, 200 and 400 a national or multi-regional one.
+## For the record of what the levels mean: T is read as a real observation
+## window, 60 and 120 being five and ten years of monthly data and 365 one year
+## of daily data; n spans the sizes a regional network actually takes, Northern
+## Italy carrying about 260 air quality stations, so 20 and 50 are a small
+## sub-network, 100 a regional one, 200 and 400 a national or multi-regional
+## one.
 ## ---------------------------------------------------------------------------
-dgp_dims <- function() {
-  list(TN      = c(60L, 120L, 365L),
-       n       = c(20L, 40L, 60L, 100L, 200L, 400L),
-       K       = c(1L, 2L, 3L),
-       omega   = c(0, 1/3, 2/3, 1),
-       balance = c("balanced", "unbalanced"))
-}
 
 ## ---------------------------------------------------------------------------
 ## One complete data set of the design, ready for STEM_Model()

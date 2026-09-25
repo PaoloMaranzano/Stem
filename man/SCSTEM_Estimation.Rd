@@ -51,11 +51,15 @@ Default is 1.}
 spatial penalty. See \code{Details}.}
 
 \item{knn}{integer, the number of nearest neighbors used to build the
-spatial penalty graph. The graph is symmetrized. Default is 5.}
+spatial penalty graph. The graph is symmetrized, and the neighbors are
+measured with the metric given by \code{distance}, so that the penalty and
+the covariance see the same geometry. Default is 5.}
 
 \item{distance}{character, \code{"euclidean"} for Euclidean distance or
-\code{"geo"} for geodesic distance. Use \code{"geo"} only when the
-coordinates are longitude/latitude. Default is \code{"geo"}.}
+\code{"geo"} for geodesic distance. It governs both the covariance of the
+measurement error and the nearest neighbors of the penalty graph. Use
+\code{"geo"} only when the coordinates are longitude/latitude. Default is
+\code{"geo"}.}
 
 \item{init_method}{character, either \code{"kmeans"} (default) or
 \code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed

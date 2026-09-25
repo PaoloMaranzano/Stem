@@ -16,6 +16,71 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-25 (second entry)
+
+**The neighbourhood graph of the Potts penalty was built with a different
+metric from the covariance.** `scstem_neighbors()` passed the coordinates to
+`spdep::knearneigh()` without `longlat`, so on geographic coordinates the
+nearest neighbours were those of a *planar* metric on raw degrees, in which one
+degree of longitude and one of latitude count the same. They do not: at 45.5
+degrees of latitude a degree of longitude is 78 km against 110.6 km, so a
+north-south pair at a given separation in kilometres looked closer than the
+east-west pair at the same separation, and the graph systematically preferred
+north-south neighbours. Meanwhile `Sigma_e` was built from
+`geodist::geodist(measure = "geodesic")`. The two spatial ingredients of the
+model therefore disagreed with each other about which locations are close.
+
+Measured on 300 points over a Po Valley box, at `knn = 5`: the planar graph
+shares 78.5% of its edges with the geodesic one, and only 40.8% of its edges are
+more east-west than north-south against 50.9% for the correct metric.
+
+* `scstem_neighbors()` gains a `distance` argument and passes
+  `longlat = TRUE` when it is `"geo"`. `SCSTEM_Estimation()` hands it the same
+  `distance` it uses for the covariance, so the two can no longer diverge.
+  Recovering 99.0% of the geodesic graph's edges, against 78.5% before.
+* The coordinate columns are named `lon`/`lat` before the call, which is the
+  convention the package follows throughout and which `spdep` otherwise has to
+  assume out loud.
+
+The default is unchanged in name only: `distance = "geo"` was already the
+default of `SCSTEM_Estimation()`, so a fit that did not set it explicitly now
+gets a different -- correct -- graph and may return a slightly different
+partition. Nothing was released with the old behaviour.
+
+**The design of the simulation study moves into `dev/paper/design.R`.** It was
+spread between `dgp_dims()` in the generator and an `expand.grid()` in the
+driver, with a third copy in the table script, which is three places to keep in
+agreement and two too many. The new file holds the factors, their levels, the
+reference cell and the blocks, and the driver and the table read it. It also
+prices whatever is written in it from the timings measured on this machine, so
+the budget of a change can be read before a run is launched:
+
+```
+Rscript dev/paper/design.R
+```
+
+The study is deliberately not a full factorial: crossing every factor with every
+other is 2700 cells at `K = 3` alone, most of them answering no question. It is a
+core factorial in the three factors that interact -- how many locations, how
+separated the regimes, how long the series -- plus one-factor-at-a-time margins
+around a reference cell for the factors that are there to show the results do not
+turn on them. 240 cells, 237 of them feasible, 206 core-hours at M = 100.
+
+`07-simulation.R` loses its per-factor command-line options, which redefined the
+design, and gains `--blocks` and a `--only_<factor>` for each factor, which
+select from it.
+
+**Three figures for the design**, from `dev/paper/15-design-figures.R`:
+`fig_design_omega.pdf` (the point configuration as the overlap varies, at every
+network size), `fig_design_knn.pdf` (the graph the penalty lives on, as `knn` and
+the overlap vary) and `fig_design_graph.pdf` (what the graph does in numbers).
+The last one earns its place: it shows that `knn` multiplies the number of edges,
+and so the weight the penalty carries at a given `phi`, but from n = 100 on it
+leaves unchanged the share of edges that cross a true regime boundary -- which is
+what decides whether the penalty helps. That share runs from 1 - 1/K, the value
+of a graph carrying no information about the partition, at `omega = 0`, to about
+0.13 at `omega = 1`.
+
 ### 2026-09-25
 
 **`STEM_Fitted()` is split in two, because it was one function doing two jobs

@@ -25,22 +25,40 @@
 ### the same pair (i,j) would contribute to the assignment score of one unit but
 ### not of the other, and the sequential ICM sweep would not be maximizing a
 ### well-defined objective.
-`scstem_neighbors` <- function(coordinates, knn = 5) {
+###
+### The graph has to be built with the SAME metric as the covariance, otherwise
+### the two spatial ingredients of the model disagree with one another. On
+### geographic coordinates, neighbors computed on raw degrees are the neighbors
+### of a planar metric in which a degree of longitude and a degree of latitude
+### count the same: at 45 degrees of latitude a degree of longitude is about
+### 78 km against 111 km, so such a graph systematically prefers north-south
+### neighbors to east-west ones. With distance = "geo" the neighbors are
+### measured on the sphere, as Sigma_e is.
+`scstem_neighbors` <- function(coordinates, knn = 5,
+                               distance = c("geo", "euclidean")) {
 
+  distance <- match.arg(distance)
   d <- nrow(coordinates)
   if (knn < 1 || knn >= d) {
     stop("'knn' must be a positive integer strictly smaller than the number of locations.",
          call. = FALSE)
   }
 
-  nb <- spdep::knn2nb(spdep::knearneigh(as.matrix(coordinates), k = knn))
+  ### the package takes the first column for the longitude and the second for
+  ### the latitude throughout, as geodist::geodist() does; naming them says so
+  ### to spdep as well, which would otherwise assume it out loud
+  cc <- as.matrix(coordinates)[, 1:2, drop = FALSE]
+  colnames(cc) <- c("lon", "lat")
+
+  nb <- spdep::knn2nb(spdep::knearneigh(cc, k = knn,
+                                        longlat = identical(distance, "geo")))
   W <- spdep::nb2mat(nb, style = "B", zero.policy = TRUE)
   W <- pmax(W, t(W))
   diag(W) <- 0
 
   nb_list <- lapply(seq_len(d), function(i) which(W[i, ] > 0))
 
-  list(W = W, nb = nb_list, knn = knn)
+  list(W = W, nb = nb_list, knn = knn, distance = distance)
 }
 
 

@@ -182,10 +182,14 @@
 #'   \code{"per-observation"} or \code{"raw"}, setting the scale factor of the
 #'   spatial penalty. See \code{Details}.
 #' @param knn integer, the number of nearest neighbors used to build the
-#'   spatial penalty graph. The graph is symmetrized. Default is 5.
+#'   spatial penalty graph. The graph is symmetrized, and the neighbors are
+#'   measured with the metric given by \code{distance}, so that the penalty and
+#'   the covariance see the same geometry. Default is 5.
 #' @param distance character, \code{"euclidean"} for Euclidean distance or
-#'   \code{"geo"} for geodesic distance. Use \code{"geo"} only when the
-#'   coordinates are longitude/latitude. Default is \code{"geo"}.
+#'   \code{"geo"} for geodesic distance. It governs both the covariance of the
+#'   measurement error and the nearest neighbors of the penalty graph. Use
+#'   \code{"geo"} only when the coordinates are longitude/latitude. Default is
+#'   \code{"geo"}.
 #' @param init_method character, either \code{"kmeans"} (default) or
 #'   \code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed
 #'   location-wise covariate means, with multiple restarts and a
@@ -508,7 +512,7 @@ SCSTEM_Estimation <- function(StemModel,
   }
 
   ### Spatial penalty graph (symmetrized knn)
-  nbinfo <- scstem_neighbors(coordinates, knn = knn)
+  nbinfo <- scstem_neighbors(coordinates, knn = knn, distance = distance)
   nb <- nbinfo$nb
   W <- nbinfo$W
 

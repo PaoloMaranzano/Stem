@@ -7,20 +7,25 @@
 ## Adjusted Rand Index of the selected partition against the truth, and the wall
 ## time.
 ##
-## EVERY FACTOR OF THE DESIGN IS A COMMAND-LINE OPTION, so a run can be narrowed
-## to the margins that will actually be discussed. The values below are the
-## defaults; each is a comma-separated list on the command line:
+## THE DESIGN IS NOT IN THIS FILE. The factors, their levels, the reference
+## cell and the blocks are in design.R, which is the setup: edit the numbers
+## there and this driver follows. Running that file on its own prints the cell
+## count and the budget, so the cost of a change can be read before a run:
 ##
-##   Rscript dev/paper/07-simulation.R                       the whole design
-##   Rscript dev/paper/07-simulation.R --balance=balanced    balanced cells only
-##   Rscript dev/paper/07-simulation.R --K=1,2 --omega=0,1 --nrep=25
-##   Rscript dev/paper/07-simulation.R --n=40,100 --TN=120,365 --tag=core
-##   Rscript dev/paper/07-simulation.R --scenario=S0,S4 --nrep=1 --tag=timing
+##   Rscript dev/paper/design.R
 ##
-## Fractions are allowed, so --omega=0,1/3,2/3,1 works. The script runs from any
-## working directory: it finds the repository from its own location, and the
-## output directory can be moved with the STEM_CACHE environment variable. That
-## is what makes it usable on a virtual machine.
+## From here a run is narrowed without touching the design, by block or by
+## level; each option is a comma-separated list:
+##
+##   Rscript dev/paper/07-simulation.R                        the whole design
+##   Rscript dev/paper/07-simulation.R --blocks=core,null     two blocks
+##   Rscript dev/paper/07-simulation.R --only_n=20,50 --nrep=5 --tag=pilot
+##   Rscript dev/paper/07-simulation.R --only_TN=120 --tag=short
+##   Rscript dev/paper/07-simulation.R --rep_from=51 --rep_to=100
+##
+## The script runs from any working directory: it finds the repository from its
+## own location, and the output directory can be moved with the STEM_CACHE
+## environment variable. That is what makes it usable on a virtual machine.
 ##
 ## FOUR OUTPUTS, because the questions have four shapes.
 ##
@@ -58,29 +63,31 @@ local({
   f <- grep("^--file=", a, value = TRUE)
   here <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
   source(file.path(here, "00-setup.R"), chdir = TRUE)
+  source(file.path(here, "design.R"), chdir = TRUE)
   source(file.path(here, "06-dgp.R"), chdir = TRUE)
 }, envir = globalenv())
 
 stem_load()
 
-dims <- dgp_dims()
 scen <- dgp_scenarios()
 
 CFG <- stem_config(list(
-  ## the design
-  n        = dims$n,
-  TN       = dims$TN,
-  K        = dims$K,
-  omega    = dims$omega,
-  balance  = dims$balance,
-  scenario = scen$id,
+  ## THE DESIGN LIVES IN design.R. The factors, their levels, the reference
+  ## cell and the blocks are written there, in one place, and are read from
+  ## here; running that file prints the cell count and the budget. The three
+  ## options below select from it rather than redefine it.
+  blocks   = stem_design_blocks(),
   nrep     = 100L,
-  ## The neighbourhood graph the Potts penalty lives on. With point-referenced
-  ## data there is no canonical adjacency -- unlike areal data, where a shared
-  ## boundary defines it -- so the graph is a modelling choice and the results
-  ## have to be shown not to depend on it. Hence knn is a FACTOR of the design,
-  ## not a setting.
-  knn      = c(3L, 5L, 10L),
+  ## Restrict the design to given levels without editing design.R, one factor
+  ## per option, so a run can be narrowed to the margin that is being looked at.
+  ## An empty option keeps every level of that factor.
+  only_n        = integer(0),
+  only_TN       = integer(0),
+  only_K        = integer(0),
+  only_omega    = numeric(0),
+  only_knn      = integer(0),
+  only_scenario = character(0),
+  only_balance  = character(0),
   ## what the estimator searches over. phi_ref is the penalty at which parameter
   ## recovery is read off, and has to be a point of phi_grid.
   k_grid   = 1:4,
@@ -122,28 +129,29 @@ dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
 ## imbalance cannot be realised with regimes of at least N_MIN units are dropped
 ## rather than silently rebalanced.
 ## ---------------------------------------------------------------------------
-cells <- NULL
-if (1L %in% CFG$K) {
-  cells <- expand.grid(n = CFG$n, TN = CFG$TN, K = 1L, omega = CFG$omega[1],
-                       id = CFG$scenario[1], balance = CFG$balance[1],
-                       knn = CFG$knn, stringsAsFactors = FALSE)
+cells <- stem_design_cells(blocks = CFG$blocks)
+## --only_<factor> keeps the named levels of that factor and nothing else.
+## The option name is on the left, the column of `cells` it filters on the right.
+for (opt in list(c("only_n", "n"), c("only_TN", "TN"), c("only_K", "K"),
+                 c("only_knn", "knn"), c("only_scenario", "id"),
+                 c("only_balance", "balance"))) {
+  lev <- CFG[[opt[1]]]
+  if (length(lev)) cells <- cells[cells[[opt[2]]] %in% lev, ]
 }
-Kmulti <- setdiff(CFG$K, 1L)
-if (length(Kmulti)) {
-  cells <- rbind(cells,
-    expand.grid(n = CFG$n, TN = CFG$TN, K = Kmulti, omega = CFG$omega,
-                id = CFG$scenario, balance = CFG$balance, knn = CFG$knn,
-                stringsAsFactors = FALSE))
-}
-## the graph needs strictly fewer neighbours than locations
-cells <- cells[cells$knn < cells$n, ]
+## omega is a double, so it is matched with a tolerance rather than with %in%
+if (length(CFG$only_omega))
+  cells <- cells[vapply(cells$omega, function(w)
+    any(abs(w - CFG$only_omega) < 1e-8), logical(1)), ]
+## cells whose imbalance cannot be realised with regimes of at least N_MIN
+## units are dropped rather than silently rebalanced
 cells <- cells[mapply(dgp_feasible, cells$n, cells$K, cells$balance), ]
-## cheapest first, so that an interrupted run still covers the design
-cells <- cells[order(cells$n * cells$TN), ]
 rownames(cells) <- NULL
 
-cat(sprintf("%d cells x %d replications, writing to\n  %s\n\n",
-            nrow(cells), CFG$nrep, CSV))
+budget <- stem_design_cost(cells, nrep = CFG$nrep)
+cat(sprintf("%d cells x %d replications, writing to\n  %s\n", nrow(cells),
+            CFG$nrep, CSV))
+cat(sprintf("estimated %.0f core-hours (%.1f h on 12 cores)\n\n",
+            budget$core_hours, budget$wall_hours))
 
 ## ---------------------------------------------------------------------------
 ## One replication

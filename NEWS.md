@@ -99,6 +99,13 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   monotonicity both hold. An exact pruning bound keeps the scan affordable.
 * The `knn` graph is **symmetrized**: the Potts penalty is defined on an
   undirected graph, whereas `spdep::knearneigh()` returns an asymmetric one.
+* The `knn` graph is built with the **same metric as the covariance**. The
+  nearest neighbors used to be taken on raw coordinates, so on longitude and
+  latitude they were the neighbors of a planar metric in which a degree of
+  longitude and a degree of latitude count the same; at 45 degrees of latitude
+  the first is about 78 km and the second about 111 km, so the graph preferred
+  north-south neighbors while `Sigma_e` was measured on the sphere. The
+  `distance` argument now governs both.
 * New `phi_scale` argument. Each location contributes `T` observations to the
   likelihood, so a penalty calibrated for cross-sectional models is not
   transferable. The default `"auto"` normalizes the penalty by the median spread

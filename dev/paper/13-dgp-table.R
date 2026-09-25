@@ -12,12 +12,13 @@ local({
   h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
   source(file.path(h, "00-setup.R"), chdir = TRUE)
 }, envir = globalenv())
+source(file.path(stem_paper_dir(), "design.R"), chdir = TRUE)
 source(file.path(stem_paper_dir(), "06-dgp.R"), chdir = TRUE)
 OUT <- stem_fig_dir()
 
 b    <- dgp_base()
 scen <- dgp_scenarios()
-dims <- dgp_dims()
+dims <- stem_design_dims()
 tot  <- b$sigma2eps + b$sigma2omega
 
 cat("BASELINE (regime 1 in every scenario), from the pooled fit on the network\n")
@@ -54,7 +55,8 @@ rows <- do.call(rbind, lapply(seq_len(nrow(scen)), function(i) {
 print(rows, row.names = FALSE, right = FALSE)
 
 cat("\nOVERLAP: standardised separation 2*omega/sqrt(nu_sp), the same for every K\n")
-print(round(setNames(2 * dims$omega / sqrt(NU_SP), c("0", "1/3", "2/3", "1")), 2))
+print(round(stats::setNames(2 * dims$omega / sqrt(NU_SP),
+                            format(dims$omega)), 2))
 cat(sprintf("nu_sp = %.1f, one abstract unit = %d km, so a cluster has sd %.0f km\n",
             NU_SP, UNIT_KM, sqrt(NU_SP) * UNIT_KM))
 cat(sprintf("and at omega = 1 the centres are %d km apart\n", 2 * UNIT_KM))
@@ -62,7 +64,7 @@ cat(sprintf("and at omega = 1 the centres are %d km apart\n", 2 * UNIT_KM))
 cat("\nREGIME SIZES\n")
 for (bal in dims$balance) {
   cat("  ", bal, "\n", sep = "")
-  for (K in c(2L, 3L)) {
+  for (K in setdiff(dims$K, 1L)) {
     line <- vapply(dims$n, function(n) {
       s <- dgp_sizes(n, K, bal)
       ok <- dgp_feasible(n, K, bal)
@@ -78,14 +80,16 @@ cat("  (X) marks a cell that cannot carry regimes of at least ", N_MIN,
 ## ---------------------------------------------------------------------------
 ## The size of the experiment
 ## ---------------------------------------------------------------------------
-cells <- rbind(
-  expand.grid(n = dims$n, TN = dims$TN, K = 1L, omega = 2/3, id = "S0",
-              balance = "balanced", stringsAsFactors = FALSE),
-  expand.grid(n = dims$n, TN = dims$TN, K = c(2L, 3L), omega = dims$omega,
-              id = scen$id, balance = dims$balance, stringsAsFactors = FALSE))
-keep <- mapply(dgp_feasible, cells$n, cells$K, cells$balance)
-cat(sprintf("\nFULL DESIGN: %d cells, of which %d feasible\n",
-            nrow(cells), sum(keep)))
+cells <- stem_design_cells()
+keep  <- mapply(dgp_feasible, cells$n, cells$K, cells$balance)
+cost  <- stem_design_cost(cells[keep, ], nrep = 100L)
+cat(sprintf("\nDESIGN: %d cells, of which %d feasible; blocks %s\n",
+            nrow(cells), sum(keep),
+            paste(stem_design_blocks(), collapse = ", ")))
+cat(sprintf("  %.0f core-hours at M = 100, %.1f h on %d cores\n",
+            cost$core_hours, cost$wall_hours, cost$cores))
+for (b in stem_design_blocks())
+  cat(sprintf("    %-10s %4d cells\n", b, nrow(stem_design_cells(blocks = b))))
 
 ## ---------------------------------------------------------------------------
 ## LaTeX
