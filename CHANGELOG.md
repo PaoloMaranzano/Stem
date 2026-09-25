@@ -16,6 +16,43 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-25 (fourth entry)
+
+**The intermediate overlap is rounded to `omega = 0.70`, and the design is
+written into the paper.** Since the separation is no longer proportional to
+`omega`, a round value of `omega` is not a round value of anything that matters,
+and the question is what a rounding costs on the scale that does. Measured at
+`K = 3` by the Bayes error of the optimal assignment to the nearest centre, and
+by the Adjusted Rand Index that rule attains -- what *any* purely spatial
+procedure could achieve:
+
+| `omega` | separation | Bayes error | attainable ARI | crossing edges |
+|---|---|---|---|---|
+| 0 | 0.00 | 0.667 | 0.000 | 0.67 |
+| 0.50 | 1.05 | 0.443 | 0.117 | 0.55 |
+| 0.686 | 1.58 | 0.333 | 0.252 | 0.44 |
+| 0.70 | 1.63 | 0.324 | 0.265 | 0.41 |
+| 1 | 3.16 | 0.100 | 0.722 | 0.15 |
+
+`0.70` is within a rounding error of `0.686` and keeps the middle level where it
+was; `0.50` would more than halve the attainable index, from 0.252 to 0.117, and
+move the intermediate cell two thirds of the way back to the null case. The
+design takes `omega = 0.70`. At `omega = 0` the Bayes error is `1 - 1/K`, the
+error of guessing, which is the definition of the null case, and the crossing
+share of the graph is the same number.
+
+**The simulation study is now described in the paper.** Section 3.1.1 carries
+the fixed-total-variance construction, the separation it implies, the table of
+the three levels and the residual dependence of the distance distribution on the
+overlap; a new Section 3.1.5 sets out the neighbourhood graph -- why it is a
+modelling choice with point-referenced data and therefore a factor, the
+symmetrization, the metric, the intractable partition function, and the fact
+that spatial proximity enters the model twice; Section 3.1.6 carries the factors
+with their levels, the five blocks with their cell counts, the evaluation
+metrics, why the station is the unit of the error measures, and what the four
+output records contain. The supplement's constants, pseudocode and regime-size
+tables follow. Both documents compile, 25 and 11 pages.
+
 ### 2026-09-25 (third entry)
 
 **The overlap parameter of the generator was doing two things at once.** In

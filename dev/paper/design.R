@@ -36,10 +36,13 @@ stem_design_levels <- function() list(
   ## dispersion within a regime is whatever is left of the fixed total variance,
   ## so the separation in within-regime standard deviations is
   ## 2*omega/sqrt(NU_TOT - Var(mu)) -- NOT proportional to omega any more. These
-  ## three levels are dgp_omega_for(c(0, 1.58, 3.16), K = 3): the same 0, 1.58
-  ## and 3.16 standard deviations the design has always been read on, now at a
-  ## constant footprint. Change them with dgp_omega_for(), not by hand.
-  omega = c(0, 0.686, 1),
+  ## three levels are dgp_omega_for(c(0, 1.58, 3.16), K = 3) = 0, 0.686, 1, rounded
+  ## to 0.70 in the middle: 1.63 standard deviations against 1.58, which is the
+  ## design the paper has always been read on, at a constant footprint. Change
+  ## them with dgp_omega_for(), not by hand: omega and the separation are no
+  ## longer proportional, and rounding the middle level to 0.50 would drop it to
+  ## 1.05 standard deviations, two thirds of the way back to the null case.
+  omega = c(0, 0.70, 1),
 
   ## relative sizes of the regimes
   balance = c("balanced", "unbalanced"),
