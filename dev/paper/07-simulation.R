@@ -80,7 +80,7 @@ CFG <- stem_config(list(
   ## boundary defines it -- so the graph is a modelling choice and the results
   ## have to be shown not to depend on it. Hence knn is a FACTOR of the design,
   ## not a setting.
-  knn      = 5L,
+  knn      = c(3L, 5L, 10L),
   ## what the estimator searches over. phi_ref is the penalty at which parameter
   ## recovery is read off, and has to be a point of phi_grid.
   k_grid   = 1:4,
@@ -212,31 +212,17 @@ run_one <- function(cell, rep) {
   ## is irreducible, and scoring against z would compress every comparison
   ## towards one.
   ##
-  ## NOTE. This does NOT use SCSTEM_Fitted(), and the distinction matters.
-  ## SCSTEM_Fitted() returns E[z | observed], which fills the gaps and therefore
-  ## returns z itself wherever z was observed -- on complete data it is the data,
-  ## and scoring it against anything would be meaningless. What is wanted here is
-  ## the SIGNAL the model fits,
+  ## NOTE. This is SCSTEM_Signal(), NOT SCSTEM_Complete(), and the distinction
+  ## matters. SCSTEM_Complete() returns E[z | observed]: it fills the gaps and
+  ## therefore returns z itself wherever z was observed, so on complete data it
+  ## IS the data and scoring it against anything measures nothing. What is
+  ## wanted here is the systematic part the model fits,
   ##
-  ##     muhat_ti = x_ti' betahat_g + K_i yhat_t^(g) ,
-  ##
-  ## which is a different object. The expression below is specific to the design
-  ## of this study -- intercept plus one covariate, p = 1, K = 1 -- and is
-  ## written out rather than taken from the package, which has no function for
-  ## it yet.
+  ##     muhat_ti = x_ti' betahat_g + K_i yhat_t^(g) .
   signal <- function(fit) {
-    if (is.null(fit) || is.null(fit$fit_list)) return(NULL)
-    mh <- matrix(NA_real_, cell$TN, cell$n)
-    for (g in seq_along(fit$fit_list)) {
-      f <- fit$fit_list[[g]]
-      if (is.null(f) || is.null(f$estimates$phi.hat)) next
-      idx <- which(fit$group == g)
-      if (!length(idx)) next
-      b <- as.numeric(f$estimates$phi.hat$beta)
-      y <- as.numeric(f$estimates$y.smoothed)
-      for (i in idx) mh[, i] <- b[1] + b[2] * dat$x[, i] + y
-    }
-    mh
+    if (is.null(fit)) return(NULL)
+    mh <- try(SCSTEM_Signal(fit), silent = TRUE)
+    if (inherits(mh, "try-error")) NULL else mh
   }
   rmse <- function(fit) {
     mh <- signal(fit)
@@ -246,9 +232,21 @@ run_one <- function(cell, rep) {
   r_true <- rmse(fit_true)
   r_pool <- rmse(fit_pool)
 
-  key <- data.frame(n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
+  ## THE PRIMARY KEY. Every one of the four outputs carries `cell` and `rep`,
+  ## and the pair identifies a run: the four files join on it and on nothing
+  ## else. `cell` is a string rather than the tuple of factors because omega is
+  ## a double -- 2/3 does not survive a round trip through a CSV exactly, and a
+  ## join on a floating-point column is a defect waiting to happen. The factor
+  ## columns are kept beside it for filtering, not for joining.
+  cell_id <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
+                     cell$n, cell$TN, cell$K, cell$omega, cell$id,
+                     substr(cell$balance, 1, 3), cell$knn,
+                     CFG$alpha[1], CFG$lambda[1])
+
+  key <- data.frame(cell = cell_id, rep = rep,
+                    n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
                     id = cell$id, balance = cell$balance, knn = cell$knn,
-                    alpha = CFG$alpha[1], lambda = CFG$lambda[1], rep = rep,
+                    alpha = CFG$alpha[1], lambda = CFG$lambda[1],
                     stringsAsFactors = FALSE)
 
   summ <- cbind(key, data.frame(
@@ -361,8 +359,13 @@ run_one <- function(cell, rep) {
 ## parameter for the recovery. Both are appended cell by cell, so an interrupted
 ## run keeps what it has and a resumed one skips it.
 done <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
-key  <- function(x) paste(x$n, x$TN, x$K, round(x$omega, 6), x$id, x$balance,
-                          x$knn, x$rep, sep = "|")
+## the resume test is on the primary key of a run
+key <- function(x) paste(x$cell, x$rep, sep = "|")
+cell_key <- function(cl, r) {
+  sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g|%d",
+          cl$n, cl$TN, cl$K, cl$omega, cl$id, substr(cl$balance, 1, 3), cl$knn,
+          CFG$alpha[1], CFG$lambda[1], r)
+}
 
 append_csv <- function(df, path) {
   if (is.null(df) || !nrow(df)) return(invisible(NULL))
@@ -394,11 +397,17 @@ for (i in seq_len(nrow(cells))) {
   for (r in reps) {
     cell <- cells[i, , drop = FALSE]
     cell$rep <- r
-    if (!is.null(done) && key(cell) %in% key(done)) next
+    if (!is.null(done) && cell_key(cell, r) %in% key(done)) next
 
     out <- tryCatch(run_one(cell, r), error = function(e) {
-      k0 <- cbind(cell[c("n", "TN", "K", "omega", "id", "balance", "knn", "rep")],
-                  alpha = CFG$alpha[1], lambda = CFG$lambda[1])
+      k0 <- data.frame(
+        cell = sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
+                       cell$n, cell$TN, cell$K, cell$omega, cell$id,
+                       substr(cell$balance, 1, 3), cell$knn,
+                       CFG$alpha[1], CFG$lambda[1]),
+        rep = r, n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
+        id = cell$id, balance = cell$balance, knn = cell$knn,
+        alpha = CFG$alpha[1], lambda = CFG$lambda[1], stringsAsFactors = FALSE)
       list(summary = cbind(k0, data.frame(
              k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
              ari_sel = NA_real_, share_sel = NA_real_,

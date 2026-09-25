@@ -94,8 +94,10 @@ boxes <- rbind(
   box(230, 515, 140, 30, "spatial.pred",                  "internal"),
   box(420, 472, 150, 34, "STEM_Bootstrap",                "exported"),
   box(420, 515, 150, 30, "STEM_Bootstrap.fn",             "internal"),
-  box(608, 472, 140, 34, "STEM_Fitted",                   "exported"),
-  box(778, 472, 142, 34, "SCSTEM_Fitted",                 "exported", 11.5),
+  box(596, 472, 128, 34, "STEM_Signal",                    "exported"),
+  box(596, 512, 128, 30, "STEM_Complete",                  "exported", 10.5),
+  box(742, 472, 140, 34, "SCSTEM_Signal",                  "exported", 11.5),
+  box(742, 512, 140, 30, "SCSTEM_Complete",                "exported", 10.5),
   ## band 4
   box( 44, 612, 160, 38, "SCSTEM_Estimation",                  "exported"),
   box( 44, 676, 160, 34, "SCSTEM_Infocrit",               "exported"),
@@ -151,8 +153,9 @@ edges <- list(
   ## band 3
   seg(300, 506, 300, 509),
   seg(495, 506, 495, 509),
-  seg(774, 489, 754, 489),
-  cur(690, 468, 700, 440, 780, 425, 830, 404),
+  seg(738, 489, 728, 489),
+  seg(738, 527, 728, 527),
+  cur(672, 468, 700, 440, 780, 425, 830, 404),
   seg(419, 530, 200, 500, dashed = TRUE),
   seg(445, 515, 160, 258, dashed = TRUE),
   ## band 4: the pipeline

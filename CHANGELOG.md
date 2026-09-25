@@ -16,6 +16,44 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-25
+
+**`STEM_Fitted()` is split in two, because it was one function doing two jobs
+under a name that belongs to only one of them.** In statistics and econometrics
+*fitted values* means what the model predicts. What the function returned was
+`E[z | observed]`: the imputation of the missing response, which wherever the
+response *was* observed returns the observation itself, because the conditional
+expectation of something already seen is that thing. On a complete record it was
+therefore the data, and scoring it against anything measured nothing -- a trap
+that caught the simulation driver, where the clustered and the pooled model came
+out with root mean squared errors identical to fifteen digits.
+
+* `STEM_Signal()` and `SCSTEM_Signal()` are new and carry the conventional
+  meaning: the conditional mean given the latent path,
+  `muhat_ti = x_ti' betahat + K_i yhat_t`, the regression surface plus the
+  latent process, without the measurement error. This is what a fit is scored
+  on.
+* `STEM_Complete()` and `SCSTEM_Complete()` are the former `*_Fitted()`,
+  renamed to say what they do. Use them to impute, not to fit.
+
+No alias is kept for `*_Fitted()`: 2.0.0 is unreleased and the pair was added
+during this development cycle, so the name never reached a user. The help pages
+of each of the four point at the other, because the distinction is exactly the
+one that is easy to get wrong.
+
+**The simulation driver.** Every output now carries a primary key -- `cell`, a
+string built from the design factors, together with `rep` -- so that the four
+files join on two columns and on nothing else. The key is a string rather than
+the tuple of factors because the overlap is a double: `2/3` does not survive a
+round trip through a CSV exactly, and a join on a floating-point column is a
+defect waiting to happen. The factors are kept beside it for filtering.
+
+The driver also records the per-station error measures for every replication and
+the full per-observation record for a configurable few, takes the neighbourhood
+size `knn` as a factor of the design rather than a setting, and accepts
+`--rep_from` / `--rep_to` so that a long study can be cut into blocks run on
+different machines.
+
 ### 2026-09-07 (later)
 
 **`SCSTEM_Estim()` is now `SCSTEM_Estimation()`.** The package exports two

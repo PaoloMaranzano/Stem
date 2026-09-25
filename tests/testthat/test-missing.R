@@ -176,7 +176,7 @@ test_that("SC-STEM estimation tolerates gaps in the response", {
   expect_true(all(fit$group %in% 1:2))
 })
 
-test_that("STEM_Fitted reproduces the observations and predicts the blanks", {
+test_that("STEM_Complete reproduces the observations and predicts the blanks", {
   s <- po_subset(Tn = 40L, d = 8L)
 
   set.seed(77)
@@ -188,7 +188,7 @@ test_that("STEM_Fitted reproduces the observations and predicts the blanks", {
                     coordinates = s$coordinates,
                     phi = po_phi(), K = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
-  zhat <- STEM_Fitted(fit)
+  zhat <- STEM_Complete(fit)
 
   expect_equal(dim(zhat), dim(s$z))
   ### wherever the response was observed the completion returns it unchanged
@@ -212,7 +212,7 @@ test_that("a fully missing time point falls back on the signal", {
                     coordinates = s$coordinates,
                     phi = po_phi(), K = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
-  zhat <- STEM_Fitted(fit)
+  zhat <- STEM_Complete(fit)
 
   ### with nothing observed there is no spatial correction, so the prediction
   ### is exactly the signal x'beta + K yhat

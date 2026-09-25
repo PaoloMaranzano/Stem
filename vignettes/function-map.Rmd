@@ -72,9 +72,9 @@ $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
 * `STEM_Simulation()` draws a new dataset from a `STEM_Model` at the parameter
   values held in its skeleton. It is the generator behind both bootstraps.
 * `STEM_Kriging()` predicts at unobserved locations through `spatial.pred()`.
-* `STEM_Fitted()` returns $E[z \mid z_{obs}]$ at the observed locations, so a
+* `STEM_Complete()` returns $E[z \mid z_{obs}]$ at the observed locations, so a
   gap in the response is filled by the model rather than left as `NA`; it is
-  the object a cross-validation exercise scores. `SCSTEM_Fitted()` does the
+  the object a cross-validation exercise scores. `SCSTEM_Complete()` does the
   same regime by regime and reassembles the network.
 * `STEM_Bootstrap()` repeats *simulate, then re-estimate* through
   `STEM_Bootstrap.fn()`, giving the sampling distribution of the parameters of a

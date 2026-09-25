@@ -345,7 +345,8 @@ uncertainty, prediction) or an engine below.
 
 | Function | Purpose |
 |---|---|
-| `STEM_Fitted()`, `SCSTEM_Fitted()` | fitted values at the observed locations, gaps filled by the model |
+| `STEM_Signal()`, `SCSTEM_Signal()` | **fitted values**: the conditional mean the model estimates, regression plus latent process, without the measurement error |
+| `STEM_Complete()`, `SCSTEM_Complete()` | gap-filling: `E[z given observed]`, which returns the data wherever the data exist |
 | `STEM_Kriging()` | spatial prediction at unobserved locations |
 | `STEM_Simulation()` | simulate from a fitted or specified model |
 | `STEM_Bootstrap()` | parametric bootstrap for the pooled model |

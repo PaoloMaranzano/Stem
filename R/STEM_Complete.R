@@ -1,7 +1,7 @@
 #' Completed response of a fitted STEM model
 #'
 #' @description
-#' \code{STEM_Fitted} returns the conditional expectation of the response given
+#' \code{STEM_Complete} returns the conditional expectation of the response given
 #' the observed data, \eqn{\mathrm{E}[z \mid \mathcal{Z}]}, for a fitted STEM
 #' model. It equals the observed value wherever the response was observed and
 #' the model-based prediction wherever it was not, so it is at once the vector
@@ -45,7 +45,7 @@
 #' Durbin, J., Koopman, S.J. (2012) \emph{Time Series Analysis by State Space
 #' Methods}, 2nd edition. Oxford University Press, Oxford.
 #'
-#' @seealso \code{\link{STEM_Estimation}}, \code{\link{SCSTEM_Fitted}}
+#' @seealso \code{\link{STEM_Estimation}}, \code{\link{SCSTEM_Complete}}
 #'
 #' @examples
 #' data(pm10)
@@ -60,14 +60,14 @@
 #'                   K = matrix(1, ncol(z), 1))
 #' \donttest{
 #' fit <- STEM_Estimation(mod, precision = 0.05, max.iter = 5)
-#' zhat <- STEM_Fitted(fit)
+#' zhat <- STEM_Complete(fit)
 #' zhat[5, 2]                        # the model-based prediction of the blank
 #' }
 #'
 #' @keywords models spatial
 #'
 #' @export
-STEM_Fitted <- function(StemModel, distance = "euclidean",
+STEM_Complete <- function(StemModel, distance = "euclidean",
                         cov.spat = Sigmastar.exp) {
 
   if (is.null(StemModel$estimates) || is.null(StemModel$estimates$phi.hat)) {
@@ -124,9 +124,9 @@ STEM_Fitted <- function(StemModel, distance = "euclidean",
 #' Completed response of a fitted SC-STEM model
 #'
 #' @description
-#' \code{SCSTEM_Fitted} returns the conditional expectation of the response
+#' \code{SCSTEM_Complete} returns the conditional expectation of the response
 #' given the observed data for a spatially-clustered STEM fit, by applying
-#' \code{\link{STEM_Fitted}} within each estimated regime and reassembling the
+#' \code{\link{STEM_Complete}} within each estimated regime and reassembling the
 #' columns in their original order.
 #'
 #' @details
@@ -146,12 +146,12 @@ STEM_Fitted <- function(StemModel, distance = "euclidean",
 #'
 #' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com}
 #'
-#' @seealso \code{\link{STEM_Fitted}}, \code{\link{SCSTEM_Estimation}}
+#' @seealso \code{\link{STEM_Complete}}, \code{\link{SCSTEM_Estimation}}
 #'
 #' @keywords models spatial
 #'
 #' @export
-SCSTEM_Fitted <- function(SCSTEM) {
+SCSTEM_Complete <- function(SCSTEM) {
 
   if (!inherits(SCSTEM, "SCSTEM_Estimation")) {
     stop("'SCSTEM' must be an object of class 'SCSTEM_Estimation' returned by SCSTEM_Estimation().",
@@ -168,7 +168,7 @@ SCSTEM_Fitted <- function(SCSTEM) {
   for (g in which(SCSTEM$final_refit)) {
     idx <- SCSTEM$idx_g[[g]]
     if (!length(idx)) next
-    out[, idx] <- STEM_Fitted(SCSTEM$fit_list[[g]], distance = dist)
+    out[, idx] <- STEM_Complete(SCSTEM$fit_list[[g]], distance = dist)
   }
   out
 }

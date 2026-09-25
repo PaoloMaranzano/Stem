@@ -38,7 +38,7 @@ crossing the picture, are named here but do not get a box of their own.
 | Missing-data bookkeeping | `stem_obs_index`, `stem_blocks_cache`, `stem_missing_blocks` |
 | Structured linear algebra | `stem_xprod`, `stem_xtrace` |
 | Regularization | `stem_beta_update`, `stem_soft`, `stem_penalized_index`, `stem_lambda_ref` |
-| Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Fitted`*, `SCSTEM_Fitted`*, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
+| Simulation and prediction | `STEM_Simulation`*, `STEM_Kriging`*, `spatial.pred`, `STEM_Signal`*, `SCSTEM_Signal`*, `STEM_Complete`*, `SCSTEM_Complete`*, `STEM_Bootstrap`*, `STEM_Bootstrap.fn` |
 | Spatially-clustered STEM | `SCSTEM_Estimation`*, `SCSTEM_Infocrit`*, `SCSTEM_Select`*, `SCSTEM_Bootstrap`*, `SCSTEM_BootInference`*, and the `scstem_*` helpers |
 
 ## Edges
@@ -87,11 +87,13 @@ STEM_Simulation          -> changedimension_covariates
 STEM_Simulation          -> Sigmastar.exp
 STEM_Kriging             -> changedimension_covariates
 STEM_Kriging             -> spatial.pred
-STEM_Fitted              -> changedimension_covariates
-STEM_Fitted              -> Sigmastar.exp
-STEM_Fitted              -> stem_obs_index
-STEM_Fitted              -> stem_blocks_cache
-SCSTEM_Fitted            -> STEM_Fitted
+STEM_Complete              -> changedimension_covariates
+STEM_Complete              -> Sigmastar.exp
+STEM_Complete              -> stem_obs_index
+STEM_Complete              -> stem_blocks_cache
+SCSTEM_Complete            -> STEM_Complete
+STEM_Signal                -> changedimension_covariates
+SCSTEM_Signal              -> STEM_Signal
 STEM_Bootstrap           -> STEM_Bootstrap.fn          [indirect, via lapply]
 STEM_Bootstrap.fn        -> STEM_Simulation
 STEM_Bootstrap.fn        -> STEM_Estimation

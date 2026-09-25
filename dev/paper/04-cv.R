@@ -197,7 +197,7 @@ run_fold <- function(fold, cfg) {
     f <- try(STEM_Estimation(mod, precision = 0.01, max.iter = 40,
                              distance = "geo"), silent = TRUE)
     if (inherits(f, "try-error")) return(NULL)
-    zhat_keep <- STEM_Fitted(f, distance = "geo")
+    zhat_keep <- STEM_Complete(f, distance = "geo")
     fits <- list(f); grp <- rep(1L, length(keep_idx))
   } else {
     f <- try(SCSTEM_Estimation(mod, k = cfg$k, phi_penalty = cfg$phi, knn = KNN,
@@ -205,7 +205,7 @@ run_fold <- function(fold, cfg) {
                           precision_full_dataset = 0.01, max_iter = 8,
                           seed = SEED, verbose = FALSE), silent = TRUE)
     if (inherits(f, "try-error")) return(NULL)
-    zhat_keep <- SCSTEM_Fitted(f)
+    zhat_keep <- SCSTEM_Complete(f)
     fits <- f$fit_list; grp <- f$group
   }
 
