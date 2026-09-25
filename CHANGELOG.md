@@ -16,6 +16,54 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-25 (third entry)
+
+**The overlap parameter of the generator was doing two things at once.** In
+`dgp_locations()` the within-regime variance was held at `nu_sp = 0.4` while the
+centres were placed `2*omega` apart, so the physical extent of the network grew
+with the separation. Measured over 20 draws at `n = 200`, `K = 3`: the spatial
+standard deviation went from 63 km at `omega = 0` to 103 km at `omega = 1`, and
+the median pairwise distance from 105 km to 180 km, against a true correlation
+range of 123 km. So `omega` separated the regimes *and* enlarged the map, and an
+effect attributed to the separation carried a share of the second.
+
+The second effect is not cosmetic. At `omega = 0` the network is a blob smaller
+than the range, the exponential decay is barely resolved over the observed
+distances, and `theta` is close to unidentified. The estimator then crawls: on a
+single *pooled* fit at `n = 20`, `T = 60` -- no clustering, no graph -- 0.4 s at
+`omega = 1` against **more than ten minutes at `omega = 0` without converging**.
+Every `omega = 0` cell of the study was effectively unaffordable, and nothing in
+the timings said so, because they had been taken at one overlap.
+
+* `dgp_locations()` now holds the TOTAL variance of a coordinate fixed,
+  `nu_sp(K, omega) = NU_TOT - Var(mu | K, omega)`, with
+  `NU_TOT = 0.4 + 2/3`: the total the design used to have at its most separated
+  cell, so that cell is unchanged and the smaller overlaps are the ones that
+  widen. The footprint is now 102-104 km of spatial standard deviation in every
+  cell, at every `K` and every `omega`, and the pooled fit at `omega = 0` takes
+  0.7 s.
+* `K = 1` needs no special case any more. It has no between-centre variance, so
+  it takes the whole of `NU_TOT` and covers the same area as everything else;
+  the `k_ref` argument is gone.
+* The separation is no longer proportional to `omega`, so the levels of the
+  design are chosen with the new `dgp_omega_for()`: `omega = 0, 0.686, 1` give
+  0, 1.58 and 3.16 within-regime standard deviations, the same three the design
+  has always been read on. `dgp_nu_sp()` and `dgp_separation()` report what a
+  cell actually is, and the scripts use them instead of recomputing
+  `2*omega/sqrt(NU_SP)` by hand.
+* `09-overlap-figures.R` keeps illustrating the design AS PUBLISHED, with the
+  within-cluster variance fixed, which is recovered from the new signature by
+  giving each cell the total its centres imply. Its third panel was already
+  making this exact point about the absolute scale.
+
+One residual dependence is worth stating in the paper rather than designing
+away: at a constant footprint, `omega` still changes the *distribution* of
+pairwise distances, from unimodal at `omega = 0` to short-within-and-long-between
+at `omega = 1`, and a spread of lags identifies a range better than a single
+scale. The estimated range at `n = 20` was 10, 42 and 75 km against a true
+123 km. That is what clustered locations mean, not an artefact of the
+parameterisation, but it should be said out loud.
+
 ### 2026-09-25 (second entry)
 
 **The neighbourhood graph of the Potts penalty was built with a different

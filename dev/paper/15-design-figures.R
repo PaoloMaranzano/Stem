@@ -27,14 +27,15 @@ local({
   h <- if (length(f)) dirname(normalizePath(sub("^--file=", "", f[1]))) else getwd()
   source(file.path(h, "00-setup.R"), chdir = TRUE)
 }, envir = globalenv())
+source(file.path(stem_paper_dir(), "design.R"), chdir = TRUE)
 source(file.path(stem_paper_dir(), "06-dgp.R"), chdir = TRUE)
 stem_load()
 OUT <- stem_fig_dir()
 
 ## the levels of the design
-N_GRID  <- c(20L, 50L, 100L, 200L, 400L)
-OM_GRID <- c(0, 0.5, 1)
-KNN     <- c(3L, 5L, 10L)
+N_GRID  <- stem_design_levels()$n
+OM_GRID <- stem_design_levels()$omega
+KNN     <- stem_design_levels()$knn
 KTRUE   <- 3L
 
 COL  <- c("#1f6f8b", "#e0a458", "#5b8c5a", "#a8516e")
@@ -81,7 +82,7 @@ lim <- c(-2.7, 2.7)
 grDevices::cairo_pdf(file.path(OUT, "fig_design_omega.pdf"),
                      width = 11.0, height = 7.4)
 graphics::par(mfrow = c(length(OM_GRID), length(N_GRID)),
-              mar = c(0.4, 0.4, 0.4, 0.4), oma = c(3.2, 11.0, 4.2, 0.8))
+              mar = c(0.4, 0.4, 0.4, 0.4), oma = c(3.2, 12.5, 4.2, 0.8))
 nr <- length(OM_GRID)
 for (wi in seq_along(OM_GRID)) {
   w <- OM_GRID[wi]
@@ -93,12 +94,12 @@ for (wi in seq_along(OM_GRID)) {
       graphics::mtext(paste0("n = ", n), side = 3, line = 0.8, cex = 0.95, font = 2)
     if (n == N_GRID[1])
       row_label(1 - (wi - 1) / nr, 1 - wi / nr, om_lab(w),
-                sprintf("%.2f sd apart", 2 * w / sqrt(NU_SP)))
+                sprintf("%.2f sd apart", dgp_separation(KTRUE, w)))
   }
 }
 graphics::mtext(sprintf("K = %d regimes: the overlap parameter across the network sizes of the design", KTRUE),
                 outer = TRUE, side = 3, line = 2.4, cex = 1.15, font = 2, col = INK)
-graphics::mtext(paste0("centres 2*omega apart, dispersion nu_sp = ", NU_SP,
+graphics::mtext(paste0("centres 2*omega apart, total spatial variance held fixed at ", round(NU_TOT, 3),
                        "; crosses are the true centres, colour the true regime"),
                 outer = TRUE, side = 1, line = 1.2, cex = 0.78, col = GREY)
 invisible(grDevices::dev.off())
@@ -132,7 +133,7 @@ NG <- 100L
 grDevices::cairo_pdf(file.path(OUT, "fig_design_knn.pdf"),
                      width = 9.8, height = 9.8)
 graphics::par(mfrow = c(length(KNN), length(OM_GRID)),
-              mar = c(1.4, 0.4, 0.4, 0.4), oma = c(4.0, 10.6, 4.2, 0.8))
+              mar = c(1.4, 0.4, 0.4, 0.4), oma = c(4.0, 12.0, 4.2, 0.8))
 nr <- length(KNN)
 for (ki in seq_along(KNN)) {
   kk <- KNN[ki]

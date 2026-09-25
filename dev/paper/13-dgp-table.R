@@ -54,12 +54,22 @@ rows <- do.call(rbind, lapply(seq_len(nrow(scen)), function(i) {
 }))
 print(rows, row.names = FALSE, right = FALSE)
 
-cat("\nOVERLAP: standardised separation 2*omega/sqrt(nu_sp), the same for every K\n")
-print(round(stats::setNames(2 * dims$omega / sqrt(NU_SP),
-                            format(dims$omega)), 2))
-cat(sprintf("nu_sp = %.1f, one abstract unit = %d km, so a cluster has sd %.0f km\n",
-            NU_SP, UNIT_KM, sqrt(NU_SP) * UNIT_KM))
-cat(sprintf("and at omega = 1 the centres are %d km apart\n", 2 * UNIT_KM))
+cat("\nOVERLAP. The total variance of a coordinate is held at NU_TOT =",
+    sprintf("%.3f", NU_TOT), "in every cell, so the\n")
+cat("network covers the same area whatever K and omega are, and the dispersion\n")
+cat("within a regime is what the centres leave over. The separation below is in\n")
+cat("within-regime standard deviations.\n\n")
+ov <- do.call(rbind, lapply(setdiff(dims$K, 1L), function(K)
+  data.frame(K = K, omega = dims$omega,
+             nu_sp = round(dgp_nu_sp(K, dims$omega), 3),
+             sd_km = round(sqrt(dgp_nu_sp(K, dims$omega)) * UNIT_KM),
+             centres_km = round(2 * dims$omega * UNIT_KM),
+             separation = round(dgp_separation(K, dims$omega), 2))))
+print(ov, row.names = FALSE)
+cat(sprintf("\none abstract unit = %d km; at K = 1 the whole of NU_TOT is within-regime,\n",
+            UNIT_KM))
+cat(sprintf("so a pooled network has sd %.0f km and covers the same area\n",
+            sqrt(NU_TOT) * UNIT_KM))
 
 cat("\nREGIME SIZES\n")
 for (bal in dims$balance) {

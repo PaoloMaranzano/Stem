@@ -32,10 +32,14 @@ stem_design_levels <- function() list(
   ## regimes. K = 1 is the null case: one regime, so nothing to recover
   K = c(1L, 3L),
 
-  ## separation of the regime centres, in units of the within-regime dispersion:
-  ## the centres sit 2*omega apart and each coordinate has variance nu_sp, so the
-  ## standardised separation is 2*omega/sqrt(nu_sp) -- 0, 1.58 and 3.16 sd
-  omega = c(0, 0.5, 1),
+  ## Separation of the regime centres. The centres sit 2*omega apart, and the
+  ## dispersion within a regime is whatever is left of the fixed total variance,
+  ## so the separation in within-regime standard deviations is
+  ## 2*omega/sqrt(NU_TOT - Var(mu)) -- NOT proportional to omega any more. These
+  ## three levels are dgp_omega_for(c(0, 1.58, 3.16), K = 3): the same 0, 1.58
+  ## and 3.16 standard deviations the design has always been read on, now at a
+  ## constant footprint. Change them with dgp_omega_for(), not by hand.
+  omega = c(0, 0.686, 1),
 
   ## relative sizes of the regimes
   balance = c("balanced", "unbalanced"),
@@ -149,16 +153,15 @@ stem_design_cells <- function(lv = stem_design_levels(),
 ## in T at fixed n and interpolated in log n. The estimate is meant for
 ## budgeting, not for reporting.
 ##
-## THE MODEL DOES NOT COVER omega, AND omega MATTERS. At omega = 0 the regime
-## centres coincide, so the network is a tight blob: at n = 20 the median
-## pairwise distance is 105 km against a true correlation range of 123 km, the
-## exponential decay is barely resolved over the observed distances, and theta
-## is close to unidentified. The EM then crawls. Measured at n = 20, T = 60,
-## K = 3, on a single pooled fit: 0.6 s at omega = 0.5, 0.4 s at omega = 1.0,
-## and more than 150 s at omega = 0 without converging. Until that is settled --
-## by holding the total spatial variance fixed across omega, so that the
-## footprint of the network stops depending on the separation -- the figures
-## below understate the cost of every omega = 0 cell by orders of magnitude.
+## THE MODEL DOES NOT COVER omega, and it no longer has to. It used to: while
+## the within-regime dispersion was held fixed, the network shrank as omega went
+## to zero, until at omega = 0 and n = 20 the median pairwise distance was 105 km
+## against a true correlation range of 123 km. The exponential decay was then
+## barely resolved over the observed distances, theta was close to unidentified,
+## and the EM crawled -- more than ten minutes for a single pooled fit that takes
+## 0.4 s at omega = 1. Holding the TOTAL spatial variance fixed instead, which is
+## what 06-dgp.R now does, leaves the footprint the same in every cell: 0.7 s at
+## omega = 0, 0.4 s at omega = 0.686 and at omega = 1, on the same n and T.
 ## ---------------------------------------------------------------------------
 STEM_COST <- data.frame(
   n    = rep(c(20L, 50L, 100L, 200L, 400L), times = 6L),

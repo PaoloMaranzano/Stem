@@ -30,10 +30,19 @@ N_GRID <- c(20, 40, 60, 80, 100)
 COL    <- c("#1f6f8b", "#e0a458", "#5b8c5a", "#a8516e")
 GREY   <- "#8a939f"
 
-## one draw, in the abstract plane of the design: dgp_locations() also maps it
-## to longitude and latitude, which the figures do not need
+## One draw, in the abstract plane of the design: dgp_locations() also maps it
+## to longitude and latitude, which the figures do not need.
+##
+## These figures illustrate the design AS PUBLISHED, in which the within-cluster
+## variance nu_sp is what is held fixed. Our own design holds the TOTAL variance
+## fixed instead -- see NU_TOT in 06-dgp.R and fig_design_omega.pdf -- because
+## fixing the within-cluster variance lets the network grow with the separation,
+## and the third figure below is precisely the one that shows why that matters.
+## The published parameterisation is recovered from the new one by giving each
+## cell the total its centres and its nu_sp imply.
 draw <- function(n, K, d, nu_sp = NU_SP, seed = 1) {
-  loc <- dgp_locations(n, K, d, nu_sp = nu_sp, balance = "balanced", seed = seed)
+  loc <- dgp_locations(n, K, d, nu_tot = nu_sp + dgp_centre_var(K, d),
+                       balance = "balanced", seed = seed)
   list(xy = loc$xy, g = loc$labels, mu = loc$mu)
 }
 

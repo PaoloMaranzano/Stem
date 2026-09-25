@@ -26,16 +26,24 @@
 ##   K = 3   equilateral triangle of side 2*omega, circumradius 2*omega/sqrt(3)
 ##   K = 4   the square of the source paper, radius omega*sqrt(2)
 ##
-## The standardised separation is then 2*omega / sqrt(nu_sp) for every K: with
-## nu_sp = 0.4 it runs from 0 at omega = 0 to 3.16 standard deviations at
-## omega = 1.
+## The dispersion within a cluster is NOT held fixed. What is held fixed is the
+## TOTAL variance of a coordinate, between-centre plus within-cluster, so that
+## the network covers the same area at every K and every omega:
+##
+##   nu_sp(K, omega) = NU_TOT - Var(mu | K, omega) ,
+##
+## and the standardised separation is 2*omega / sqrt(nu_sp(K, omega)), which is
+## no longer proportional to omega. It still runs from 0 at omega = 0 to 3.16
+## standard deviations at omega = 1, and the intermediate level of the design is
+## chosen with dgp_omega_for() so that it lands on 1.58. See NU_TOT below for
+## why the total rather than the within is the thing to fix.
 ##
 ## The abstract plane is mapped onto a geographic box centred on the Po Valley,
 ## one abstract unit being UNIT_KM kilometres. This is not cosmetic: it is what
-## makes the covariance parameters interpretable. With UNIT_KM = 100 and
-## nu_sp = 0.4 a cluster has a standard deviation of 63 km and, at omega = 1,
-## the centres are 200 km apart, against a baseline correlation range of 123 km
-## -- the regime in which a monitoring network of the Po Valley actually sits.
+## makes the covariance parameters interpretable. With UNIT_KM = 100 the network
+## has a standard deviation of 103 km whatever the overlap, and at omega = 1 the
+## centres are 200 km apart, against a baseline correlation range of 123 km --
+## the regime in which a monitoring network of the Po Valley actually sits.
 ##
 ## WHY THE GENERATOR IS NOT STEM_Simulation() CALLED REGIME BY REGIME
 ##
@@ -173,7 +181,30 @@
 ## its own and the same replication uses the same geometry across scenarios.
 ## ---------------------------------------------------------------------------
 
-NU_SP   <- 0.4          # variance of each coordinate within a cluster
+## The TOTAL variance of each coordinate: between-centre plus within-regime.
+## It is held fixed across K and omega, and the within-regime dispersion is
+## whatever is left over,
+##
+##     nu_sp(K, omega) = NU_TOT - Var(mu | K, omega) .
+##
+## WHY IT IS THE TOTAL, AND NOT THE WITHIN, THAT IS FIXED. With the within-regime
+## dispersion held fixed instead -- centres 2*omega apart around clusters of
+## constant spread -- the map grows with the separation, and omega then does two
+## things at once: it separates the regimes AND it enlarges the network. The
+## second is not innocuous here, because the covariance has a range: at omega = 0
+## and n = 20 the median pairwise distance was 105 km against a true range of
+## 123 km, so the exponential decay was barely resolved over the observed
+## distances, theta was close to unidentified, and the EM crawled -- 0.4 s for a
+## pooled fit at omega = 1 against more than ten minutes at omega = 0, on the
+## same n and T. Any effect attributed to the separation would have carried a
+## share of that. Holding the total fixed leaves the footprint of the network,
+## and so the identifiability of theta, the same in every cell.
+##
+## The value is the total the design used to have at its most separated cell,
+## K = 3 and omega = 1, so that cell is unchanged and the smaller overlaps are
+## the ones that widen.
+NU_TOT  <- 0.4 + 2/3    # = NU_SP + dgp_centre_var(3, 1)
+NU_SP   <- 0.4          # kept for reference: the former within-cluster variance
 UNIT_KM <- 100          # kilometres per abstract unit of the overlap design
 LON0    <- 9.5          # centre of the geographic box, Po Valley
 LAT0    <- 45.5
@@ -215,6 +246,30 @@ dgp_centre_var <- function(K, omega) {
   mu <- dgp_centres(K, omega)
   if (K == 1L) return(0)
   mean(apply(mu, 2, function(v) mean((v - mean(v))^2)))
+}
+
+## What is left of the total variance for the dispersion within a regime, and
+## the separation of the centres it implies, in within-regime standard
+## deviations. The second is the quantity the design is really indexed by:
+## omega is the knob, this is what it means.
+## dgp_centres() takes one omega at a time, so these vectorise over it
+dgp_nu_sp <- function(K, omega, nu_tot = NU_TOT)
+  nu_tot - vapply(omega, function(w) dgp_centre_var(K, w), numeric(1))
+
+dgp_separation <- function(K, omega, nu_tot = NU_TOT) {
+  if (K == 1L) return(rep(0, length(omega)))
+  d <- dgp_nu_sp(K, omega, nu_tot)
+  ifelse(d > 0, 2 * omega / sqrt(d), NA_real_)
+}
+
+## The overlap that delivers a wanted separation. Because the dispersion now
+## depends on omega, the two are no longer proportional: with
+## Var(mu) = c_K omega^2 the separation is 2 omega / sqrt(NU_TOT - c_K omega^2),
+## which inverts to the expression below. This is what the levels of omega in
+## design.R are chosen with.
+dgp_omega_for <- function(sep, K, nu_tot = NU_TOT) {
+  cK <- if (K == 1L) 0 else dgp_centre_var(K, 1)     # Var(mu) at omega = 1
+  sep * sqrt(nu_tot / (4 + sep^2 * cK))
 }
 
 ## Regime sizes.
@@ -268,17 +323,24 @@ dgp_labels <- function(n, K, balance = "balanced", n_min = N_MIN) {
 ## latitude so that distances are kilometres and the covariance parameters keep
 ## their meaning.
 ##
-##   s_i | g_i = g  ~  N_2( mu_g , nu_sp I_2 )
+##   s_i | g_i = g  ~  N_2( mu_g , nu_sp(K, omega) I_2 )
 ##
-## with mu_g = dgp_centres(K, omega). For K = 1 the dispersion is nu_sp + the
-## between-centre variance the design would have had at the same overlap, so
-## that the pooled case is not simply a smaller map.
-dgp_locations <- function(n, K, omega, nu_sp = NU_SP, balance = "balanced",
-                          seed = 1, k_ref = 2L) {
+## with mu_g = dgp_centres(K, omega) and nu_sp(K, omega) = NU_TOT minus the
+## between-centre variance, so that every cell of the design covers the same
+## area whatever K and omega are. K = 1 needs no special case: it has no
+## between-centre variance, so it takes the whole of NU_TOT.
+dgp_locations <- function(n, K, omega, nu_tot = NU_TOT, balance = "balanced",
+                          seed = 1) {
   set.seed(seed)
   mu <- dgp_centres(K, omega)
   g  <- dgp_labels(n, K, balance)
-  sd_i <- sqrt(if (K == 1L) nu_sp + dgp_centre_var(k_ref, omega) else nu_sp)
+  nu_sp <- nu_tot - dgp_centre_var(K, omega)
+  if (nu_sp <= 0) {
+    stop("the centres of K = ", K, " at omega = ", omega, " already spread more ",
+         "than the total variance NU_TOT = ", signif(nu_tot, 4),
+         ": raise NU_TOT or lower omega", call. = FALSE)
+  }
+  sd_i <- sqrt(nu_sp)
   xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sd_i),
               mu[g, 2] + stats::rnorm(n, sd = sd_i))
   coords <- cbind(

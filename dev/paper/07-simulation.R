@@ -124,10 +124,12 @@ dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
 ## The cells
 ##
 ## K = 1 has a single regime, so the overlap, the balance and the scenario are
-## all vacuous there: it enters once per (n, T), with the dispersion inflated so
-## that the map is the same size as at K = 2 -- see dgp_locations(). Cells whose
-## imbalance cannot be realised with regimes of at least N_MIN units are dropped
-## rather than silently rebalanced.
+## all vacuous there: it enters once per (n, T). It covers the same area as
+## every other cell, because the generator holds the total spatial variance
+## fixed and a single regime simply takes all of it -- see NU_TOT in 06-dgp.R --
+## so the selection rule is not handed a free geometric cue for telling k = 1
+## from k > 1. Cells whose imbalance cannot be realised with regimes of at least
+## N_MIN units are dropped rather than silently rebalanced.
 ## ---------------------------------------------------------------------------
 cells <- stem_design_cells(blocks = CFG$blocks)
 ## --only_<factor> keeps the named levels of that factor and nothing else.
