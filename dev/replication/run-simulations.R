@@ -96,11 +96,18 @@ if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) SIM_DEFINE_ONLY <- FALSE
 
 
 ## ---------------------------------------------------------------------------
-## The only prerequisite
+## The only prerequisite: Stem
 ##
-## Stem is installed from CRAN when it is there and from GitHub otherwise. This
-## is the one thing the script does to the machine it runs on, and it does it
-## only when the package is missing.
+## Stem is installed from GitHub (SIM_STEM_REF), and again whenever GitHub holds
+## a newer commit than the installed one, so the study always runs on the
+## current code; installing is the one thing the script does to the machine. It
+## happens when the script is run, not when analyse-simulations.R or the worker
+## processes read its definitions. Offline, an installed Stem that carries what
+## the study uses is accepted as it is.
+##
+## For the paper SIM_STEM_REF should be pinned to the commit the study was run
+## with (e.g. "PaoloMaranzano/Stem@d7cfe78"), so that a replication installs
+## exactly that code.
 ## ---------------------------------------------------------------------------
 sim_require <- function(pkgs) {
   for (p in pkgs) {
@@ -112,39 +119,49 @@ sim_require <- function(pkgs) {
   }
 }
 
-## An installed Stem is not enough: it has to be recent enough to carry what
-## the study uses. The version number cannot tell, because the development
-## builds all say 2.0.0, so the check is on the features themselves -- the
-## fitted-signal functions, and a neighbour graph that takes the metric of the
-## covariance. A stale build would otherwise run to the end and fail every
-## replication, which is how this check came to exist.
-##
-## SIM_STEM_REF is the GitHub reference installed when Stem is missing or stale.
-## For the paper it should be pinned to the commit the study was run with, so
-## that a replication installs exactly that code.
 SIM_STEM_REF <- "PaoloMaranzano/Stem"
 
-sim_stem_ok <- function() {
+## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
+sim_github_sha <- function(ref = SIM_STEM_REF) {
+  repo <- sub("@.*$", "", ref)
+  at   <- if (grepl("@", ref, fixed = TRUE)) sub("^.*@", "", ref) else "HEAD"
+  j <- tryCatch({
+    con <- url(sprintf("https://api.github.com/repos/%s/commits/%s", repo, at))
+    on.exit(close(con))
+    paste(readLines(con, warn = FALSE), collapse = "")
+  }, error = function(e) "", warning = function(w) "")
+  m <- regmatches(j, regexpr("\"sha\" *: *\"[0-9a-f]{40}\"", j))
+  if (length(m)) gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m)) else NA_character_
+}
+
+## The installed Stem carries what the study uses and, when GitHub can be
+## reached and the script is run rather than read, is GitHub's commit. The
+## version number cannot tell: the development builds all say 2.0.0.
+sim_stem_ok <- function(latest = NA_character_) {
   if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
   ns <- asNamespace("Stem")
   have <- c("STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "SCSTEM_Bootstrap", "scstem_neighbors", "scstem_align_labels",
             "scstem_ari")
-  all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
+  feats <- all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
+  here <- utils::packageDescription("Stem")$RemoteSha
+  feats && (is.na(latest) || (!is.null(here) && identical(here, latest)))
 }
 
-if (!sim_stem_ok()) {
+SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) NA_character_ else sim_github_sha()
+if (!sim_stem_ok(SIM_STEM_SHA)) {
   message(if (requireNamespace("Stem", quietly = TRUE))
-            "the installed Stem is older than this study needs: updating it"
-          else "Stem is not installed: installing it")
+            "a newer Stem is on GitHub: updating it" else
+            "Stem is not installed: installing it from GitHub")
   sim_require("remotes")
   if ("Stem" %in% loadedNamespaces()) try(unloadNamespace("Stem"), silent = TRUE)
-  remotes::install_github(SIM_STEM_REF, upgrade = "never", quiet = TRUE)
-  if (!sim_stem_ok())
-    stop("Stem could not be brought up to date. Install it by hand with\n",
-         "  remotes::install_github(\"", SIM_STEM_REF, "\")\n",
-         "then start a NEW R session and run again.", call. = FALSE)
+  remotes::install_github(SIM_STEM_REF, upgrade = "never", force = TRUE, quiet = TRUE)
+  if (!sim_stem_ok(SIM_STEM_SHA))
+    stop("Stem could not be installed or brought up to date. Restart R ",
+         "(Session > Restart R in RStudio) and run again; if it still fails, ",
+         "install it by hand with\n  remotes::install_github(\"", SIM_STEM_REF,
+         "\")", call. = FALSE)
 }
 sim_require(c("geodist", "spdep"))
 suppressPackageStartupMessages(library("Stem"))

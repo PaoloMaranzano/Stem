@@ -13,10 +13,16 @@ disconnected from its sources.
 
 ## Requirements
 
-R, and nothing else to set up. Each script checks that an installed Stem
-carries what it needs, and installs or updates it from GitHub when it does not.
-The check is on the features, not on the version number, because the
-development builds all report 2.0.0.
+R, and nothing else to set up. Each script installs Stem from GitHub
+(`PaoloMaranzano/Stem`) when it is missing, and installs it again whenever
+GitHub holds a newer commit than the installed one, so the study always runs on
+the current code. Offline, an installed Stem that carries what the scripts use
+is accepted as it is. The check is on the commit and on the features, not on
+the version number, because the development builds all report 2.0.0.
+
+For the paper the reference installed (`SIM_STEM_REF` and `APP_STEM_REF`) is
+to be pinned to the commit the results were produced with, or replaced by the
+CRAN release.
 
 ## Running the simulations from RStudio
 

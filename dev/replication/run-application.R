@@ -35,42 +35,65 @@
 
 
 ## ---------------------------------------------------------------------------
-## Where this script is
+## Where this script is: from Rscript, or from Source in RStudio
 ## ---------------------------------------------------------------------------
 app_here <- local({
   a <- commandArgs(trailingOnly = FALSE)
   m <- grep("^--file=", a, value = TRUE)
   f <- if (length(m)) normalizePath(sub("^--file=", "", m[1]), winslash = "/") else NULL
+  if (is.null(f)) for (i in rev(seq_len(sys.nframe()))) {
+    of <- sys.frame(i)$ofile
+    if (!is.null(of)) { f <- normalizePath(of, winslash = "/"); break }
+  }
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
 
 ## ---------------------------------------------------------------------------
-## The only prerequisite: a Stem recent enough to carry what is used here.
-## The development builds all say 2.0.0, so the check is on the features.
+## The only prerequisite: Stem, installed from GitHub, and again whenever GitHub
+## holds a newer commit than the installed one. Offline, an installed Stem that
+## carries what is used here is accepted as it is. The development builds all
+## say 2.0.0, so the check is on the features and on the commit.
 ## ---------------------------------------------------------------------------
 APP_STEM_REF <- "PaoloMaranzano/Stem"
 
-app_stem_ok <- function() {
+app_github_sha <- function(ref = APP_STEM_REF) {
+  repo <- sub("@.*$", "", ref)
+  at   <- if (grepl("@", ref, fixed = TRUE)) sub("^.*@", "", ref) else "HEAD"
+  j <- tryCatch({
+    con <- url(sprintf("https://api.github.com/repos/%s/commits/%s", repo, at))
+    on.exit(close(con))
+    paste(readLines(con, warn = FALSE), collapse = "")
+  }, error = function(e) "", warning = function(w) "")
+  m <- regmatches(j, regexpr("\"sha\" *: *\"[0-9a-f]{40}\"", j))
+  if (length(m)) gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m)) else NA_character_
+}
+
+app_stem_ok <- function(latest = NA_character_) {
   if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
   ns <- asNamespace("Stem")
   have <- c("STEM_Model", "STEM_Estimation", "STEM_Signal", "SCSTEM_Infocrit",
             "SCSTEM_Select", "SCSTEM_Bootstrap", "SCSTEM_BootInference",
             "scstem_neighbors")
-  all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
+  feats <- all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
+  here <- utils::packageDescription("Stem")$RemoteSha
+  feats && (is.na(latest) || (!is.null(here) && identical(here, latest)))
 }
-if (!app_stem_ok()) {
+
+APP_STEM_SHA <- app_github_sha()
+if (!app_stem_ok(APP_STEM_SHA)) {
   message(if (requireNamespace("Stem", quietly = TRUE))
-            "the installed Stem is older than this script needs: updating it"
-          else "Stem is not installed: installing it")
+            "a newer Stem is on GitHub: updating it" else
+            "Stem is not installed: installing it from GitHub")
   if (!requireNamespace("remotes", quietly = TRUE))
     utils::install.packages("remotes", repos = "https://cloud.r-project.org")
   if ("Stem" %in% loadedNamespaces()) try(unloadNamespace("Stem"), silent = TRUE)
-  remotes::install_github(APP_STEM_REF, upgrade = "never", quiet = TRUE)
-  if (!app_stem_ok())
-    stop("Stem could not be brought up to date. Install it by hand with\n",
-         "  remotes::install_github(\"", APP_STEM_REF, "\")\n",
-         "then start a NEW R session and run again.", call. = FALSE)
+  remotes::install_github(APP_STEM_REF, upgrade = "never", force = TRUE, quiet = TRUE)
+  if (!app_stem_ok(APP_STEM_SHA))
+    stop("Stem could not be installed or brought up to date. Restart R ",
+         "(Session > Restart R in RStudio) and run again; if it still fails, ",
+         "install it by hand with\n  remotes::install_github(\"", APP_STEM_REF,
+         "\")", call. = FALSE)
 }
 suppressPackageStartupMessages(library("Stem"))
 

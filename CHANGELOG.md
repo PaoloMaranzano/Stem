@@ -16,6 +16,19 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26 (fifth entry)
+
+**The replication scripts keep Stem in step with GitHub.** On a second machine
+`install_github()` failed with HTTP 404 because the repository was private; it
+is being made public, to be released on CRAN once the paper is done. The
+feature check alone could not see a change of behaviour at an unchanged version
+number, so `run-simulations.R` and `run-application.R` now also compare the
+installed `RemoteSha` with the commit GitHub holds and reinstall when they
+differ. The check runs only when a script is run, not when the analysis or the
+worker processes read the runner's definitions; offline it falls back to the
+feature check. `run-application.R` also finds its own folder when started with
+Source in RStudio.
+
 ### 2026-09-26 (fourth entry)
 
 **The simulation runner is launched from RStudio and uses every core by
