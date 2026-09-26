@@ -16,6 +16,21 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26 (fourth entry)
+
+**The simulation runner is launched from RStudio and uses every core by
+itself.** `dev/replication/run-simulations.R` is opened in RStudio on any machine
+that sees the Drive folder and started with Source; the SETUP block gains `mode`
+(`"run"`, `"coverage"`, `"dry"`) and `cores` (all physical cores but one by
+default). The replications are dispatched one at a time to a PSOCK cluster as
+each worker frees up, so the slow cells (n = 400 with T = 60) hold one core and
+not the run; only the master writes the files and prints progress with the time
+left. Results are identical to a single-core run, since every seed derives from
+the replication. Writes retry when a synchronization client holds a file. This
+replaces the eight manual processes of the previous README. The whole design is
+kept, all 237 cells; the prior cost table is replaced by times measured on this
+machine, which put it at about 680 core-hours, some 85 hours on 8 cores.
+
 ### 2026-09-26 (third entry)
 
 **The theory of the assignment score is withdrawn from the package and the

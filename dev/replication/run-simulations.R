@@ -1,18 +1,33 @@
 ## ===========================================================================
 ## SC-STEM: the simulation study. THE RUNNER.
 ##
-## One script, self-contained. It needs nothing but an installed Stem package,
-## it runs from whatever folder it happens to sit in, and it writes its results
-## beside itself. Copy it onto another machine, run it, and the outputs appear
-## next to it. Its companion is analyse-simulations.R, which turns those
-## outputs into the tables and figures of the paper.
+## One script, self-contained. It needs nothing but R, runs from whatever folder
+## it sits in -- the Google Drive folder included -- and writes its results
+## beside itself, in results/. Its companion is analyse-simulations.R, which
+## turns those results into the tables and figures of the paper.
 ##
-##     Rscript run-simulations.R                       the whole design
-##     Rscript run-simulations.R --blocks=core,null    two blocks
-##     Rscript run-simulations.R --only_n=20,50 --nrep=5 --tag=pilot
-##     Rscript run-simulations.R --rep_from=51 --rep_to=100
-##     Rscript run-simulations.R --dry                 price it, run nothing
-##     Rscript run-simulations.R --coverage            the bootstrap experiment
+## HOW TO RUN IT
+##
+##   1. Open this file in RStudio.
+##   2. If you want, change the SETUP below: the levels of the design, and in
+##      "4. THE RUN" the mode ("run", "coverage", "dry"), the number of cores,
+##      the replications.
+##   3. Press Source (Ctrl+Shift+S).
+##
+## The first time, Stem is installed or updated from GitHub. The replications
+## are then spread over the cores, and every one prints a line with its time and
+## the time left. The run can be stopped at any moment with the red Stop button
+## and resumed by pressing Source again: what was recorded is skipped. Keep the
+## RStudio session open while it runs.
+##
+## Do not run the same tag on two machines at once: they would write to the same
+## files. To share the work between machines give each its own `tag` and its own
+## range of replications, and analyse them together with --tag=a,b.
+##
+## The same settings can be given from a terminal, which overrides the SETUP:
+##
+##     Rscript run-simulations.R --cores=8 --rep_from=51 --rep_to=100
+##     Rscript run-simulations.R --mode=dry
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package. It is deliberately disconnected from it: Stem is a dependency like
@@ -58,10 +73,16 @@ sim_this_file <- function() {
   }
   NULL
 }
-SIM_HERE <- local({
-  f <- sim_this_file()
-  if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
-})
+SIM_FILE <- sim_this_file()
+SIM_HERE <- if (is.null(SIM_FILE)) normalizePath(getwd(), winslash = "/") else dirname(SIM_FILE)
+
+## The cores to use by default: all the physical ones but one, so that the
+## machine stays usable while the study runs.
+sim_default_cores <- function() {
+  n <- suppressWarnings(parallel::detectCores(logical = FALSE))
+  if (is.na(n)) n <- suppressWarnings(parallel::detectCores())
+  if (is.na(n)) 1L else max(1L, as.integer(n) - 1L)
+}
 ## ---------------------------------------------------------------------------
 ## Definitions only?
 ##
@@ -245,6 +266,16 @@ SIM_BLOCKS <- c("core", "null", "scenarios", "graph", "balance")
 ## 4. THE RUN. What this invocation does, all overridable on the command line.
 ## ---------------------------------------------------------------------------
 CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE), list(
+  ## What to do when the file is sourced:
+  ##   "run"       the Monte Carlo
+  ##   "coverage"  the bootstrap coverage experiment
+  ##   "dry"       print the design and an estimate of its cost, run nothing
+  mode     = "run",
+
+  ## How many cores to use. The default is all the physical cores of the machine
+  ## but one; write a number to choose. Each core runs one replication at a time.
+  cores    = sim_default_cores(),
+
   blocks   = SIM_BLOCKS,
   nrep     = 100L,
 
@@ -320,11 +351,26 @@ sim_model <- function(dat, n) {
     K = matrix(1, n, 1))
 }
 
+## Write, and if the file is momentarily locked -- a synchronization client such
+## as Google Drive holds a file while it uploads it -- wait and try again rather
+## than stop a run of several days.
+sim_retry <- function(write, tries = 20L, wait = 3) {
+  for (i in seq_len(tries)) {
+    ok <- tryCatch({ write(); TRUE }, error = function(e) {
+      if (i == tries) stop(e)
+      FALSE
+    })
+    if (ok) return(invisible(NULL))
+    Sys.sleep(wait)
+  }
+}
+
 ## Append to a CSV, writing the header only when the file is new.
 sim_append <- function(df, path) {
   if (is.null(df) || !nrow(df)) return(invisible(NULL))
-  utils::write.table(df, path, sep = ",", row.names = FALSE,
-                     col.names = !file.exists(path), append = file.exists(path))
+  sim_retry(function()
+    utils::write.table(df, path, sep = ",", row.names = FALSE,
+                       col.names = !file.exists(path), append = file.exists(path)))
 }
 
 
@@ -999,31 +1045,28 @@ sim_cells <- function(lv = SIM_LEVELS,
 ## 5. What a cell costs.
 ##
 ## Seconds for ONE replication -- one (k, phi) grid through SCSTEM_Infocrit()
-## and SCSTEM_Select() -- measured on the author's machine, single core, at
-## k_grid = 1:4 and phi_grid of length 3, at omega = 0.5. The entries are affine
-## in T at fixed n and interpolated in log n. The estimate is meant for
-## budgeting, not for reporting.
-##
-## THE MODEL DOES NOT COVER omega, and it no longer has to. It used to: while
-## the within-regime dispersion was held fixed, the network shrank as omega went
-## to zero, until at omega = 0 and n = 20 the median pairwise distance was 105 km
-## against a true correlation range of 123 km. The exponential decay was then
-## barely resolved over the observed distances, theta was close to unidentified,
-## and the EM crawled -- more than ten minutes for a single pooled fit that takes
-## 0.4 s at omega = 1. Holding the TOTAL spatial variance fixed instead, which is
-## what 06-dgp.R now does, leaves the footprint the same in every cell: 0.7 s at
-## omega = 0, 0.4 s at omega = 0.686 and at omega = 1, on the same n and T.
+## and SCSTEM_Select() -- on one core, at k_grid = 1:4 and phi_grid of length 3,
+## interpolated in log n and in T for sizes not in the table. The estimate is
+## meant for budgeting, not for reporting; once replications are recorded, the
+## "dry" mode recalibrates it on them.
 ## ---------------------------------------------------------------------------
+## MEASURED on 2026-09-26, one replication of every cell of the core and null
+## blocks, on the author's machine, averaged over the three overlaps. The times
+## are heavy-tailed -- a replication in which the EM struggles can take ten times
+## the typical one -- so a single replication per cell is a rough guide. The
+## cells with n = 400 and T = 60 are the extreme case: there the pooled fit
+## alone took more than twenty minutes and a whole replication more than an
+## hour without finishing, so they are entered at one hour, a lower bound.
 STEM_COST <- data.frame(
   n    = rep(c(20L, 50L, 100L, 200L, 400L), times = 6L),
   K    = rep(c(1L, 3L), each = 15L),
   TN   = rep(rep(c(60L, 120L, 365L), each = 5L), times = 2L),
-  secs = c(  5.4,  7.4, 10.9, 27.5,  99.0,     # K = 1, T = 60
-             7.4, 10.3, 15.2, 32.6, 110.1,     # K = 1, T = 120
-            15.9, 22.2, 32.6, 53.6, 155.7,     # K = 1, T = 365
-             4.1, 12.4, 10.0, 20.6,  68.9,     # K = 3, T = 60
-             7.8, 17.2, 15.3, 27.7,  77.5,     # K = 3, T = 120
-            23.1, 36.8, 37.2, 56.8, 112.4)     # K = 3, T = 365
+  secs = c(  3.3, 17.2, 13.5,  24.9, 3600,     # K = 1, T = 60
+             4.9, 17.6, 20.0,  27.4,  97.0,    # K = 1, T = 120
+            15.7, 18.8, 28.9,  65.3, 159.0,    # K = 1, T = 365
+             4.2, 43.6, 31.1,  26.5, 3600,     # K = 3, T = 60
+             7.5, 32.8, 37.4,  37.1,  86.8,    # K = 3, T = 120
+            19.0, 58.5, 42.7, 247.6, 122.6)    # K = 3, T = 365
 )
 
 ## seconds for one replication of one cell, interpolated in log(n) and linear
@@ -1089,384 +1132,268 @@ sim_cost <- function(cells, nrep = 100L, cores = 12L, measured = NULL) {
 ## One replication is the whole procedure a user would run: build the model
 ## object, fit the (k, phi) grid with SCSTEM_Infocrit(), apply the two-step rule
 ## with SCSTEM_Select(). What is recorded is described at the top of the file.
+##
+## The work is a list of TASKS, one per (cell, replication). The tasks are
+## handed to the cores one at a time, as each core frees up, so a replication
+## that happens to be slow holds up one core and not the others; every result
+## comes back to this R session, which alone writes the files and prints the
+## progress. A slow cell -- n = 400 with T = 60 can take an hour for a single
+## replication -- therefore costs its own time and nothing more.
 ## ===========================================================================
-sim_main <- function() {
+SIM_SCEN <- dgp_scenarios()
 
-  OUT <- CFG$out[1]
-  OUT <- normalizePath(OUT, winslash = "/", mustWork = FALSE)
-  scen <- dgp_scenarios()
-  sim_print_config(CFG)
+## ---------------------------------------------------------------------------
+## One replication
+## ---------------------------------------------------------------------------
+sim_one <- function(cell, rep) {
 
-  CSV     <- file.path(OUT, sprintf("%s.csv", CFG$tag))
-  CSV_PAR <- file.path(OUT, sprintf("%s-params.csv", CFG$tag))
-  CSV_STA <- file.path(OUT, sprintf("%s-stations.csv", CFG$tag))
-  DIR_OBS <- file.path(OUT, sprintf("%s-obs", CFG$tag))
+  row <- SIM_SCEN[SIM_SCEN$id == cell$id, , drop = FALSE]
+  dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$omega, row, rep = rep,
+                  balance = cell$balance)
 
-  ## ---------------------------------------------------------------------------
-  ## The cells
+  mod <- sim_model(dat, cell$n)
+
+  t0 <- proc.time()[["elapsed"]]
+  ## The estimator is held to the same floor as the generator. N_MIN is the
+  ## smallest regime in which a range is identified in any practical sense, so
+  ## a configuration below it is one the design itself calls unidentified --
+  ## and fitting it is not merely uninformative but ruinously slow: at n = 20
+  ## a k = 4 fit, with regimes of four and five locations, took 364 s where
+  ## k = 3 took one. With the floor the package refuses such a k at once, the
+  ## grid records it among the failed configurations, and the selection rule
+  ## never sees it.
+  ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
+                        distance = "geo", verbose = FALSE, knn = cell$knn,
+                        min_cluster_size = N_MIN,
+                        alpha = CFG$alpha[1], lambda = CFG$lambda[1])
+  sel <- Stem::SCSTEM_Select(ic)
+  secs <- proc.time()[["elapsed"]] - t0
+
+  ## ------------------------------------------------------------------------
+  ## Two questions, two fits, deliberately separated.
   ##
-  ## K = 1 has a single regime, so the overlap, the balance and the scenario are
-  ## all vacuous there: it enters once per (n, T). It covers the same area as
-  ## every other cell, because the generator holds the total spatial variance
-  ## fixed and a single regime simply takes all of it -- see NU_TOT above --
-  ## so the selection rule is not handed a free geometric cue for telling k = 1
-  ## from k > 1. Cells whose imbalance cannot be realised with regimes of at least
-  ## N_MIN units are dropped rather than silently rebalanced.
-  ## ---------------------------------------------------------------------------
-  cells <- sim_cells(blocks = CFG$blocks)
-  ## --only_<factor> keeps the named levels of that factor and nothing else.
-  ## The option name is on the left, the column of `cells` it filters on the right.
-  for (opt in list(c("only_n", "n"), c("only_TN", "TN"), c("only_K", "K"),
-                   c("only_knn", "knn"), c("only_scenario", "id"),
-                   c("only_balance", "balance"))) {
-    lev <- CFG[[opt[1]]]
-    if (length(lev)) cells <- cells[cells[[opt[2]]] %in% lev, ]
+  ## SELECTION asks whether the rule finds the truth, and is read off the fit
+  ## the rule chose. RECOVERY asks whether the estimator gets the parameters
+  ## right when it is told the truth, and is read off the fit at the TRUE
+  ## number of regimes. Measuring recovery on the selected fit would confound
+  ## the two: a poor estimate would be indistinguishable from a poor selection.
+  ## Both fits are already in the grid, so neither costs an extra run.
+  ## ------------------------------------------------------------------------
+  grab <- function(kk, pp) {
+    j <- which(ic$table$k == kk & abs(ic$table$phi - pp) < 1e-8)
+    if (!length(j)) NULL else ic$fits[[j[1]]]
   }
-  ## omega is a double, so it is matched with a tolerance rather than with %in%
-  if (length(CFG$only_omega))
-    cells <- cells[vapply(cells$omega, function(w)
-      any(abs(w - CFG$only_omega) < 1e-8), logical(1)), ]
-  ## cells whose imbalance cannot be realised with regimes of at least N_MIN
-  ## units are dropped rather than silently rebalanced
-  cells <- cells[mapply(dgp_feasible, cells$n, cells$K, cells$balance), ]
-  rownames(cells) <- NULL
+  fit_sel  <- sel$fit
+  ## with one regime the penalty is vacuous, and the grid holds k = 1 only at
+  ## the first value of phi
+  fit_true <- grab(cell$K, if (cell$K == 1L) CFG$phi_grid[1] else CFG$phi_ref[1])
+  fit_pool <- grab(1L, CFG$phi_grid[1])
 
-  prev <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
-  budget <- sim_cost(cells, nrep = CFG$nrep, measured = prev)
-  cat(sprintf("%d cells x %d replications, writing to\n  %s\n", nrow(cells),
-              CFG$nrep, CSV))
-  if (is.na(budget$calibration)) {
-    cat(sprintf("estimated %.0f core-hours (%.1f h on 12 cores), from the prior table:\n",
-                budget$core_hours, budget$wall_hours))
-    cat("  NOT RELIABLE -- run the first replications, then --dry again\n\n")
-  } else {
-    cat(sprintf("estimated %.0f core-hours (%.1f h on 12 cores), calibrated on %d\n",
-                budget$core_hours, budget$wall_hours, budget$measured_reps))
-    cat(sprintf("  replications already run in %d of the %d cells; the prior table was\n",
-                budget$measured_cells, budget$cells))
-    cat(sprintf("  off by a factor of %.2f\n\n", budget$calibration))
+  ## Clustering accuracy. The ARI is invariant to label switching; the share of
+  ## correctly assigned locations is not, so the labels are first relocated onto
+  ## the truth by the majority rule, exactly as the bootstrap does.
+  acc <- function(fit) {
+    if (is.null(fit) || is.null(fit$group)) return(c(ari = NA_real_, share = NA_real_))
+    g  <- fit$group
+    kk <- max(max(g), cell$K)
+    map <- scstem_align_labels(reference = dat$labels, refit = g, K = kk)
+    c(ari   = scstem_ari(g, dat$labels),
+      share = mean(map[g] == dat$labels, na.rm = TRUE))
   }
+  a_sel  <- acc(fit_sel)
+  a_true <- acc(fit_true)
 
-  ## --dry prices the run and stops: nothing is fitted and nothing is written
-  if (sim_flag("dry")) {
-    cat("cells by number of locations and periods\n")
-    print(table(n = cells$n, T = cells$TN))
-    cat("\ncells by block\n")
-    for (b in CFG$blocks)
-      cat(sprintf("  %-10s %4d\n", b, nrow(sim_cells(blocks = b))))
-    return(invisible(cells))
+  ## Predictive accuracy against the CONDITIONAL MEAN, not against z: the noise
+  ## is irreducible, and scoring against z would compress every comparison
+  ## towards one.
+  ##
+  ## NOTE. This is SCSTEM_Signal(), NOT SCSTEM_Complete(), and the distinction
+  ## matters. SCSTEM_Complete() returns E[z | observed]: it fills the gaps and
+  ## therefore returns z itself wherever z was observed, so on complete data it
+  ## IS the data and scoring it against anything measures nothing. What is
+  ## wanted here is the systematic part the model fits,
+  ##
+  ##     muhat_ti = x_ti' betahat_g + K_i yhat_t^(g) .
+  signal <- function(fit) {
+    if (is.null(fit)) return(NULL)
+    mh <- try(Stem::SCSTEM_Signal(fit), silent = TRUE)
+    if (inherits(mh, "try-error")) NULL else mh
   }
+  rmse <- function(fit) {
+    mh <- signal(fit)
+    if (is.null(mh) || all(is.na(mh))) return(NA_real_)
+    sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
+  }
+  r_true <- rmse(fit_true)
+  r_pool <- rmse(fit_pool)
 
-  dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
-  dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
+  ## THE PRIMARY KEY. Every one of the four outputs carries `cell` and `rep`,
+  ## and the pair identifies a run: the four files join on it and on nothing
+  ## else. `cell` is a string rather than the tuple of factors because omega is
+  ## a double -- 2/3 does not survive a round trip through a CSV exactly, and a
+  ## join on a floating-point column is a defect waiting to happen. The factor
+  ## columns are kept beside it for filtering, not for joining.
+  cell_id <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
+                     cell$n, cell$TN, cell$K, cell$omega, cell$id,
+                     substr(cell$balance, 1, 3), cell$knn,
+                     CFG$alpha[1], CFG$lambda[1])
 
-  ## ---------------------------------------------------------------------------
-  ## One replication
-  ## ---------------------------------------------------------------------------
-  run_one <- function(cell, rep) {
+  key <- data.frame(cell = cell_id, rep = rep,
+                    n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
+                    id = cell$id, balance = cell$balance, knn = cell$knn,
+                    alpha = CFG$alpha[1], lambda = CFG$lambda[1],
+                    stringsAsFactors = FALSE)
 
-    row <- scen[scen$id == cell$id, , drop = FALSE]
-    dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$omega, row, rep = rep,
-                    balance = cell$balance)
+  summ <- cbind(key, data.frame(
+    k_hat = sel$k_selected, phi_hat = sel$phi_selected,
+    k_correct = as.integer(sel$k_selected == cell$K),
+    ## SCSTEM_Select() chooses among k > 1 only and never returns the pooled
+    ## model, so on its own it cannot say that a network has no regimes. The
+    ## comparison it leaves to the user is recorded here: is the selected
+    ## configuration better than k = 1 on the BIC, and by how much
+    ## log-likelihood? The pooled fit is in the grid, so this costs nothing.
+    bic_beats_pooled = {
+      b1 <- ic$table$BIC[ic$table$k == 1][1]
+      bs <- ic$table$BIC[ic$table$k == sel$k_selected &
+                         abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
+      as.integer(is.finite(b1) && is.finite(bs) && bs < b1) },
+    gain_over_pooled = {
+      l1 <- ic$table$loglik[ic$table$k == 1][1]
+      ls <- ic$table$loglik[ic$table$k == sel$k_selected &
+                            abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
+      ls - l1 },
+    ari_sel = a_sel[["ari"]],   share_sel = a_sel[["share"]],
+    ari_true = a_true[["ari"]], share_true = a_true[["share"]],
+    rmse_true = r_true, rmse_pooled = r_pool, rmse_ratio = r_true / r_pool,
+    nconf = nrow(ic$table), nfail = nrow(ic$failed),
+    secs = secs, stringsAsFactors = FALSE))
 
-    mod <- sim_model(dat, cell$n)
+  ## ------------------------------------------------------------------------
+  ## Parameter recovery, regime by regime, at the true number of regimes and
+  ## after relocating the estimated labels onto the true ones. What is stored is
+  ## the estimate beside the truth, one row each: bias, RMSE and coverage are
+  ## Monte Carlo summaries of this file, not quantities a single replication
+  ## could compute.
+  ## ------------------------------------------------------------------------
+  ## the relocation of the estimated regimes onto the true ones, used both here
+  ## and by the per-station record below
+  map <- if (is.null(fit_true) || is.null(fit_true$group)) NULL else
+    scstem_align_labels(reference = dat$labels, refit = fit_true$group,
+                        K = cell$K)
 
-    t0 <- proc.time()[["elapsed"]]
-    ## The estimator is held to the same floor as the generator. N_MIN is the
-    ## smallest regime in which a range is identified in any practical sense, so
-    ## a configuration below it is one the design itself calls unidentified --
-    ## and fitting it is not merely uninformative but ruinously slow: at n = 20
-    ## a k = 4 fit, with regimes of four and five locations, took 364 s where
-    ## k = 3 took one. With the floor the package refuses such a k at once, the
-    ## grid records it among the failed configurations, and the selection rule
-    ## never sees it.
-    ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
-                          distance = "geo", verbose = FALSE, knn = cell$knn,
-                          min_cluster_size = N_MIN,
-                          alpha = CFG$alpha[1], lambda = CFG$lambda[1])
-    sel <- Stem::SCSTEM_Select(ic)
-    secs <- proc.time()[["elapsed"]] - t0
+  tru <- dgp_truth(dat$psi)
+  est <- rep(NA_real_, nrow(tru))
+  if (!is.null(fit_true) && !is.null(fit_true$phi_hat) && !is.null(map)) {
+    ph  <- fit_true$phi_hat
+    est <- vapply(seq_len(nrow(tru)), function(i) {
+      g_fit <- which(map == tru$regime[i])   # the fitted regime playing that role
+      p     <- tru$parameter[i]
+      if (!length(g_fit) || !(p %in% colnames(ph))) NA_real_ else ph[g_fit[1], p]
+    }, numeric(1))
+  }
+  params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est)
+  rownames(params) <- NULL
 
-    ## ------------------------------------------------------------------------
-    ## Two questions, two fits, deliberately separated.
-    ##
-    ## SELECTION asks whether the rule finds the truth, and is read off the fit
-    ## the rule chose. RECOVERY asks whether the estimator gets the parameters
-    ## right when it is told the truth, and is read off the fit at the TRUE
-    ## number of regimes. Measuring recovery on the selected fit would confound
-    ## the two: a poor estimate would be indistinguishable from a poor selection.
-    ## Both fits are already in the grid, so neither costs an extra run.
-    ## ------------------------------------------------------------------------
-    grab <- function(kk, pp) {
-      j <- which(ic$table$k == kk & abs(ic$table$phi - pp) < 1e-8)
-      if (!length(j)) NULL else ic$fits[[j[1]]]
-    }
-    fit_sel  <- sel$fit
-    ## with one regime the penalty is vacuous, and the grid holds k = 1 only at
-    ## the first value of phi
-    fit_true <- grab(cell$K, if (cell$K == 1L) CFG$phi_grid[1] else CFG$phi_ref[1])
-    fit_pool <- grab(1L, CFG$phi_grid[1])
+  ## ------------------------------------------------------------------------
+  ## Per-station and per-observation records.
+  ##
+  ## WHY BOTH, AND WHY THE STATION IS THE UNIT. With point-referenced data the
+  ## unit that carries a regime is the STATION, so the error measure that
+  ## answers "does the clustering help, and where" is the one computed within a
+  ## station over time and then looked at across stations. Pooling over all n*T
+  ## cells at once gives a single number that is, on a balanced panel, exactly
+  ## the root mean of the per-station mean squared errors -- so it is a summary
+  ## OF the per-station measure, not an alternative to it, and it destroys the
+  ## distribution that shows the regimes at work. On an unbalanced panel it is
+  ## not even that: it weights a station by how many periods it was observed.
+  ## Both are recorded; the station file is what the tables are built from.
+  ##
+  ## The target is mu, the conditional mean given the latent path, not z. The
+  ## nugget in z is irreducible, so scoring against z would add the same
+  ## constant to every model and compress every comparison towards one. In the
+  ## APPLICATION mu is not available and the honest measure is out-of-sample
+  ## against z, with spatio-temporal blocking; that is a different script.
+  ## ------------------------------------------------------------------------
+  mh_true <- signal(fit_true)
+  mh_pool <- signal(fit_pool)
+  mh_sel  <- signal(fit_sel)
+  g_true_hat <- if (is.null(map)) rep(NA_integer_, cell$n) else
+    as.integer(map)[fit_true$group]
+  g_sel_hat <- if (is.null(fit_sel)) rep(NA_integer_, cell$n) else fit_sel$group
 
-    ## Clustering accuracy. The ARI is invariant to label switching; the share of
-    ## correctly assigned locations is not, so the labels are first relocated onto
-    ## the truth by the majority rule, exactly as the bootstrap does.
-    acc <- function(fit) {
-      if (is.null(fit) || is.null(fit$group)) return(c(ari = NA_real_, share = NA_real_))
-      g  <- fit$group
-      kk <- max(max(g), cell$K)
-      map <- scstem_align_labels(reference = dat$labels, refit = g, K = kk)
-      c(ari   = scstem_ari(g, dat$labels),
-        share = mean(map[g] == dat$labels, na.rm = TRUE))
-    }
-    a_sel  <- acc(fit_sel)
-    a_true <- acc(fit_true)
+  colstat <- function(M, f) if (is.null(M)) rep(NA_real_, cell$n) else
+    apply(f(M), 2, mean, na.rm = TRUE)
+  sq <- function(M) (M - dat$mu)^2
+  ab <- function(M) abs(M - dat$mu)
+  sqz <- function(M) (M - dat$z)^2
 
-    ## Predictive accuracy against the CONDITIONAL MEAN, not against z: the noise
-    ## is irreducible, and scoring against z would compress every comparison
-    ## towards one.
-    ##
-    ## NOTE. This is SCSTEM_Signal(), NOT SCSTEM_Complete(), and the distinction
-    ## matters. SCSTEM_Complete() returns E[z | observed]: it fills the gaps and
-    ## therefore returns z itself wherever z was observed, so on complete data it
-    ## IS the data and scoring it against anything measures nothing. What is
-    ## wanted here is the systematic part the model fits,
-    ##
-    ##     muhat_ti = x_ti' betahat_g + K_i yhat_t^(g) .
-    signal <- function(fit) {
-      if (is.null(fit)) return(NULL)
-      mh <- try(Stem::SCSTEM_Signal(fit), silent = TRUE)
-      if (inherits(mh, "try-error")) NULL else mh
-    }
-    rmse <- function(fit) {
-      mh <- signal(fit)
-      if (is.null(mh) || all(is.na(mh))) return(NA_real_)
-      sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
-    }
-    r_true <- rmse(fit_true)
-    r_pool <- rmse(fit_pool)
+  station <- cbind(key[rep(1L, cell$n), ], data.frame(
+    station  = seq_len(cell$n),
+    lon = dat$coordinates[, 1], lat = dat$coordinates[, 2],
+    g_true   = dat$labels,
+    g_hat    = g_true_hat,
+    g_hat_sel = g_sel_hat,
+    correct  = as.integer(g_true_hat == dat$labels),
+    rmse_true = sqrt(colstat(mh_true, sq)),
+    mae_true  = colstat(mh_true, ab),
+    rmse_pool = sqrt(colstat(mh_pool, sq)),
+    mae_pool  = colstat(mh_pool, ab),
+    rmse_z_true = sqrt(colstat(mh_true, sqz)),
+    stringsAsFactors = FALSE))
+  rownames(station) <- NULL
 
-    ## THE PRIMARY KEY. Every one of the four outputs carries `cell` and `rep`,
-    ## and the pair identifies a run: the four files join on it and on nothing
-    ## else. `cell` is a string rather than the tuple of factors because omega is
-    ## a double -- 2/3 does not survive a round trip through a CSV exactly, and a
-    ## join on a floating-point column is a defect waiting to happen. The factor
-    ## columns are kept beside it for filtering, not for joining.
-    cell_id <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
-                       cell$n, cell$TN, cell$K, cell$omega, cell$id,
-                       substr(cell$balance, 1, 3), cell$knn,
-                       CFG$alpha[1], CFG$lambda[1])
-
-    key <- data.frame(cell = cell_id, rep = rep,
-                      n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
-                      id = cell$id, balance = cell$balance, knn = cell$knn,
-                      alpha = CFG$alpha[1], lambda = CFG$lambda[1],
-                      stringsAsFactors = FALSE)
-
-    summ <- cbind(key, data.frame(
-      k_hat = sel$k_selected, phi_hat = sel$phi_selected,
-      k_correct = as.integer(sel$k_selected == cell$K),
-      ## SCSTEM_Select() chooses among k > 1 only and never returns the pooled
-      ## model, so on its own it cannot say that a network has no regimes. The
-      ## comparison it leaves to the user is recorded here: is the selected
-      ## configuration better than k = 1 on the BIC, and by how much
-      ## log-likelihood? The pooled fit is in the grid, so this costs nothing.
-      bic_beats_pooled = {
-        b1 <- ic$table$BIC[ic$table$k == 1][1]
-        bs <- ic$table$BIC[ic$table$k == sel$k_selected &
-                           abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
-        as.integer(is.finite(b1) && is.finite(bs) && bs < b1) },
-      gain_over_pooled = {
-        l1 <- ic$table$loglik[ic$table$k == 1][1]
-        ls <- ic$table$loglik[ic$table$k == sel$k_selected &
-                              abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
-        ls - l1 },
-      ari_sel = a_sel[["ari"]],   share_sel = a_sel[["share"]],
-      ari_true = a_true[["ari"]], share_true = a_true[["share"]],
-      rmse_true = r_true, rmse_pooled = r_pool, rmse_ratio = r_true / r_pool,
-      nconf = nrow(ic$table), nfail = nrow(ic$failed),
-      secs = secs, stringsAsFactors = FALSE))
-
-    ## ------------------------------------------------------------------------
-    ## Parameter recovery, regime by regime, at the true number of regimes and
-    ## after relocating the estimated labels onto the true ones. What is stored is
-    ## the estimate beside the truth, one row each: bias, RMSE and coverage are
-    ## Monte Carlo summaries of this file, not quantities a single replication
-    ## could compute.
-    ## ------------------------------------------------------------------------
-    ## the relocation of the estimated regimes onto the true ones, used both here
-    ## and by the per-station record below
-    map <- if (is.null(fit_true) || is.null(fit_true$group)) NULL else
-      scstem_align_labels(reference = dat$labels, refit = fit_true$group,
-                          K = cell$K)
-
-    tru <- dgp_truth(dat$psi)
-    est <- rep(NA_real_, nrow(tru))
-    if (!is.null(fit_true) && !is.null(fit_true$phi_hat) && !is.null(map)) {
-      ph  <- fit_true$phi_hat
-      est <- vapply(seq_len(nrow(tru)), function(i) {
-        g_fit <- which(map == tru$regime[i])   # the fitted regime playing that role
-        p     <- tru$parameter[i]
-        if (!length(g_fit) || !(p %in% colnames(ph))) NA_real_ else ph[g_fit[1], p]
-      }, numeric(1))
-    }
-    params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est)
-    rownames(params) <- NULL
-
-    ## ------------------------------------------------------------------------
-    ## Per-station and per-observation records.
-    ##
-    ## WHY BOTH, AND WHY THE STATION IS THE UNIT. With point-referenced data the
-    ## unit that carries a regime is the STATION, so the error measure that
-    ## answers "does the clustering help, and where" is the one computed within a
-    ## station over time and then looked at across stations. Pooling over all n*T
-    ## cells at once gives a single number that is, on a balanced panel, exactly
-    ## the root mean of the per-station mean squared errors -- so it is a summary
-    ## OF the per-station measure, not an alternative to it, and it destroys the
-    ## distribution that shows the regimes at work. On an unbalanced panel it is
-    ## not even that: it weights a station by how many periods it was observed.
-    ## Both are recorded; the station file is what the tables are built from.
-    ##
-    ## The target is mu, the conditional mean given the latent path, not z. The
-    ## nugget in z is irreducible, so scoring against z would add the same
-    ## constant to every model and compress every comparison towards one. In the
-    ## APPLICATION mu is not available and the honest measure is out-of-sample
-    ## against z, with spatio-temporal blocking; that is a different script.
-    ## ------------------------------------------------------------------------
-    mh_true <- signal(fit_true)
-    mh_pool <- signal(fit_pool)
-    mh_sel  <- signal(fit_sel)
-    g_true_hat <- if (is.null(map)) rep(NA_integer_, cell$n) else
-      as.integer(map)[fit_true$group]
-    g_sel_hat <- if (is.null(fit_sel)) rep(NA_integer_, cell$n) else fit_sel$group
-
-    colstat <- function(M, f) if (is.null(M)) rep(NA_real_, cell$n) else
-      apply(f(M), 2, mean, na.rm = TRUE)
-    sq <- function(M) (M - dat$mu)^2
-    ab <- function(M) abs(M - dat$mu)
-    sqz <- function(M) (M - dat$z)^2
-
-    station <- cbind(key[rep(1L, cell$n), ], data.frame(
-      station  = seq_len(cell$n),
-      lon = dat$coordinates[, 1], lat = dat$coordinates[, 2],
-      g_true   = dat$labels,
-      g_hat    = g_true_hat,
-      g_hat_sel = g_sel_hat,
-      correct  = as.integer(g_true_hat == dat$labels),
-      rmse_true = sqrt(colstat(mh_true, sq)),
-      mae_true  = colstat(mh_true, ab),
-      rmse_pool = sqrt(colstat(mh_pool, sq)),
-      mae_pool  = colstat(mh_pool, ab),
-      rmse_z_true = sqrt(colstat(mh_true, sqz)),
+  obs <- NULL
+  if (rep <= CFG$keep_obs[1]) {
+    ii <- rep(seq_len(cell$n), each = cell$TN)
+    tt <- rep(seq_len(cell$TN), times = cell$n)
+    obs <- cbind(key[rep(1L, cell$n * cell$TN), ], data.frame(
+      t = tt, station = ii,
+      lon = dat$coordinates[ii, 1], lat = dat$coordinates[ii, 2],
+      x = as.vector(dat$x), z = as.vector(dat$z), mu = as.vector(dat$mu),
+      g_true = dat$labels[ii], g_hat = g_true_hat[ii], g_hat_sel = g_sel_hat[ii],
+      mu_hat = if (is.null(mh_true)) NA_real_ else as.vector(mh_true),
+      mu_hat_sel = if (is.null(mh_sel)) NA_real_ else as.vector(mh_sel),
+      mu_hat_pool = if (is.null(mh_pool)) NA_real_ else as.vector(mh_pool),
       stringsAsFactors = FALSE))
-    rownames(station) <- NULL
-
-    obs <- NULL
-    if (rep <= CFG$keep_obs[1]) {
-      ii <- rep(seq_len(cell$n), each = cell$TN)
-      tt <- rep(seq_len(cell$TN), times = cell$n)
-      obs <- cbind(key[rep(1L, cell$n * cell$TN), ], data.frame(
-        t = tt, station = ii,
-        lon = dat$coordinates[ii, 1], lat = dat$coordinates[ii, 2],
-        x = as.vector(dat$x), z = as.vector(dat$z), mu = as.vector(dat$mu),
-        g_true = dat$labels[ii], g_hat = g_true_hat[ii], g_hat_sel = g_sel_hat[ii],
-        mu_hat = if (is.null(mh_true)) NA_real_ else as.vector(mh_true),
-        mu_hat_sel = if (is.null(mh_sel)) NA_real_ else as.vector(mh_sel),
-        mu_hat_pool = if (is.null(mh_pool)) NA_real_ else as.vector(mh_pool),
-        stringsAsFactors = FALSE))
-      rownames(obs) <- NULL
-    }
-
-    list(summary = summ, params = params, station = station, obs = obs)
+    rownames(obs) <- NULL
   }
 
-  ## ---------------------------------------------------------------------------
-  ## The loop, appending as it goes
-  ## ---------------------------------------------------------------------------
-  ## Two files, because the two have different shapes: one row per replication for
-  ## the selection and accuracy measures, one row per replication, regime and
-  ## parameter for the recovery. Both are appended cell by cell, so an interrupted
-  ## run keeps what it has and a resumed one skips it.
-  done <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
-  ## the resume test is on the primary key of a run
-  key <- function(x) paste(x$cell, x$rep, sep = "|")
-  cell_key <- function(cl, r) {
-    sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g|%d",
-            cl$n, cl$TN, cl$K, cl$omega, cl$id, substr(cl$balance, 1, 3), cl$knn,
-            CFG$alpha[1], CFG$lambda[1], r)
-  }
+  list(summary = summ, params = params, station = station, obs = obs)
+}
 
+## The row a replication leaves when it fails: the key of the run, NA for every
+## measure, and the reason. On a long run on another machine a silent NA is a day
+## lost, so the reason is always recorded.
+sim_failed <- function(cell, rep, msg) {
+  k0 <- data.frame(
+    cell = sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
+                   cell$n, cell$TN, cell$K, cell$omega, cell$id,
+                   substr(cell$balance, 1, 3), cell$knn,
+                   CFG$alpha[1], CFG$lambda[1]),
+    rep = rep, n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
+    id = cell$id, balance = cell$balance, knn = cell$knn,
+    alpha = CFG$alpha[1], lambda = CFG$lambda[1],
+    stringsAsFactors = FALSE)
+  list(summary = cbind(k0, data.frame(
+         k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
+         bic_beats_pooled = NA_integer_, gain_over_pooled = NA_real_,
+         ari_sel = NA_real_, share_sel = NA_real_,
+         ari_true = NA_real_, share_true = NA_real_,
+         rmse_true = NA_real_, rmse_pooled = NA_real_, rmse_ratio = NA_real_,
+         nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_,
+         error = msg, stringsAsFactors = FALSE)),
+       params = NULL, station = NULL, obs = NULL)
+}
 
-  ## The per-observation record goes to one compressed file per cell and
-  ## replication rather than into a shared CSV: it is n*T rows, so appending it to
-  ## a single file would produce something no editor opens and no resume could
-  ## check cheaply.
-  save_obs <- function(df, cell, rep) {
-    if (is.null(df)) return(invisible(NULL))
-    f <- sprintf("obs_n%d_T%d_K%d_w%s_%s_%s_knn%d_rep%04d.rds",
-                 cell$n, cell$TN, cell$K, sub("\\.", "", sprintf("%.2f", cell$omega)),
-                 cell$id, substr(cell$balance, 1, 3), cell$knn, rep)
-    saveRDS(df, file.path(DIR_OBS, f), compress = "xz")
-  }
-
-  reps <- seq.int(CFG$rep_from[1], CFG$rep_to[1])
-  cat(sprintf("replications %d to %d; per-observation records kept for the first %d\n\n",
-              CFG$rep_from[1], CFG$rep_to[1], CFG$keep_obs[1]))
-
-  cat(sprintf("%4s %5s %2s %5s %-4s %-10s %3s %5s | %7s %5s %6s %6s %6s\n",
-              "n", "T", "K", "omega", "scen", "balance", "knn", "rep",
-              "secs", "k_hat", "ARI", "share", "rmseR"))
-
-  for (i in seq_len(nrow(cells))) {
-    for (r in reps) {
-      cell <- cells[i, , drop = FALSE]
-      cell$rep <- r
-      if (!is.null(done) && cell_key(cell, r) %in% key(done)) next
-
-      out <- tryCatch(run_one(cell, r), error = function(e) {
-        k0 <- data.frame(
-          cell = sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g",
-                         cell$n, cell$TN, cell$K, cell$omega, cell$id,
-                         substr(cell$balance, 1, 3), cell$knn,
-                         CFG$alpha[1], CFG$lambda[1]),
-          rep = r, n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
-          id = cell$id, balance = cell$balance, knn = cell$knn,
-          alpha = CFG$alpha[1], lambda = CFG$lambda[1],
-          stringsAsFactors = FALSE)
-        list(summary = cbind(k0, data.frame(
-               k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
-               bic_beats_pooled = NA_integer_, gain_over_pooled = NA_real_,
-               ari_sel = NA_real_, share_sel = NA_real_,
-               ari_true = NA_real_, share_true = NA_real_,
-               rmse_true = NA_real_, rmse_pooled = NA_real_, rmse_ratio = NA_real_,
-               nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_,
-               error = conditionMessage(e),
-               stringsAsFactors = FALSE)),
-             params = NULL, station = NULL, obs = NULL)
-      })
-      ## a replication that failed says why, in the log and in the file: on a
-      ## long run on another machine a silent NA is a day lost
-      if (is.null(out$summary$error)) out$summary$error <- ""
-
-      sim_append(out$summary, CSV)
-      sim_append(out$params,  CSV_PAR)
-      sim_append(out$station, CSV_STA)
-      save_obs(out$obs, cell, r)
-
-      s <- out$summary
-      cat(sprintf("%4d %5d %2d %5.2f %-4s %-10s %3d %5d | %7.1f %5s %6s %6s %6s\n",
-                  s$n, s$TN, s$K, s$omega, s$id, s$balance, s$knn, s$rep, s$secs,
-                  format(s$k_hat), format(round(s$ari_true, 3)),
-                  format(round(s$share_true, 3)), format(round(s$rmse_ratio, 3))))
-      if (nzchar(s$error)) cat("      FAILED: ", s$error, "\n", sep = "")
-      utils::flush.console()
-    }
-  }
-
-  invisible(NULL)
+sim_one_safe <- function(cell, rep) {
+  out <- tryCatch(sim_one(cell, rep),
+                  error = function(e) sim_failed(cell, rep, conditionMessage(e)))
+  if (is.null(out$summary$error)) out$summary$error <- ""
+  out
 }
 
 ## ===========================================================================
-## THE COVERAGE EXPERIMENT (run with --coverage)
+## THE COVERAGE EXPERIMENT (mode = "coverage")
 ##
 ## The point estimator is one thing; the interval built around it is another,
 ## and the second does not follow from the first. This experiment asks whether
@@ -1508,11 +1435,282 @@ SIM_COVERAGE <- list(
   levels   = c(0.90, 0.95)
 )
 
+cov_one <- function(cell, rep) {
+  row <- SIM_SCEN[SIM_SCEN$id == cell$id, , drop = FALSE]
+  dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$omega, row,
+                  rep = CFG$seed0[1] + 5000L + rep, balance = cell$balance)
+  mod <- sim_model(dat, cell$n)
+
+  t0 <- proc.time()[["elapsed"]]
+  fit <- Stem::SCSTEM_Estimation(mod, k = cell$K, phi_penalty = SIM_COVERAGE$phi,
+                                 distance = "geo", verbose = FALSE,
+                                 min_cluster_size = N_MIN,
+                                 alpha = CFG$alpha[1], lambda = CFG$lambda[1])
+  boot <- Stem::SCSTEM_Bootstrap(fit, B = CFG$boot_B[1],
+                                 seed = CFG$seed0[1] + 5000L + rep,
+                                 verbose = FALSE)
+  secs <- proc.time()[["elapsed"]] - t0
+
+  ## the bootstrap aligns every refit onto the ORIGINAL fit; aligning the
+  ## original fit onto the TRUTH is this experiment's job
+  map <- scstem_align_labels(reference = dat$labels, refit = fit$group,
+                             K = cell$K)
+  tru <- dgp_truth(dat$psi)
+  cell_id <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_phi%g", cell$n, cell$TN,
+                     cell$K, cell$omega, cell$id, substr(cell$balance, 1, 3),
+                     SIM_COVERAGE$phi)
+  key <- data.frame(cell = cell_id, rep = rep, n = cell$n, TN = cell$TN,
+                    K = cell$K, omega = cell$omega, id = cell$id,
+                    balance = cell$balance, stringsAsFactors = FALSE)
+
+  out <- list(); inf <- NULL
+  for (lev in SIM_COVERAGE$levels) {
+    inf <- try(Stem::SCSTEM_BootInference(boot, level = lev, digits = 12),
+               silent = TRUE)
+    if (inherits(inf, "try-error")) { inf <- NULL; next }
+    s <- inf$summary
+    for (i in seq_len(nrow(tru))) {
+      g_fit <- which(map == tru$regime[i])
+      p <- tru$parameter[i]
+      j <- if (length(g_fit)) which(s$cluster == g_fit[1] & s$parameter == p) else integer(0)
+      if (!length(j)) next
+      r <- s[j[1], ]
+      out[[length(out) + 1L]] <- cbind(key, data.frame(
+        level = lev, regime = tru$regime[i], parameter = p,
+        truth = tru$truth[i], estimate = r$estimate, se = r$se,
+        normal_lo = r$normal_lo, normal_up = r$normal_up,
+        basic_lo = r$basic_lo, basic_up = r$basic_up,
+        perc_lo = r$perc_lo, perc_up = r$perc_up,
+        bc_lo = r$bc_lo, bc_up = r$bc_up,
+        n_draws = r$n_draws, stringsAsFactors = FALSE))
+    }
+  }
+  stab <- cbind(key, data.frame(
+    B_used = if (is.null(boot$B_used)) CFG$boot_B[1] else boot$B_used,
+    ari_mean = if (is.null(inf)) NA_real_ else mean(inf$stability$ARI, na.rm = TRUE),
+    ari_min = if (is.null(inf)) NA_real_ else min(inf$stability$ARI, na.rm = TRUE),
+    ari_share1 = if (is.null(inf)) NA_real_ else mean(inf$stability$ARI >= 0.999, na.rm = TRUE),
+    secs = secs, stringsAsFactors = FALSE))
+  list(coverage = if (length(out)) do.call(rbind, out) else NULL,
+       stability = stab)
+}
+
+cov_one_safe <- function(cell, rep) {
+  tryCatch(cov_one(cell, rep), error = function(e)
+    list(coverage = NULL, stability = NULL, error = conditionMessage(e)))
+}
+
+
+## ===========================================================================
+## Running the tasks on several cores
+## ===========================================================================
+
+## What a core does with one task. Top-level functions, so that only their
+## name travels to the cores, not the environment they were created in.
+sim_task_fun <- function(task) sim_one_safe(task$cell, task$rep)
+cov_task_fun <- function(task) cov_one_safe(task$cell, task$rep)
+
+## What a core does once, when it starts: load this very file in
+## definitions-only mode -- Stem, the generator, the functions above -- and
+## take the settings of the session that launched it.
+sim_worker_init <- function(path, cfg) {
+  assign("SIM_DEFINE_ONLY", TRUE, envir = globalenv())
+  source(path, local = globalenv())
+  assign("CFG", cfg, envir = globalenv())
+  invisible(TRUE)
+}
+
+## Runs `fun` on every task and hands each result to `on_result` in this
+## session as soon as it arrives. With one core the tasks simply run here; with
+## more, a cluster of R processes is started and the tasks are handed out one at
+## a time as the processes free up -- the scheduling of
+## parallel::clusterApplyLB(), written out so that each result can be saved the
+## moment it arrives instead of all at the end. The cluster is stopped on exit,
+## also when the run is interrupted from RStudio.
+sim_run_tasks <- function(tasks, fun, on_result, cores) {
+  n <- length(tasks)
+  if (!n) return(invisible(0L))
+  cores <- max(1L, min(as.integer(cores), n))
+  if (cores > 1L && is.null(SIM_FILE)) {
+    message("the path of this script is unknown, so it runs on one core; ",
+            "open the file and press Source rather than pasting it")
+    cores <- 1L
+  }
+  if (cores == 1L) {
+    for (k in seq_len(n)) on_result(fun(tasks[[k]]), tasks[[k]], k, n)
+    return(invisible(n))
+  }
+  cat(sprintf("starting %d R processes ...\n", cores)); utils::flush.console()
+  cl <- parallel::makePSOCKcluster(cores)
+  on.exit(parallel::stopCluster(cl), add = TRUE)
+  parallel::clusterCall(cl, sim_worker_init, SIM_FILE, CFG)
+  send <- utils::getFromNamespace("sendCall", "parallel")
+  recv <- utils::getFromNamespace("recvOneResult", "parallel")
+  for (i in seq_len(cores)) send(cl[[i]], fun, list(tasks[[i]]), tag = i)
+  nxt <- cores + 1L
+  for (k in seq_len(n)) {
+    d <- recv(cl)
+    if (nxt <= n) {
+      send(cl[[d$node]], fun, list(tasks[[nxt]]), tag = nxt)
+      nxt <- nxt + 1L
+    }
+    on_result(d$value, tasks[[d$tag]], k, n)
+  }
+  invisible(n)
+}
+
+## The tasks in the order they are run: replication by replication, so that an
+## interrupted run leaves whole replications of the design behind, and within a
+## replication in a shuffled but fixed order of the cells, so that the running
+## average of the times -- hence the estimate of the time left -- is
+## representative from the first minutes rather than biased by cheap cells.
+sim_tasks <- function(cells, reps, done_keys, key_of) {
+  set.seed(20260926)
+  ord <- sample(nrow(cells))
+  tasks <- list()
+  for (r in reps) for (i in ord) {
+    cell <- cells[i, , drop = FALSE]
+    if (key_of(cell, r) %in% done_keys) next
+    tasks[[length(tasks) + 1L]] <- list(cell = cell, rep = r)
+  }
+  tasks
+}
+
+sim_hours <- function(x) if (x < 1) sprintf("%.0f min", 60 * x) else sprintf("%.1f h", x)
+
+
+## ===========================================================================
+## The Monte Carlo
+## ===========================================================================
+sim_main <- function() {
+
+  OUT <- normalizePath(CFG$out[1], winslash = "/", mustWork = FALSE)
+  sim_print_config(CFG)
+
+  CSV     <- file.path(OUT, sprintf("%s.csv", CFG$tag))
+  CSV_PAR <- file.path(OUT, sprintf("%s-params.csv", CFG$tag))
+  CSV_STA <- file.path(OUT, sprintf("%s-stations.csv", CFG$tag))
+  DIR_OBS <- file.path(OUT, sprintf("%s-obs", CFG$tag))
+
+  ## ---------------------------------------------------------------------------
+  ## The cells
+  ##
+  ## K = 1 has a single regime, so the overlap, the balance and the scenario are
+  ## all vacuous there: it enters once per (n, T). It covers the same area as
+  ## every other cell, because the generator holds the total spatial variance
+  ## fixed and a single regime simply takes all of it -- see NU_TOT above --
+  ## so the selection rule is not handed a free geometric cue for telling k = 1
+  ## from k > 1. Cells whose imbalance cannot be realised with regimes of at least
+  ## N_MIN units are dropped rather than silently rebalanced.
+  ## ---------------------------------------------------------------------------
+  cells <- sim_cells(blocks = CFG$blocks)
+  ## only_<factor> keeps the named levels of that factor and nothing else.
+  ## The option name is on the left, the column of `cells` it filters on the right.
+  for (opt in list(c("only_n", "n"), c("only_TN", "TN"), c("only_K", "K"),
+                   c("only_knn", "knn"), c("only_scenario", "id"),
+                   c("only_balance", "balance"))) {
+    lev <- CFG[[opt[1]]]
+    if (length(lev)) cells <- cells[cells[[opt[2]]] %in% lev, ]
+  }
+  ## omega is a double, so it is matched with a tolerance rather than with %in%
+  if (length(CFG$only_omega))
+    cells <- cells[vapply(cells$omega, function(w)
+      any(abs(w - CFG$only_omega) < 1e-8), logical(1)), ]
+  cells <- cells[mapply(dgp_feasible, cells$n, cells$K, cells$balance), ]
+  rownames(cells) <- NULL
+
+  prev <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
+  budget <- sim_cost(cells, nrep = CFG$nrep, cores = CFG$cores[1], measured = prev)
+  cat(sprintf("%d cells x %d replications, writing to\n  %s\n", nrow(cells),
+              CFG$nrep, OUT))
+  if (is.na(budget$calibration)) {
+    cat(sprintf("estimated %.0f core-hours (%s on %d cores), from the prior table:\n",
+                budget$core_hours, sim_hours(budget$wall_hours), CFG$cores[1]))
+    cat("  a rough guide only; the estimate printed as the run goes is the one to trust\n\n")
+  } else {
+    cat(sprintf("estimated %.0f core-hours (%s on %d cores), calibrated on the %d\n",
+                budget$core_hours, sim_hours(budget$wall_hours), CFG$cores[1],
+                budget$measured_reps))
+    cat("  replications already recorded\n\n")
+  }
+
+  ## "dry" prices the run and stops: nothing is fitted and nothing is written
+  if (identical(CFG$mode[1], "dry") || sim_flag("dry")) {
+    cat("cells by number of locations and periods\n")
+    print(table(n = cells$n, T = cells$TN))
+    cat("\ncells by block\n")
+    for (b in CFG$blocks)
+      cat(sprintf("  %-10s %4d\n", b, nrow(sim_cells(blocks = b))))
+    return(invisible(cells))
+  }
+
+  dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+  dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
+
+  ## the resume test is on the primary key of a run
+  cell_key <- function(cl, r) {
+    sprintf("n%d_T%d_K%d_w%.2f_%s_%s_knn%d_a%g_l%g|%d",
+            cl$n, cl$TN, cl$K, cl$omega, cl$id, substr(cl$balance, 1, 3), cl$knn,
+            CFG$alpha[1], CFG$lambda[1], r)
+  }
+  done <- if (is.null(prev)) character(0) else paste(prev$cell, prev$rep, sep = "|")
+
+  ## The per-observation record goes to one compressed file per cell and
+  ## replication rather than into a shared CSV: it is n*T rows, so appending it to
+  ## a single file would produce something no editor opens and no resume could
+  ## check cheaply.
+  save_obs <- function(df, cell, rep) {
+    if (is.null(df)) return(invisible(NULL))
+    f <- sprintf("obs_n%d_T%d_K%d_w%s_%s_%s_knn%d_rep%04d.rds",
+                 cell$n, cell$TN, cell$K, sub(".", "", sprintf("%.2f", cell$omega), fixed = TRUE),
+                 cell$id, substr(cell$balance, 1, 3), cell$knn, rep)
+    sim_retry(function() saveRDS(df, file.path(DIR_OBS, f), compress = "xz"))
+  }
+
+  reps  <- seq.int(CFG$rep_from[1], CFG$rep_to[1])
+  tasks <- sim_tasks(cells, reps, done, cell_key)
+  cat(sprintf("replications %d to %d: %d tasks to run, %d already recorded;",
+              CFG$rep_from[1], CFG$rep_to[1], length(tasks),
+              nrow(cells) * length(reps) - length(tasks)))
+  cat(sprintf(" per-observation records kept for the first %d\n\n", CFG$keep_obs[1]))
+  if (!length(tasks)) { cat("nothing to do\n"); return(invisible(NULL)) }
+
+  cat(sprintf("%13s %4s %5s %2s %5s %-4s %-3s %3s %4s | %9s %5s %6s | %s\n",
+              "", "n", "T", "K", "omega", "scen", "bal", "knn", "rep",
+              "time", "k_hat", "ARI", "elapsed, and left"))
+  t_start <- proc.time()[["elapsed"]]
+  on_result <- function(out, task, k, n) {
+    ## a result that is not a list is an R process that died on the task
+    if (!is.list(out) || is.null(out$summary))
+      out <- sim_failed(task$cell, task$rep, paste(as.character(out), collapse = " "))
+    if (is.null(out$summary$error)) out$summary$error <- ""
+    sim_append(out$summary, CSV)
+    sim_append(out$params,  CSV_PAR)
+    sim_append(out$station, CSV_STA)
+    save_obs(out$obs, task$cell, task$rep)
+    s  <- out$summary
+    el <- (proc.time()[["elapsed"]] - t_start) / 3600
+    cat(sprintf("[%5d/%5d] %4d %5d %2d %5.2f %-4s %-3s %3d %4d | %7.1f s %5s %6s | %s, ~%s left\n",
+                k, n, s$n, s$TN, s$K, s$omega, s$id, substr(s$balance, 1, 3), s$knn,
+                s$rep, s$secs, format(s$k_hat), format(round(s$ari_true, 3)),
+                sim_hours(el), sim_hours(el / k * (n - k))))
+    if (nzchar(s$error)) cat("              FAILED: ", s$error, "\n", sep = "")
+    utils::flush.console()
+  }
+
+  sim_run_tasks(tasks, sim_task_fun, on_result, CFG$cores[1])
+  cat(sprintf("\ndone in %s\n", sim_hours((proc.time()[["elapsed"]] - t_start) / 3600)))
+  invisible(NULL)
+}
+
+
+## ===========================================================================
+## The coverage experiment
+## ===========================================================================
 sim_coverage <- function() {
 
   OUT <- normalizePath(CFG$out[1], winslash = "/", mustWork = FALSE)
-  scen <- dgp_scenarios()
-  cv <- SIM_COVERAGE
+  cv  <- SIM_COVERAGE
   CSV <- file.path(OUT, sprintf("%s-coverage.csv", CFG$tag))
   CSA <- file.path(OUT, sprintf("%s-stability.csv", CFG$tag))
 
@@ -1522,95 +1720,38 @@ sim_coverage <- function() {
   cells <- cells[mapply(dgp_feasible, cells$n, cells$K, cells$balance), ]
   rownames(cells) <- NULL
   cat(sprintf("coverage: %d cells x %d replications x %d refits, writing to\n  %s\n\n",
-              nrow(cells), CFG$boot_reps, CFG$boot_B, CSV))
-  if (sim_flag("dry")) return(invisible(cells))
+              nrow(cells), CFG$boot_reps, CFG$boot_B, OUT))
+  if (identical(CFG$mode[1], "dry") || sim_flag("dry")) return(invisible(cells))
   dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
-  one <- function(cell, rep) {
-    row <- scen[scen$id == cell$id, , drop = FALSE]
-    dat <- dgp_draw(cell$n, cell$TN, cell$K, cell$omega, row,
-                    rep = CFG$seed0[1] + 5000L + rep, balance = cell$balance)
-    mod <- sim_model(dat, cell$n)
+  cov_key <- function(cell, r)
+    paste(sprintf("n%d_T%d_K%d_w%.2f_%s_%s_phi%g", cell$n, cell$TN, cell$K,
+                  cell$omega, cell$id, substr(cell$balance, 1, 3), cv$phi), r)
+  prev <- if (file.exists(CSA)) utils::read.csv(CSA, stringsAsFactors = FALSE) else NULL
+  done <- if (is.null(prev)) character(0) else paste(prev$cell, prev$rep)
+  tasks <- sim_tasks(cells, seq_len(CFG$boot_reps[1]), done, cov_key)
+  cat(sprintf("%d tasks to run\n\n", length(tasks)))
+  if (!length(tasks)) { cat("nothing to do\n"); return(invisible(NULL)) }
 
-    t0 <- proc.time()[["elapsed"]]
-    fit <- Stem::SCSTEM_Estimation(mod, k = cell$K, phi_penalty = cv$phi,
-                                   distance = "geo", verbose = FALSE,
-                                   min_cluster_size = N_MIN,
-                                   alpha = CFG$alpha[1], lambda = CFG$lambda[1])
-    boot <- Stem::SCSTEM_Bootstrap(fit, B = CFG$boot_B[1],
-                                   seed = CFG$seed0[1] + 5000L + rep,
-                                   verbose = FALSE)
-    secs <- proc.time()[["elapsed"]] - t0
-
-    ## the bootstrap aligns every refit onto the ORIGINAL fit; aligning the
-    ## original fit onto the TRUTH is this experiment's job
-    map <- scstem_align_labels(reference = dat$labels, refit = fit$group,
-                               K = cell$K)
-    tru <- dgp_truth(dat$psi)
-    cell_id <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_phi%g", cell$n, cell$TN,
-                       cell$K, cell$omega, cell$id, substr(cell$balance, 1, 3),
-                       cv$phi)
-    key <- data.frame(cell = cell_id, rep = rep, n = cell$n, TN = cell$TN,
-                      K = cell$K, omega = cell$omega, id = cell$id,
-                      balance = cell$balance, stringsAsFactors = FALSE)
-
-    out <- list(); inf <- NULL
-    for (lev in cv$levels) {
-      inf <- try(Stem::SCSTEM_BootInference(boot, level = lev, digits = 12),
-                 silent = TRUE)
-      if (inherits(inf, "try-error")) { inf <- NULL; next }
-      s <- inf$summary
-      for (i in seq_len(nrow(tru))) {
-        g_fit <- which(map == tru$regime[i])
-        p <- tru$parameter[i]
-        j <- if (length(g_fit)) which(s$cluster == g_fit[1] & s$parameter == p) else integer(0)
-        if (!length(j)) next
-        r <- s[j[1], ]
-        out[[length(out) + 1L]] <- cbind(key, data.frame(
-          level = lev, regime = tru$regime[i], parameter = p,
-          truth = tru$truth[i], estimate = r$estimate, se = r$se,
-          normal_lo = r$normal_lo, normal_up = r$normal_up,
-          basic_lo = r$basic_lo, basic_up = r$basic_up,
-          perc_lo = r$perc_lo, perc_up = r$perc_up,
-          bc_lo = r$bc_lo, bc_up = r$bc_up,
-          n_draws = r$n_draws, stringsAsFactors = FALSE))
-      }
+  t_start <- proc.time()[["elapsed"]]
+  on_result <- function(out, task, k, n) {
+    el <- (proc.time()[["elapsed"]] - t_start) / 3600
+    cell <- task$cell
+    if (!is.list(out) || !is.null(out$error) || is.null(out$stability)) {
+      msg <- if (is.list(out)) out$error else paste(as.character(out), collapse = " ")
+      cat(sprintf("[%4d/%4d] %4d %5d %2d %5.2f %-4s %4d | FAILED: %s\n", k, n, cell$n,
+                  cell$TN, cell$K, cell$omega, cell$id, task$rep, msg))
+      return(invisible(NULL))
     }
-    stab <- cbind(key, data.frame(
-      B_used = if (is.null(boot$B_used)) CFG$boot_B[1] else boot$B_used,
-      ari_mean = if (is.null(inf)) NA_real_ else mean(inf$stability$ARI, na.rm = TRUE),
-      ari_min = if (is.null(inf)) NA_real_ else min(inf$stability$ARI, na.rm = TRUE),
-      ari_share1 = if (is.null(inf)) NA_real_ else mean(inf$stability$ARI >= 0.999, na.rm = TRUE),
-      secs = secs, stringsAsFactors = FALSE))
-    list(coverage = if (length(out)) do.call(rbind, out) else NULL,
-         stability = stab)
+    sim_append(out$coverage, CSV)
+    sim_append(out$stability, CSA)
+    s <- out$stability
+    cat(sprintf("[%4d/%4d] %4d %5d %2d %5.2f %-4s %4d | %8.1f s  ARI %.3f | %s, ~%s left\n",
+                k, n, s$n, s$TN, s$K, s$omega, s$id, s$rep, s$secs, s$ari_mean,
+                sim_hours(el), sim_hours(el / k * (n - k))))
+    utils::flush.console()
   }
-
-  done <- if (file.exists(CSA)) utils::read.csv(CSA, stringsAsFactors = FALSE) else NULL
-  cat(sprintf("%4s %5s %2s %5s %-4s %5s | %8s %8s %8s\n",
-              "n", "T", "K", "omega", "scen", "rep", "secs", "ariBoot", "share1"))
-  for (i in seq_len(nrow(cells))) {
-    for (r in seq_len(CFG$boot_reps[1])) {
-      cell <- cells[i, , drop = FALSE]
-      cid <- sprintf("n%d_T%d_K%d_w%.2f_%s_%s_phi%g", cell$n, cell$TN, cell$K,
-                     cell$omega, cell$id, substr(cell$balance, 1, 3), cv$phi)
-      if (!is.null(done) && paste(cid, r) %in% paste(done$cell, done$rep)) next
-      out <- try(one(cell, r), silent = TRUE)
-      if (inherits(out, "try-error")) {
-        cat(sprintf("%4d %5d %2d %5.2f %-4s %5d | FAILED: %s\n", cell$n,
-                    cell$TN, cell$K, cell$omega, cell$id, r,
-                    conditionMessage(attr(out, "condition"))))
-        next
-      }
-      sim_append(out$coverage, CSV)
-      sim_append(out$stability, CSA)
-      s <- out$stability
-      cat(sprintf("%4d %5d %2d %5.2f %-4s %5d | %8.1f %8.3f %8.3f\n",
-                  s$n, s$TN, s$K, s$omega, s$id, s$rep, s$secs,
-                  s$ari_mean, s$ari_share1))
-      utils::flush.console()
-    }
-  }
+  sim_run_tasks(tasks, cov_task_fun, on_result, CFG$cores[1])
   invisible(NULL)
 }
 
@@ -1619,5 +1760,5 @@ sim_coverage <- function() {
 ## Run
 ## ===========================================================================
 if (!SIM_DEFINE_ONLY) {
-  if (sim_flag("coverage")) sim_coverage() else sim_main()
+  if (identical(CFG$mode[1], "coverage") || sim_flag("coverage")) sim_coverage() else sim_main()
 }
