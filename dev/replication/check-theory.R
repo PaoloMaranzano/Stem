@@ -49,6 +49,7 @@ TH <- sim_config(list(
             "ic-stem", "tables"),
   reps  = 400L,
   alg_reps = 10L,
+  alg_cells = integer(0),   # rows of the algorithm cells to run; empty is all
   out   = file.path(here, "theory")
 ))
 OUT <- TH$out[1]
@@ -365,6 +366,7 @@ if ("algorithm" %in% TH$parts) {
   cells <- rbind(
     data.frame(id = "S4", omega = SIM_LEVELS$omega, K = 3L),
     data.frame(id = c("S3b", "S1a", "S0"), omega = 0.70, K = 3L))
+  if (length(TH$alg_cells)) cells <- cells[TH$alg_cells, , drop = FALSE]
   n <- 60L; Tn <- 120L
   res <- NULL; traces <- NULL
   for (ci in seq_len(nrow(cells))) for (rp in seq_len(TH$alg_reps)) {
@@ -557,12 +559,15 @@ if ("ic-stem" %in% TH$parts) {
   agg <- stats::aggregate(cbind(gain, gain_per_location, bic_prefers_2) ~ n, data = res, FUN = mean)
   print(agg, row.names = FALSE, digits = 3)
   save_csv(res, "ic-stem.csv")
-  fit <- stats::lm(gain ~ n, data = res)
-  verdict("ic-stem", "in SC-STEM too the null gain grows linearly in the network size",
-          stats::coef(fit)[["n"]] > 0 && summary(fit)$r.squared > 0.5,
-          sprintf("slope %.2f per location, R^2 = %.2f; BIC prefers k = 2 in %.0f%% of fits at n = %d",
-                  stats::coef(fit)[["n"]], summary(fit)$r.squared,
-                  100 * agg$bic_prefers_2[nrow(agg)], agg$n[nrow(agg)]))
+  ## The canonical mechanism of Proposition 5 does NOT carry over: SC-STEM's
+  ## regimes are independent blocks, so a split discards the latent path and the
+  ## part of the error field the blocks share, and on these null data that loss
+  ## outweighs the gain of the partition search. (We predicted the opposite
+  ## before running this check; the paper states both mechanisms.)
+  verdict("ic-stem", "in SC-STEM a split of a network with no regimes loses likelihood, and BIC keeps k = 1",
+          all(agg$gain < 0) && all(agg$bic_prefers_2 == 0),
+          sprintf("gain of k = 2 over k = 1 from %.0f to %.0f; BIC prefers k = 2 in %.0f%% of fits",
+                  max(agg$gain), min(agg$gain), 100 * mean(res$bic_prefers_2)))
   cat("\n")
 }
 
