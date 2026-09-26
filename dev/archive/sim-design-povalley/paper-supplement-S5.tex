@@ -1,0 +1,81 @@
+\section{The data-generating process}\label{supp:dgp}\label{sm:designs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Section~3.1 of the manuscript states the generator in equations. This section gives it as an algorithm, records the regime sizes the design produces, and states the constants.
+
+\subsection{Constants}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+symbol & value & meaning \\
+\midrule
+$\nu_{\mathrm{tot}}$ & $0.4 + 2/3$ & total variance of each coordinate, held fixed \\
+$\nu_{sp}(K,\omega)$ & $\nu_{\mathrm{tot}} - c_K \omega^2$ & within-cluster variance, the remainder \\
+$c_K$        & $1/2,\,2/3,\,1$ & between-centre variance at $\omega=1$, for $K = 2, 3, 4$ \\
+             & $100$ km     & one abstract unit of the overlap design \\
+             & $(9.5, 45.5)$ & centre of the geographic box, Po Valley \\
+$n_{\min}$   & $6$          & smallest regime the design admits \\
+$a$          & $0.7$        & temporal persistence of the covariate \\
+$\rho_x$     & $100$ km     & spatial range of the covariate innovations \\
+$\bar v_y$   & $6.0$        & stationary variance of every latent process \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The lower bound $n_{\min}$ is not the one the software enforces, which is $r+2$; it is set by the \emph{spatial} information a regime needs, since a regime estimates a range from its own pairwise distances and six locations already give fifteen of them. Below that a failure to recover the partition would be a failure to fit, not a failure to separate, and the two would be indistinguishable in the results.
+
+\subsection{The algorithm}
+
+\begin{algorithm}[H]
+\caption{One replication of the design}\label{alg:dgp}
+\begin{algorithmic}[1]
+\Require $n$, $T$, $K$, overlap $\omega$, balance, scenario $s$, level $\ell$, coupling $\rho$, replication $r$
+\State $(n_1,\dots,n_K) \gets \textsc{Sizes}(n, K, \text{balance})$; \; $g \gets$ labels in blocks
+\State $\mu \gets \textsc{Centres}(K, \omega)$;\quad $\nu_{sp} \gets \nu_{\mathrm{tot}} - \mathrm{Var}(\mu)$
+\For{$i = 1,\dots,n$} \; $s_i \gets \mu_{g_i} + N_2(0, \nu_{sp} I_2)$ \EndFor
+\State map $s$ to longitude and latitude; \; $h \gets$ geodesic distances
+\State $C_x \gets \exp(-h/\rho_x)$; \; $L_x \gets \mathrm{chol}(C_x)$
+\State $x_1 \gets L_x^\top N(0,I)$
+\For{$t = 2,\dots,T$} \; $x_t \gets a\,x_{t-1} + \sqrt{1-a^2}\, L_x^\top N(0,I)$ \EndFor
+\State $x \gets (x - \bar x)/\mathrm{sd}(x)$
+\State $\Psi_1,\dots,\Psi_K \gets \textsc{Parameters}(s, \ell, K)$ \Comment{regime $g$ at fraction $(g-1)/(K-1)$}
+\State $\Sigma_\eta \gets \Delta R_\rho \Delta$; \; $L_\eta \gets \mathrm{chol}(\Sigma_\eta)$
+\State $y_1 \gets \sqrt{\bar v_y}\,\mathrm{chol}(R_\rho)^\top N(0,I)$
+\For{$t = 2,\dots,T$} \; $y_t \gets \mathrm{diag}(G)\, y_{t-1} + L_\eta^\top N(0,I)$ \EndFor
+\If{the regimes share $(\sigma^2_\epsilon, \sigma^2_\omega, \theta)$ and not \textsc{ForceBlock}}
+  \State $L \gets \mathrm{chol}(\Sigma)$; \; \textbf{for} $t$ \textbf{do} $e_t \gets L^\top N(0,I)$
+\Else
+  \State \textbf{for} $g = 1,\dots,K$: $L_g \gets \mathrm{chol}(\Sigma_g)$; \textbf{for} $t$: $e_{t,I_g} \gets L_g^\top N(0,I)$
+\EndIf
+\For{$t = 1,\dots,T$ and $i = 1,\dots,n$}
+  \State $z_{ti} \gets \beta_{0,g_i} + \beta_{1,g_i} x_{ti} + y_{t,g_i} + e_{ti}$
+\EndFor
+\Ensure $z$ ($T \times n$), $X = [\mathbf{1}, \mathrm{vec}(x)]$, coordinates, labels $g$, $\Psi_1,\dots,\Psi_K$
+\end{algorithmic}
+\end{algorithm}
+
+Seeds are derived from the replication index alone, so a cell reproduces on its own and the same replication uses the same geometry across scenarios: differences between scenarios are then differences in the parameters and not in the draw.
+
+\subsection{Regime sizes}
+
+The balanced allocation is equal up to the remainder; the unbalanced one is proportional to $1:2:\cdots:K$, corrected so that no regime falls below $n_{\min}$. A cell is dropped when that correction flattens the allocation to a ratio below $1.5$ between the largest and the smallest regime, since it would then duplicate the balanced cell under another name.
+
+\begin{center}
+\begin{tabular}{lllllll}
+\toprule
+& & $n = 20$ & $50$ & $100$ & $200$ & $400$ \\
+\midrule
+balanced   & $K=3$ & 7/7/6 & 17/17/16 & 34/33/33 & 67/67/66 & 134/133/133 \\
+unbalanced & $K=3$ & --- & 8/17/25 & 17/33/50 & 33/67/100 & 67/133/200 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Replications and the fitted grid}
+
+Every replication fits the pooled model as a benchmark and the SC-STEM model over the grid $k = 1,\dots,4$ and $\phi \in \{0, 0.5, 1\}$, so that the model-selection behaviour is measured on the same replications as the estimation behaviour rather than on a sub-study. Both the pooled fit and the fit at the true number of regimes are members of that grid, so neither costs an additional run. The number of replications is $M = 100$ in every cell of the design.
+
+Seeds are derived from the replication index, so that a cell is reproducible on its own and replication $r$ carries the same geometry and the same covariate across scenarios: a contrast between two scenarios is then a contrast between their parameters and not between two independent draws of everything else.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

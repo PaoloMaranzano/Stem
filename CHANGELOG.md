@@ -16,6 +16,40 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-27
+
+**The simulation design is generic.** The baseline regime was the pooled fit of
+the Po Valley PM2.5 network of the application, and the plane was mapped onto
+a geographic box around the Po Valley; the study then described that network
+rather than the method, and the application is going to change. The plane is
+now used as it is, with Euclidean distances in its own units, and every value
+has a reading that depends on no application: a standardized response with its
+unit variance split into covariate 30%, common dynamics 30%, spatial field 20%
+and nugget 20% (beta = (2, 0.55), a coefficient of variation of 0.5), a
+persistence G = 0.8 (a shock halves in 3.1 periods), and practical ranges of 2
+for the error field and 4 for the covariate against a network about 4 units
+across. The contrasts read the same way: the covariate effect times 1.25, 1.5
+or 2; G down to 0.7, 0.5 or 0.2; a local field, practical range down to 1, 0.5
+or 0.25 with a nugget share up to 0.6, 0.7 or 0.8. The Po Valley design, its
+scripts, its paper sections and its tables are kept in
+`dev/archive/sim-design-povalley`.
+
+**Scenario S0b.** A scratch check on the archived design showed that an error
+field drawn regime by regime reveals the partition with no parameter differing:
+at `n = 100`, `T = 120`, the true 3-regime partition beat the pooled model by
+178 to 287 in log-likelihood, against a BIC cost of about 75, while with one
+field over the network it lost by 570 to 663. Moving S1 and S2 to a field by
+regime, as first proposed, would therefore have credited them with that
+information; they keep the single field, and S0b -- S0 with the field by regime
+-- measures what S3, S4 and S5, whose field cannot be global, receive for free.
+The design has 255 cells, 252 of them feasible.
+
+**The scenario table** of the paper shows every parameter in every regime at
+`K = 3`, with the coupling of the latent paths and the kind of error field; the
+analysis writes it from the generator, so the two cannot disagree. The paper
+also gains a table of the baseline regime and a statement, per scenario, of
+the question it answers.
+
 ### 2026-09-26 (sixth entry)
 
 **`SCSTEM_Select()` can select the pooled model.** Step (S1) ranked only the

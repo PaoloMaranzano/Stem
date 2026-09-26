@@ -84,10 +84,15 @@ interact -- number of locations, separation of the regimes, length of the
 series -- plus one-factor-at-a-time margins around a reference cell for the
 factors that are there to show the results do not turn on them.
 
-The whole design at 100 replications is about 680 core-hours, some 85 hours on
-8 cores. Most of it is the cells with n = 400 and T = 60, whose pooled fit is
-slow to converge; their cost is a lower bound, so trust the time left printed
-on the console over this figure.
+The design is generic: no value is calibrated on the application. The plane is
+used with Euclidean distances in its own units, the response is standardized,
+and every parameter has a reading of its own (see `dgp_base()` and `dgp_psi()`
+in the runner). The earlier design, calibrated on the Po Valley network of the
+application, is kept in `dev/archive/sim-design-povalley` of the repository.
+
+The cost table of the runner was measured on that earlier design and is
+pessimistic for the generic one, which fits faster; trust the time left printed
+on the console over the "dry" estimate until it is measured again.
 
 A replication that fails says why, both on the console and in the `error`
 column of the results.

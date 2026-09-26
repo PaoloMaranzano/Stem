@@ -179,7 +179,7 @@ if ("design" %in% AN$parts) {
   ## penalty rewards when it should not, so the edges are coloured by that.
   ## -------------------------------------------------------------------------
   graph_panel <- function(s, knn, lim, cex_pt = 0.8) {
-    W  <- neighbors(s$coords, knn = knn, distance = "euclidean")$W
+    W  <- neighbors(s$coords, knn = knn, distance = "geo")$W
     graphics::plot(NA, xlim = lim, ylim = lim, asp = 1, xlab = "", ylab = "",
                    xaxt = "n", yaxt = "n", bty = "n")
     graphics::rect(lim[1], lim[1], lim[2], lim[2], border = "#dfe4ea", lwd = 0.8)
@@ -230,9 +230,9 @@ if ("design" %in% AN$parts) {
     do.call(rbind, lapply(KNN, function(kk)
       do.call(rbind, lapply(OM_GRID, function(w) {
         s  <- draw_loc(n, KTRUE, w, seed = 100 + n)
-        W  <- neighbors(s$coords, knn = kk, distance = "euclidean")$W
+        W  <- neighbors(s$coords, knn = kk, distance = "geo")$W
         ij <- which(upper.tri(W) & W > 0, arr.ind = TRUE)
-        dm <- as.matrix(stats::dist(s$coords))
+        dm <- as.matrix(geodist::geodist(s$coords, measure = "geodesic")) / 1000
         data.frame(n = n, knn = kk, omega = w,
                    degree = mean(rowSums(W > 0)),
                    cross  = mean(s$g[ij[, 1]] != s$g[ij[, 2]]),
@@ -245,7 +245,7 @@ if ("design" %in% AN$parts) {
   for (v in c("degree", "cross", "len")) {
     ttl <- switch(v, degree = "mean degree",
                   cross = "share of edges crossing a regime",
-                  len = "median edge length")
+                  len = "median edge length (km)")
     ylim <- range(gtab[[v]]); if (v == "cross") ylim <- c(0, max(ylim))
     graphics::plot(NA, xlim = range(N_GRID), ylim = ylim, log = "x",
                    xlab = "", ylab = "", xaxt = "n", bty = "n",
@@ -303,7 +303,7 @@ if ("design" %in% AN$parts) {
          sub = sprintf("all three contrasts, %.2f sd apart", dgp_separation(KTRUE, wmax))),
     list(K = KTRUE, omega = wmax, id = "S1a", bal = "balanced",
          lab = sprintf("K = %d, omega = %s", KTRUE, format(wmax)),
-         sub = "separated in space, covariate effect x1.25 (S1a)"),
+         sub = "separated in space, coefficients 0.25 sd apart"),
     list(K = KTRUE, omega = wmax, id = "S4", bal = "unbalanced",
          lab = sprintf("K = %d, omega = %s", KTRUE, format(wmax)),
          sub = "unbalanced regimes")
@@ -369,43 +369,29 @@ if ("design" %in% AN$parts) {
   pdf_close("fig_dgp_examples.pdf")
 
   ## -------------------------------------------------------------------------
-  ## A5. The scenarios side by side: every parameter in every regime at K = 3,
-  ##     the coupling of the latent paths and how the error field is drawn.
-  ##     A parameter that differs between regimes is printed in bold as
-  ##     regime 1 / 2 / 3; one that does not is printed once.
+  ## A5. The scenarios: what each sets in the last regime
   ## -------------------------------------------------------------------------
   b   <- dgp_base()
   tot <- b$sigma2eps + b$sigma2omega
-  by_regime <- function(v, digits = 2) {
-    s <- fmt(v, digits)
-    if (length(unique(s)) == 1L) s[1] else
-      paste0("\\textbf{", paste(s, collapse = " / "), "}")
-  }
-  what <- c(S0 = "nothing", S1 = "$\\beta_1$", S2 = "$G$", S3 = "covariance",
-            S4 = "all three")
   srows <- do.call(rbind, lapply(seq_len(nrow(scen)), function(i) {
     s <- scen[i, ]
-    ps <- dgp_psi(s$scenario, s$level, K = 3L)
-    field <- if (dgp_common_field(ps) && !isTRUE(s$force_block)) "one" else "by regime"
-    data.frame(id = s$id, what = what[[s$scenario]],
-               beta1  = by_regime(vapply(ps, function(p) p$beta[2], 1)),
-               d_beta = fmt((ps[[3]]$beta[2] - b$beta[2]) / sqrt(tot)),
-               G      = by_regime(vapply(ps, function(p) p$G, 1)),
-               nugget = by_regime(vapply(ps, function(p) p$sigma2eps / tot, 1)),
-               range  = by_regime(vapply(ps, function(p) 3 / p$theta, 1)),
-               rho = fmt(s$rho, 0), field = field, stringsAsFactors = FALSE)
+    p <- dgp_psi(s$scenario, s$level, K = 2L)[[2]]
+    data.frame(id = s$id, label = s$label,
+               beta1 = fmt(p$beta[2]),
+               d_beta = fmt((p$beta[2] - b$beta[2]) / sqrt(tot)),
+               G = fmt(p$G), nugget = fmt(p$sigma2eps / tot),
+               range = fmt(1 / p$theta / 1000, 0), rho = fmt(s$rho, 0),
+               stringsAsFactors = FALSE)
   }))
   tex_write(c(
-    "\\begin{tabular}{llllllrrl}",
+    "\\begin{tabular}{llrrrrrr}",
     "\\toprule",
-    "& & \\multicolumn{5}{c}{regime parameters, regimes 1 / 2 / 3} & & \\\\",
-    "\\cmidrule(lr){3-7}",
-    paste("id & differs in & $\\beta_1$ & $\\Delta\\beta_1/\\sigma$ & $G$ &",
-          "nugget share & practical range & $\\rho$ & error field \\\\"),
+    "& & \\multicolumn{6}{c}{parameters of the last regime} \\\\",
+    "\\cmidrule(l){3-8}",
+    "id & separation & $\\beta_1$ & $\\Delta\\beta_1/\\sigma$ & $G$ & nugget share & range (km) & $\\rho$ \\\\",
     "\\midrule",
-    sprintf("%s & %s & %s & %s & %s & %s & %s & %s & %s \\\\", srows$id, srows$what,
-            srows$beta1, srows$d_beta, srows$G, srows$nugget, srows$range,
-            srows$rho, srows$field),
+    sprintf("%s & %s & %s & %s & %s & %s & %s & %s \\\\", srows$id, srows$label,
+            srows$beta1, srows$d_beta, srows$G, srows$nugget, srows$range, srows$rho),
     "\\bottomrule",
     "\\end{tabular}"), "tab_dgp.tex")
 
@@ -425,8 +411,8 @@ if ("design" %in% AN$parts) {
                 mu[g, 2] + stats::rnorm(M, sd = sqrt(nu)))
     d2 <- sapply(seq_len(KTRUE), function(j) (xy[, 1] - mu[j, 1])^2 + (xy[, 2] - mu[j, 2])^2)
     gh <- max.col(-d2)
-    data.frame(omega = w, nu_sp = nu, sd_u = sqrt(nu),
-               centre_u = 2 * w, sep = dgp_separation(KTRUE, w),
+    data.frame(omega = w, nu_sp = nu, sd_km = sqrt(nu) * UNIT_KM,
+               centre_km = 2 * w * UNIT_KM, sep = dgp_separation(KTRUE, w),
                bayes = mean(gh != g), ari = ari(gh[1:20000], g[1:20000]))
   }))
   cat("\nthe overlap levels\n"); print(otab, row.names = FALSE, digits = 3)
@@ -435,9 +421,9 @@ if ("design" %in% AN$parts) {
     "\\toprule",
     "$\\omega$ & $\\nu_{sp}$ & cluster sd & centre distance & $\\delta$ & Bayes error & attainable ARI \\\\",
     "\\midrule",
-    sprintf("$%s$ & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ & $%s$ \\\\",
-            fmt(otab$omega, 2), fmt(otab$nu_sp, 3), fmt(otab$sd_u, 2),
-            fmt(otab$centre_u, 2), fmt(otab$sep, 2), fmt(otab$bayes, 3),
+    sprintf("$%s$ & $%s$ & $%s$ km & $%s$ km & $%s$ & $%s$ & $%s$ \\\\",
+            fmt(otab$omega, 2), fmt(otab$nu_sp, 3), fmt(otab$sd_km, 0),
+            fmt(otab$centre_km, 0), fmt(otab$sep, 2), fmt(otab$bayes, 3),
             fmt(otab$ari, 3)),
     "\\bottomrule",
     "\\end{tabular}"), "tab_overlap.tex")

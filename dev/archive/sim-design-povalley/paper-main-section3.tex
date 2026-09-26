@@ -1,0 +1,214 @@
+\section{Simulation experiments}\label{sec3}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Design and evaluation metrics}\label{sec3:design}
+
+Each replication generates a data set at a known partition and known regime-specific parameters, and the full procedure is then run on it as it would be on real data, that is including the initialization, the endogenous partitioning and the final refit. Throughout, the latent dimension is $p=1$ with $K_g = \mathbf{1}_{n_g}$ within each regime, and the design carries an intercept and one covariate.
+
+Two things separate two regimes in this model: \emph{where} their locations are, and \emph{how} their parameters differ. Those two channels are logically independent --- regimes may be perfectly separated in space and indistinguishable in their parameters, or the reverse --- and the experiment is built so that they can be varied one against the other. The spatial channel is controlled by an overlap parameter, the parametric channel by the scenarios of Section~\ref{sec3:scenarios}. Figure~\ref{fig:dgp} shows one replication at several combinations of the two.
+
+\subsubsection{Spatial configuration: the overlap parameter}\label{sec3:overlap}
+
+The geometry follows the overlapping design of \citet{MorelliMaranzanoOtto2026}, whose parameter $d$ we write as $\omega$ to avoid a collision with the number of locations. Locations are drawn from a mixture of $K$ isotropic bivariate Gaussians whose centres $\mu_1,\dots,\mu_K$ are placed at nearest-neighbour distance $2\omega$:
+\begin{equation}
+  s_i \mid g_i = g \;\sim\; N_2\!\left(\mu_g,\; \nu_{sp} I_2\right),
+  \qquad i = 1,\dots,n ,
+  \label{eq:dgpcoords}
+\end{equation}
+independently over $i$, with $g_i \in \{1,\dots,K\}$ the regime of location $i$. Fixing the \emph{nearest-neighbour} distance rather than the radius of the configuration makes $\omega$ mean the same degree of overlap whatever $K$: the centres are $(\pm\omega,0)$ for $K=2$ and the vertices of an equilateral triangle of side $2\omega$ for $K=3$.
+
+\paragraph{What is held fixed as the overlap moves.} The dispersion $\nu_{sp}$ within a regime is \emph{not} a constant of the design. What is held constant is the total variance of a coordinate, between-centre plus within-regime,
+\begin{equation}
+  \nu_{sp}(K,\omega) \;=\; \nu_{\mathrm{tot}} - \mathrm{Var}(\mu \mid K, \omega),
+  \qquad
+  \mathrm{Var}(\mu \mid K, \omega) = c_K\,\omega^2 ,
+  \label{eq:nutot}
+\end{equation}
+with $c_2 = 1/2$, $c_3 = 2/3$ and $c_4 = 1$, and $\nu_{\mathrm{tot}} = 0.4 + 2/3$. The reason is that the alternative, holding $\nu_{sp}$ fixed while the centres move apart, makes $\omega$ do two things at once: it separates the regimes \emph{and} it enlarges the network. The second is not innocuous in a model whose covariance has a range. Over twenty draws at $n=200$ and $K=3$, holding $\nu_{sp}=0.4$ took the spatial standard deviation of the network from $63$ km at $\omega=0$ to $103$ km at $\omega=1$ and the median pairwise distance from $105$ km to $180$ km, against a true correlation range of $123$ km; at $\omega=0$ the network is a blob smaller than the range, the exponential decay is barely resolved over the observed distances and $\theta$ is close to unidentified. Any effect attributed to the separation would then have carried a share of a change in the identifiability of the covariance. Under \eqref{eq:nutot} the network has a spatial standard deviation of $102$ to $104$ km in every cell, at every $K$ and every $\omega$.
+
+The standardised separation is then
+\begin{equation}
+  \delta(K,\omega) \;=\; \frac{2\omega}{\sqrt{\nu_{\mathrm{tot}} - c_K \omega^2}} ,
+  \label{eq:sep}
+\end{equation}
+no longer proportional to $\omega$. It runs from $0$ at $\omega=0$, where the clusters coincide and the partition leaves no spatial signature at all, to $3.16$ standard deviations at $\omega=1$; the intermediate level of the design, $\omega = 0.70$, gives $\delta = 1.63$. Table~\ref{tab:overlap} reads the three levels on the scale that matters, the information a purely spatial rule could extract from them: the Bayes error of the optimal assignment to the nearest centre, and the Adjusted Rand Index that rule attains. At $\omega = 0$ the Bayes error is $1 - 1/K$, the error of guessing, and the attainable index is zero by construction. The value $\nu_{\mathrm{tot}} = 0.4 + 2/3$ is the total the configuration has at $K=3$ and $\omega=1$, so that the most separated cell is exactly the one the design would have had with $\nu_{sp} = 0.4$ fixed, and it is the smaller overlaps that widen.
+
+\begin{table}[t]
+\centering
+\caption{The three levels of the overlap, at $K=3$. The dispersion within a regime is what the centres leave over from the fixed total $\nu_{\mathrm{tot}}$, so the footprint of the network is the same in all three. The Bayes error and the attainable index are those of the optimal rule that assigns a location to the nearest centre, estimated from $200{,}000$ draws: they are what \emph{any} purely spatial procedure could achieve, and the penalty of Section~\ref{sec2:scstem} is the device that lets the model approach them.}
+\label{tab:overlap}
+\input{Figures/tab_overlap}
+\end{table}
+
+The abstract plane is mapped affinely onto a geographic box centred on the Po Valley at one unit per $100$ km, so that distances are kilometres and the covariance parameters keep their meaning. Against a baseline correlation range of $123$ km, a network of standard deviation about $100$ km with centres $140$ to $200$ km apart is the regime in which a regional monitoring network actually sits. Figure~\ref{fig:overlap} shows the configuration at the three levels and at every network size of the design.
+
+The pooled case $K=1$ is included as a design cell of its own, since ``does the procedure correctly decline to split a homogeneous network?'' is a distinct question from ``does it recover the split when there is one?''. It needs no special treatment: having no between-centre variance it takes the whole of $\nu_{\mathrm{tot}}$, so it covers the same area as every other cell and the selection rule is not handed a free geometric cue for telling $k=1$ from $k>1$.
+
+\paragraph{What the overlap still does besides separating.} One dependence survives \eqref{eq:nutot} and is better stated than designed away. At a constant footprint, $\omega$ still changes the \emph{distribution} of the pairwise distances, from unimodal at $\omega=0$ to short-within-and-long-between at $\omega=1$, and a spread of lags identifies a range better than a single scale does. That is what clustered locations mean rather than an artefact of the parameterisation, but it is a second channel through which the overlap reaches the estimates of the covariance, and the results on $\theta$ are read with it in mind.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{Figures/fig_design_omega}
+\caption{The spatial configuration at $K=3$, for the three levels of the overlap (rows) and the five network sizes (columns). Colour is the true regime, crosses are the centres, and the axes are the same in every panel. The total spatial variance is held at $\nu_{\mathrm{tot}}$ by \eqref{eq:nutot}, so the cloud covers the same area in all fifteen panels and only the separation changes down the rows.}
+\label{fig:overlap}
+\end{figure}
+
+\subsubsection{The generator}\label{sec3:generator}
+
+Write $I_g = \{i : g_i = g\}$ for the index set of regime $g$ and $n_g = |I_g|$, and $h_{ij}$ for the geodesic distance between $s_i$ and $s_j$. A replication is generated as follows.
+
+\paragraph{Regime sizes.} $n_1,\dots,n_K$ are equal up to the remainder in the balanced version of the design and proportional to $1:2:\cdots:K$ in the unbalanced one, in both cases subject to a lower bound $n_{\min}$ that guarantees every regime can support its own fit. Labels are assigned in blocks, so that the partition is fixed within a design cell and only the coordinates are random.
+
+\paragraph{Covariate.} One standardised exogenous covariate, an autoregression in time whose innovations are a spatially correlated field:
+\begin{equation}
+  x_1 = w_1, \qquad
+  x_t = a\,x_{t-1} + \sqrt{1-a^2}\,w_t, \qquad
+  w_t \sim N_n(0, C_x), \quad (C_x)_{ij} = e^{-h_{ij}/\rho_x},
+  \label{eq:dgpcov}
+\end{equation}
+with $a = 0.7$ and $\rho_x = 100$ km, centred and scaled over all $nT$ values. The two knobs matter: a covariate independent across stations would make a contrast in $\beta$ trivially visible, and a perfectly common one would make it indistinguishable from the latent process. This sits between the two.
+
+\paragraph{Latent processes.} One autoregression per regime, with cross-correlated innovations:
+\begin{equation}
+  y_t = \mathrm{diag}(G_1,\dots,G_K)\,y_{t-1} + \eta_t,
+  \qquad \eta_t \sim N_K(0, \Sigma_\eta),
+  \qquad \Sigma_\eta = \Delta R_\rho \Delta,
+  \label{eq:dgplatent}
+\end{equation}
+where $\Delta = \mathrm{diag}(\sigma_{\eta,1},\dots,\sigma_{\eta,K})$, $(R_\rho)_{gh} = \rho$ for $g \neq h$ and $1$ otherwise, $\sigma^2_{\eta,g} = \bar v_y (1-G_g^2)$ and $y_1 \sim N_K(0, \bar v_y R_\rho)$. Tying the innovation variance to $G_g$ holds the stationary variance of every latent process at $\bar v_y$, so that a scenario separating the regimes on their persistence separates them on persistence alone and not on the amplitude of the signal.
+
+The cross-correlation $\rho$ is the central device of the design and is discussed in Section~\ref{sec3:coupling}.
+
+\paragraph{Measurement error.} When all regimes share $(\sigma^2_\epsilon, \sigma^2_\omega, \theta)$ the error is drawn as one global spatial field,
+\begin{equation}
+  e_t \sim N_n(0, \Sigma), \qquad
+  \Sigma = \sigma^2_\epsilon I_n + \sigma^2_\omega \exp(-\theta h),
+  \label{eq:dgperr}
+\end{equation}
+independently over $t$; otherwise one field per regime, independent across regimes,
+\begin{equation}
+  e_{t,I_g} \sim N_{n_g}(0, \Sigma_g), \qquad
+  \Sigma_g = \sigma^2_{\epsilon g} I_{n_g}
+           + \sigma^2_{\omega g} \exp(-\theta_g h_{I_g I_g}).
+  \label{eq:dgperrg}
+\end{equation}
+The distinction is deliberate: a block structure in the residual covariance is an intrinsic feature of a scenario in which the regimes differ in their covariance, and an artefact of the generator in one in which they do not.
+
+\paragraph{Response.} Finally,
+\begin{equation}
+  z_{ti} = \beta_{0,g_i} + \beta_{1,g_i}\,x_{ti} + y_{t,g_i} + e_{ti},
+  \label{eq:dgpz}
+\end{equation}
+which is the measurement equation \eqref{eq:scmeas} with $K_g = \mathbf{1}_{n_g}$, that is exactly the model the procedure fits. The pseudocode is given in Section~S5 of the Supplementary Material.
+
+\subsubsection{Coupling of the latent processes}\label{sec3:coupling}
+
+An earlier version of this design generated each regime by simulating the model on its own sub-network, which is what the specification literally says: regime $g$ has its own latent process and two locations in different regimes are uncorrelated. That is faithful and it is also useless as an experiment. It makes the partition identifiable from the correlation structure alone, whatever the parameters: generating with \emph{identical} parameters in the two regimes and one latent path per regime recovers the true partition in every replication, while generating the same data with one shared latent path gives an Adjusted Rand Index of $0.14$. What such a design measures is the recovery of the latent split, not of any difference in $\Psi_g$, so a scenario separating the regimes only in the dynamics or only in the spatial covariance would be testing nothing of the sort.
+
+The coupling is therefore made an explicit factor through $\rho$ in \eqref{eq:dgplatent}. At $\rho = 1$ the regimes share their dynamics and the partition can be found \emph{only} through the parameters, which is the honest and hard case and the one used throughout. At $\rho = 0$ the processes are independent, which is the model-consistent and easy case, retained as a single reference cell so that the size of the confound can be read off directly.
+
+One consequence deserves stating. With equal transition coefficients the correlation of the latent processes is exactly $\rho$; with different ones it is
+\begin{equation}
+  \mathrm{Cor}(y_{t,g}, y_{t,h}) =
+  \rho\,\frac{\sqrt{(1-G_g^2)(1-G_h^2)}}{1 - G_g G_h} \;<\; 1
+  \qquad \text{whenever } G_g \neq G_h ,
+  \label{eq:leak}
+\end{equation}
+however large $\rho$ is. Two autoregressions with different persistence cannot be perfectly correlated, so a scenario that separates the regimes on their dynamics necessarily leaks a little information through the latent paths. The design measures that leak instead of concealing it.
+
+\subsubsection{Scenarios: what separates the regimes}\label{sec3:scenarios}
+
+The parametric channel is organised around \emph{which component of $\Psi_g$ separates the regimes}, and by how much. Regime $1$ always carries a baseline calibrated on the pooled fit of the real network of Section~\ref{sec4:data}; regime $K$ carries the full contrast; with $K=3$ the middle regime sits halfway, so that $K=2$ and $K=3$ mean the same thing by the same numbers. With $K=1$ every scenario collapses to the baseline.
+
+\begin{description}[leftmargin=1.2em,itemsep=3pt,topsep=3pt]
+  \item[\textbf{S0 --- no separation.}] Every regime carries the baseline. The true partition is not identified, and the cell measures the false-positive behaviour of the selection rule.
+  \item[\textbf{S1 --- separation in the regression coefficients.}] The regimes share the dynamics and the covariance and differ only in $\beta_g$, at three levels expressed in residual standard deviations: $0.25$, $0.50$ and $1.00$. This is the design under which the cross-sectional intuition applies most directly.
+  \item[\textbf{S2 --- separation in the latent dynamics.}] The regimes share $\beta$ and the covariance and differ in the persistence $G_g$, at two levels. This tests whether the assignment score \eqref{eq:score}, which sees the dynamics only through the smoothed state, can discriminate regimes that differ in nothing else.
+  \item[\textbf{S3 --- separation in the spatial covariance.}] The regimes share $\beta$ and the dynamics and differ in the decomposition of the residual variance --- the nugget share and the range --- at two levels. This is the hardest case for the assignment score, which retains only the total variance $\sigma^2_{\epsilon g} + \sigma^2_{\omega g}$ and is blind to any reallocation between the two components leaving their sum unchanged; the scenario documents that limitation and measures how much of the separation the parameter step recovers through the exact likelihood.
+  \item[\textbf{S4 --- joint separation.}] All three components differ, at the middle level. This is the scenario closest to the intended use of the model.
+  \item[\textbf{S5 --- reference.}] As S4, but with $\rho = 0$ and the error field drawn regime by regime, reproducing the model-consistent generator discussed in Section~\ref{sec3:coupling}.
+\end{description}
+
+Table~\ref{tab:dgp} gives the parameter values each scenario sets.
+
+\begin{table}[t]
+\centering
+\caption{The scenarios side by side, at $K = 3$. A parameter that differs between the regimes is printed in bold as its values in regimes 1 / 2 / 3; one printed once is common to all of them. Regime 1 always carries the baseline: $\beta = (2.34, 0.60)$, $\sigma^2_\epsilon = 21.4$, $\sigma^2_\omega = 4.19$ (a nugget share of $0.84$), a range of $123$ km, $G = 0.90$ and a stationary latent variance of $6.0$, so a residual standard deviation of $\sigma = 5.06$; the total residual variance $\sigma^2_\epsilon + \sigma^2_\omega$ is the same in every regime. $\Delta\beta_1/\sigma$ is the contrast between regimes 1 and 3 in units of $\sigma$. $\rho$ is the correlation of the innovations of the latent processes \eqref{eq:dgplatent}, and the error field is drawn once over the whole network \eqref{eq:dgperr} or regime by regime \eqref{eq:dgperrg}.}
+\label{tab:dgp}
+{\small\setlength{\tabcolsep}{4pt}\input{Figures/tab_dgp}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{Figures/fig_dgp_examples}
+\caption{One replication of the design at the reference network size $n = 100$ and at $T = 365$, for six combinations of the number of regimes, the overlap and the scenario. Left: the locations, coloured by true regime, crosses at the cluster centres. Right: the series they carry over the first $120$ periods --- three stations per regime in thin lines, the latent process of each regime, shifted to the regime mean, in thick lines. Rows two to four raise the overlap at a fixed scenario; row five holds the overlap at its largest and weakens the parametric contrast instead, which is the case the design exists to separate.}
+\label{fig:dgp}
+\end{figure}
+
+\subsubsection{The neighbourhood graph, and why it is a factor}\label{sec3:graph}
+
+Section~\ref{sec2:potts} argues why a Potts penalty belongs on point-referenced data and what it takes to use it there. Two of its points are properties of the design. The number of neighbours $m$ of the graph is a choice of the analyst and not a feature of the problem, so it is a factor of the experiment rather than a fixed setting, with levels $\{3, 5, 10\}$. And the graph is built with the metric of the covariance: on a network of $300$ locations over the Po Valley box at $m=5$, a graph built on raw longitude and latitude shares only $78.5\%$ of its edges with the geodesic one, and $40.8\%$ of its edges are more east-west than north-south against $50.9\%$ for the correct metric. The third point, that spatial proximity enters the model twice, is what the cells at $\omega = 0$ and the scenario S0 measure: when the data carry no regimes the penalty is the only term of the objective that prefers one partition to another, so a procedure that returns a spatially compact partition there is reporting the penalty and not the data.
+
+The quantity that governs how much the penalty can help is not the density of the graph but the share of its edges that join two \emph{different} true regimes: those are precisely the pairs the penalty rewards for agreeing when they should not. For $K$ balanced regimes a graph carrying no information about the partition has a crossing share of $1 - 1/K$. Measured at $K=3$ over the design, that share is $0.68$ at $\omega=0$ --- the value of an uninformative graph, to two decimals --- $0.41$ at $\omega=0.70$ and $0.13$ at $\omega=1$, and it is remarkably insensitive to $k$: from $n = 100$ on, the three values of $k$ reproduce it to within $0.03$. What $k$ does change is the number of edges, from a mean degree of $3.8$ at $k=3$ to $12.5$ at $k=10$. Under a fixed scale of the penalty that would multiply the weight it carries at a given $\phi$; under the default scale of Section~\ref{sec:phiscale} it does not, since $c$ divides by the mean degree. The number of neighbours spreads the same pull over more and longer edges, while the information the graph holds about the partition is set by the geometry alone. Figure~\ref{fig:knn} shows the graphs and Figure~\ref{fig:graphnum} the two statements in numbers.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{Figures/fig_design_knn}
+\caption{The neighbourhood graph the penalty is evaluated on, at $n=100$ and $K=3$, for the three values of $k$ (rows) and the three levels of the overlap (columns). Grey edges join two locations of the same true regime; red edges cross a regime boundary and are the pairs the penalty rewards for agreeing when they should not. The simulated data are identical across a row: $k$ changes the objective, not the observations.}
+\label{fig:knn}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{Figures/fig_design_graph}
+\caption{What the neighbourhood graph does, at $K=3$. Left: the mean degree, set by $k$ alone. Centre: the share of edges that cross a true regime boundary, set by the overlap alone from $n=100$ on; the dotted line is $1-1/K$, the value of a graph carrying no information about the partition. Right: the median edge length. Line colour is $k$, line type is the overlap.}
+\label{fig:graphnum}
+\end{figure}
+
+\subsubsection{Factors and evaluation metrics}\label{sec3:factors}
+
+The factors of the experiment are the number of locations $n \in \{20, 50, 100, 200, 400\}$, chosen to span a small sub-network, a regional one and a national one --- Northern Italy carries about $260$ air quality stations; the series length $T \in \{60, 120, 365\}$, read as five and ten years of monthly data and one year of daily data; the number of regimes $K \in \{1, 3\}$, the first being the null case of Section~\ref{sec3:overlap}; the overlap $\omega \in \{0, 0.70, 1\}$, that is separations of $0$, $1.63$ and $3.16$ standard deviations; the neighbourhood size $k \in \{3, 5, 10\}$ of Section~\ref{sec3:graph}; the balance of the regime sizes, equal or proportional to $1:2:\cdots:K$; and the ten scenarios of Table~\ref{tab:dgp}. The procedure is fitted over a grid of $k \in \{1,\dots,4\}$ regimes and penalties $\phi \in \{0, 0.5, 1\}$, so that the model-selection behaviour is assessed jointly with the estimation behaviour, and the recovery of the parameters is read at the true number of regimes and $\phi = 0.5$. The estimator is held to the same floor as the generator: a configuration that would leave a regime with fewer than $n_{\min} = 6$ locations is not fitted, since on fewer locations the range of the regime is not identified, and the grid simply omits it. At $n = 20$ this removes $k = 4$. The floor is not only a matter of principle: below it the fit is also ruinously slow, a $k=4$ fit on twenty locations taking minutes where $k=3$ takes a second.
+
+\paragraph{The design is not a full factorial.} Crossing every factor with every other is $2700$ cells at $K=3$ alone, most of them answering no question. The experiment is instead a factorial in the three factors that interact --- how many locations, how separated the regimes, how long the series --- together with one-factor-at-a-time margins around a reference cell for the factors that are there to establish that the results do not turn on them. The reference cell is $n = 100$, $T = 120$, $K = 3$, $\omega = 0.70$, balanced, scenario S4, $k = 5$. Five blocks result:
+
+\begin{description}[leftmargin=1.2em,itemsep=3pt,topsep=3pt]
+  \item[\textbf{Core} (45 cells).] $n \times \omega \times T$ fully crossed at the reference scenario and graph: recovery as a function of the three quantities that govern it.
+  \item[\textbf{Null} (15 cells).] The same $n \times T$ grid at $K=1$, where there is no regime to find and the question is whether the procedure invents one.
+  \item[\textbf{Scenarios} (150 cells).] All ten scenarios crossed with $n$ and $\omega$ at the reference $T$: what has to differ between regimes for the difference to be found.
+  \item[\textbf{Graph} (45 cells).] $k$ crossed with $n$ and $\omega$, the two factors it interacts with, a dense graph on a small network behaving unlike a sparse one on a large network.
+  \item[\textbf{Balance} (15 cells).] Unequal regime sizes crossed with $n$ and $\omega$.
+\end{description}
+
+The blocks overlap on the reference configuration and are deduplicated, leaving $240$ cells, of which $237$ admit the requested imbalance with regimes of at least $n_{\min}$ locations. Each is replicated $M = 100$ times from a seed derived from the replication index, so that a cell is reproducible on its own and the same replication carries the same geometry across scenarios.
+
+\paragraph{Evaluation metrics.} Performance is measured along four dimensions:
+\begin{enumerate}[leftmargin=*,itemsep=2pt,topsep=3pt]
+  \item \emph{Recovery of the partition}, by the Adjusted Rand Index \citep{HubertArabie1985} between the estimated and the true partition, computed at the true number of regimes and at the selected one. The index is invariant to relabelling; the share of correctly assigned locations, which is not, is also reported after aligning the estimated labels to the true ones by the majority rule.
+  \item \emph{Accuracy of the regime-specific parameters}, by the bias and the root mean squared error of the components of $\Psi_g$ over replications, after the same alignment. These are Monte Carlo summaries and not quantities a single replication could produce, so the record kept is one row per replication, regime and parameter, holding the truth beside the estimate.
+  \item \emph{Predictive accuracy}, measured against the conditional mean and not against the response. The target is
+  \begin{equation}
+    \mu_{ti} = x_{ti}' \beta_{g_i} + K_i\, y_{t,g_i} ,
+    \label{eq:signal}
+  \end{equation}
+  the systematic part of \eqref{eq:dgpz}, because the measurement error in $z$ is irreducible and scoring against $z$ would add the same constant to every model and compress every comparison towards one. The estimate is the fitted signal $\hat\mu_{ti} = x_{ti}' \hat\beta_{\hat g_i} + K_i \hat y_{t,\hat g_i}$, not the conditional expectation of $z$ given what was observed: on a complete record the latter returns the data itself and measures nothing. Errors are reported relative to the pooled STEM fit, so the gain attributable to the regimes is immediately readable.
+  \item \emph{Model selection}, by the frequency with which the two-step rule of Section~\ref{sec:tuning} recovers the true number of regimes, and by the behaviour of the information criteria across the penalty grid. The pooled model competes with the clustered configurations inside the rule and is returned when no partition improves on it, so the cells $K = 1$ measure directly how often a homogeneous network is split.
+\end{enumerate}
+
+\paragraph{The station is the unit of the error measures.} With point-referenced data the unit that carries a regime is the location, so the error that answers ``does the clustering help, and where'' is computed within a station over time and then examined across stations. The pooled root mean squared error over all $nT$ cells is, on a balanced panel, exactly the root mean of the per-station mean squared errors,
+\begin{equation}
+  \mathrm{RMSE}_{\mathrm{pool}}
+  = \sqrt{\frac{1}{nT}\sum_{i=1}^{n}\sum_{t=1}^{T} (\hat\mu_{ti} - \mu_{ti})^2}
+  = \sqrt{\frac{1}{n}\sum_{i=1}^{n} \mathrm{MSE}_i} ,
+  \label{eq:pooledrmse}
+\end{equation}
+so it is a summary \emph{of} the per-station measure rather than an alternative to it, and it destroys the distribution across stations that shows the regimes at work. On an unbalanced panel it is not even that, since it then weights a station by how many periods it was observed. Both are recorded and the per-station file is what the tables are built from. In the application of Section~\ref{sec4} the conditional mean is not available and the honest measure is out-of-sample against $z$ with spatio-temporal blocking, which is a different exercise and reported there.
+
+In every case the pooled STEM model is retained as the benchmark: the question the experiments answer is not whether SC-STEM fits better --- a model with $k$ times as many parameters generally will --- but whether it recovers the regimes that generated the data, and whether the additional parameters buy predictive accuracy that the pooled model does not deliver.
+
+\paragraph{What is recorded.} Each replication writes four records sharing the primary key (cell, replication): one row per replication with the selected configuration, the recovery indices, the errors and the wall time; one row per replication, regime and parameter with truth beside estimate; one row per replication and station with its coordinates, its true and estimated regime and its errors over time; and, for the first five replications of each cell, one row per station and period with the covariate, the response, the true conditional mean, the labels and the fitted signals of the clustered and of the pooled model. The last is $nT$ rows and is kept only for the representative-replication figures. The four join on the key and on nothing else; the factors are carried beside it for filtering, the overlap being a double that no join should rest on.
+
+\subsection{Results}\label{sec3:results}
+
+\TODO{The simulation study has been designed but not yet executed. This subsection will report, for each design and each separation level: the ARI distribution across replications and penalties, the bias and RMSE of the regime-specific parameters, the relative predictive accuracy against the pooled fit, and the selection frequencies of the two-step rule. The per-design tables and the representative replications go to the supplementary material.}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

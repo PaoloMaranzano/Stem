@@ -163,7 +163,7 @@ if (!sim_stem_ok(SIM_STEM_SHA)) {
          "install it by hand with\n  remotes::install_github(\"", SIM_STEM_REF,
          "\")", call. = FALSE)
 }
-sim_require("spdep")
+sim_require(c("geodist", "spdep"))
 suppressPackageStartupMessages(library("Stem"))
 
 
@@ -242,8 +242,8 @@ SIM_LEVELS <- list(
   ## relative sizes of the regimes
   balance = c("balanced", "unbalanced"),
 
-  ## which parameters differ between regimes; the eleven rows of dgp_scenarios()
-  scenario = c("S0", "S0b", "S1a", "S1b", "S1c", "S2a", "S2b", "S3a", "S3b", "S4", "S5"),
+  ## which parameters differ between regimes; the ten rows of dgp_scenarios()
+  scenario = c("S0", "S1a", "S1b", "S1c", "S2a", "S2b", "S3a", "S3b", "S4", "S5"),
 
   ## The neighbourhood graph the Potts penalty lives on. With point-referenced
   ## data there is no canonical adjacency -- unlike areal data, where a shared
@@ -362,8 +362,7 @@ sim_model <- function(dat, n) {
     z = dat$z, covariates = dat$covariates, coordinates = dat$coordinates,
     phi = list(beta = matrix(ols$coefficients, ncol = 1),
                sigma2eps = 0.7 * s2, sigma2omega = 0.3 * s2,
-               theta = 1 / stats::median(stats::dist(dat$coordinates)),
-               G = matrix(0.8, 1, 1),
+               theta = 1 / 100000, G = matrix(0.8, 1, 1),
                Sigmaeta = matrix(0.2 * s2, 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1)),
     K = matrix(1, n, 1))
@@ -432,12 +431,12 @@ sim_append <- function(df, path) {
 ## chosen with dgp_omega_for() so that it lands on 1.58. See NU_TOT below for
 ## why the total rather than the within is the thing to fix.
 ##
-## The design is GENERIC: it is tied to no application, and the plane is used as
-## it is, with Euclidean distances in its own units. The network has a standard
-## deviation of about 1.03 units per coordinate whatever the overlap, so it
-## spans about four units, and every spatial range below is stated against that
-## extent: a practical range of 2 means that locations half the network apart
-## are essentially uncorrelated.
+## The abstract plane is mapped onto a geographic box centred on the Po Valley,
+## one abstract unit being UNIT_KM kilometres. This is not cosmetic: it is what
+## makes the covariance parameters interpretable. With UNIT_KM = 100 the network
+## has a standard deviation of 103 km whatever the overlap, and at omega = 1 the
+## centres are 200 km apart, against a baseline correlation range of 123 km --
+## the regime in which a monitoring network of the Po Valley actually sits.
 ##
 ## WHY THE GENERATOR IS NOT STEM_Simulation() CALLED REGIME BY REGIME
 ##
@@ -479,12 +478,9 @@ sim_append <- function(df, path) {
 ## when they are not -- in which case the block structure is intrinsic to the
 ## scenario rather than an artefact of the generator.
 ##
-## Every value has a reading that does not depend on any application: the
-## response is standardized, the variance of a location is split into shares
-## (covariate, common dynamics, spatial field, nugget), the persistence is read
-## as the half-life of a shock, and a range is a PRACTICAL range, the distance at
-## which the correlation falls to 5%, against the extent of the network. See
-## dgp_base() and dgp_psi().
+## Effect sizes are in interpretable units: the coefficient contrast in residual
+## standard deviations, the variance contrast as a nugget share, the range in
+## kilometres.
 ## ---------------------------------------------------------------------------
 
 ## ---------------------------------------------------------------------------
@@ -506,22 +502,20 @@ sim_append <- function(df, path) {
 ##     with mu_g = dgp_centres(K, omega): centres at nearest-neighbour distance
 ##     2*omega, so 2*omega / sqrt(nu_sp) is the standardised separation and is
 ##     the same for every K. For K = 1, nu_sp is replaced by
-##     nu_sp + Var(mu | K = 2, omega). h_ij is the Euclidean distance between
-##     s_i and s_j in the plane.
+##     nu_sp + Var(mu | K = 2, omega). The plane is mapped affinely to longitude
+##     and latitude at UNIT_KM kilometres per unit, centred on (LON0, LAT0), and
+##     h_ij is the geodesic distance between s_i and s_j.
 ##
 ## (3) Covariate.  One standardised, exogenous covariate, an AR(1) in time whose
 ##     innovations are a spatially correlated field:
 ##
 ##        x_1 = w_1 ,   x_t = a x_{t-1} + sqrt(1 - a^2) w_t ,
-##        w_t ~ N_n(0, C_x) ,   (C_x)_ij = exp(-3 h_ij / R_x) ,
+##        w_t ~ N_n(0, C_x) ,   (C_x)_ij = exp(-h_ij / rho_x) ,
 ##
-##     with a = 0.7 (a shock to the driver halves in about two periods) and a
-##     practical range R_x = 4, the whole network: the driver varies on a large
-##     scale, the error field (practical range 2) on a more local one. Then
-##     centred and scaled over all nT values. A covariate independent across
-##     stations would make a coefficient contrast trivially visible; a perfectly
-##     common one would make it indistinguishable from the latent process. This
-##     sits in between.
+##     with a = 0.7 and rho_x = 100 km, then centred and scaled over all nT
+##     values. A covariate independent across stations would make a coefficient
+##     contrast trivially visible; a perfectly common one would make it
+##     indistinguishable from the latent process. This sits in between.
 ##
 ## (4) Latent processes.  One AR(1) per regime, with cross-correlated
 ##     innovations:
@@ -559,9 +553,9 @@ sim_append <- function(df, path) {
 ##   input  n, T, K, omega, balance, scenario s, level l, rho, replication r
 ##   1  n_1..n_K  <- sizes(n, K, balance)          ; g <- labels(n_1..n_K)
 ##   2  mu        <- centres(K, omega)
-##   3  for i in 1..n:  s_i <- mu_{g_i} + N_2(0, nu_sp I)
+##   3  for i in 1..n:  s_i <- mu_{g_i} + N_2(0, nu_sp I)      ; map to lon/lat
 ##   4  h         <- geodesic distances between the s_i
-##   5  C_x       <- exp(-3 h / R_x)  ;  L_x <- chol(C_x)
+##   5  C_x       <- exp(-h / rho_x)  ;  L_x <- chol(C_x)
 ##      x_1 <- L_x' N(0, I) ;  for t in 2..T:  x_t <- a x_{t-1} + sqrt(1-a^2) L_x' N(0,I)
 ##      x   <- (x - mean(x)) / sd(x)
 ##   6  Psi_1..Psi_K <- parameters(s, l, K)        ; regime g at fraction (g-1)/(K-1)
@@ -590,12 +584,12 @@ sim_append <- function(df, path) {
 ## dispersion held fixed instead -- centres 2*omega apart around clusters of
 ## constant spread -- the map grows with the separation, and omega then does two
 ## things at once: it separates the regimes AND it enlarges the network. The
-## second is not innocuous here, because the covariance has a range: in an
-## earlier version of the design, at omega = 0 and n = 20, the median pairwise
-## distance was about as long as the range, so the exponential decay was barely
-## resolved over the observed distances, theta was close to unidentified, and
-## the EM crawled -- 0.4 s for a pooled fit at omega = 1 against more than ten
-## minutes at omega = 0, on the same n and T. Any effect attributed to the separation would have carried a
+## second is not innocuous here, because the covariance has a range: at omega = 0
+## and n = 20 the median pairwise distance was 105 km against a true range of
+## 123 km, so the exponential decay was barely resolved over the observed
+## distances, theta was close to unidentified, and the EM crawled -- 0.4 s for a
+## pooled fit at omega = 1 against more than ten minutes at omega = 0, on the
+## same n and T. Any effect attributed to the separation would have carried a
 ## share of that. Holding the total fixed leaves the footprint of the network,
 ## and so the identifiability of theta, the same in every cell.
 ##
@@ -604,6 +598,9 @@ sim_append <- function(df, path) {
 ## the ones that widen.
 NU_TOT  <- 0.4 + 2/3    # = NU_SP + dgp_centre_var(3, 1)
 NU_SP   <- 0.4          # kept for reference: the former within-cluster variance
+UNIT_KM <- 100          # kilometres per abstract unit of the overlap design
+LON0    <- 9.5          # centre of the geographic box, Po Valley
+LAT0    <- 45.5
 ## The smallest regime the design allows. The package itself refuses fewer than
 ## r + 2 units, but the binding constraint is spatial rather than parametric: a
 ## regime estimates a range from its own pairwise distances, and six locations
@@ -715,8 +712,9 @@ dgp_labels <- function(n, K, balance = "balanced", n_min = N_MIN) {
   rep(seq_len(K), times = dgp_sizes(n, K, balance, n_min))
 }
 
-## Locations: the abstract cloud of the overlap design, in the plane, with
-## Euclidean distances in its units.
+## Locations: the abstract cloud of the overlap design, mapped to longitude and
+## latitude so that distances are kilometres and the covariance parameters keep
+## their meaning.
 ##
 ##   s_i | g_i = g  ~  N_2( mu_g , nu_sp(K, omega) I_2 )
 ##
@@ -736,39 +734,24 @@ dgp_locations <- function(n, K, omega, nu_tot = NU_TOT, balance = "balanced",
          ": raise NU_TOT or lower omega", call. = FALSE)
   }
   sd_i <- sqrt(nu_sp)
-  xy <- cbind(sx = mu[g, 1] + stats::rnorm(n, sd = sd_i),
-              sy = mu[g, 2] + stats::rnorm(n, sd = sd_i))
-  list(coords = xy, labels = g, xy = xy, mu = mu, sizes = tabulate(g, K))
+  xy <- cbind(mu[g, 1] + stats::rnorm(n, sd = sd_i),
+              mu[g, 2] + stats::rnorm(n, sd = sd_i))
+  coords <- cbind(
+    lon = LON0 + xy[, 1] * UNIT_KM / (111.320 * cos(LAT0 * pi / 180)),
+    lat = LAT0 + xy[, 2] * UNIT_KM / 110.574)
+  list(coords = coords, labels = g, xy = xy, mu = mu, sizes = tabulate(g, K))
 }
 
 ## ---------------------------------------------------------------------------
-## Baseline parameters: the regime every scenario starts from
-##
-## Generic by construction, each value with a reading of its own. The response
-## is standardized, with unit variance at a location, and that variance is
-## split into four shares:
-##
-##   covariate            30%   beta_1^2 Var(x) = 0.30, x standardized
-##   common dynamics      30%   stationary variance of the latent process
-##   spatial field        20%   partial sill sigma^2_omega
-##   nugget               20%   sigma^2_eps: measurement error and micro-scale
-##
-## so the systematic part (covariate and dynamics) explains 60% and the local
-## part 40%, with a residual standard deviation sigma = sqrt(0.40) = 0.63, the
-## unit of every coefficient contrast. The mean is two standard deviations above
-## zero -- a coefficient of variation of 0.5, the profile of a positive quantity
-## such as a concentration or a price, which the process rarely takes below zero.
-## A shock to the common dynamics halves in about three periods (G = 0.8), and
-## the spatial field has a practical range of 2, half the extent of the network.
+## Baseline parameters, from the pooled fit on the real network
 ## ---------------------------------------------------------------------------
 dgp_base <- function() {
-  list(beta        = c(2, sqrt(0.30)),  # mean level; covariate explains 30%
-       sigma2eps   = 0.20,              # nugget
-       sigma2omega = 0.20,              # partial sill
-       range       = 2,                 # practical range, half the network
-       theta       = 3 / 2,             # exp(-theta h) is 5% at h = range
-       G           = 0.80,              # half-life of a shock: 3.1 periods
-       var_y       = 0.30)              # stationary variance of the dynamics
+  list(beta        = c(2.34, 0.60),   # intercept and one standardised covariate
+       sigma2eps   = 21.4,            # nugget
+       sigma2omega = 4.19,            # partial sill
+       theta       = 8.1e-06,         # 1/theta = 123 km
+       G           = 0.90,            # persistence of the latent process
+       var_y       = 6.0)             # stationary variance of the latent process
 }
 
 ## The innovation variance that holds the stationary variance of an AR(1) at
@@ -783,10 +766,10 @@ sigma_eta_of <- function(G, var_y) var_y * (1 - G^2)
 ## visible; one that was perfectly common would make it indistinguishable from
 ## the latent process. This sits in between, and the two knobs are explicit.
 ## ---------------------------------------------------------------------------
-dgp_covariate <- function(coords, TN, a_time = 0.7, range = 4, seed = 1) {
+dgp_covariate <- function(coords, TN, a_time = 0.7, range_km = 100, seed = 1) {
   d <- nrow(coords)
-  dm <- as.matrix(stats::dist(coords))
-  Cx <- exp(-3 * dm / range)
+  dm <- geodist::geodist(coords, measure = "geodesic")
+  Cx <- exp(-dm / (range_km * 1000))
   L <- chol(Cx + diag(1e-8, d))
 
   set.seed(seed)
@@ -813,28 +796,17 @@ dgp_design <- function(x) {
 ## full contrast; with K = 3 the middle regime sits halfway, so that K = 2
 ## reproduces exactly the earlier design and K = 3 extends it without changing
 ## the meaning of `level`.
-##
-## The three levels are weak, medium and strong, and each contrast has a reading
-## of its own:
-##
-##   S1  the effect of the covariate is 1.25, 1.5 or 2 times the baseline
-##       (0.22, 0.43, 0.87 residual standard deviations)
-##   S2  the persistence falls from 0.8 to 0.7, 0.5 or 0.2: a shock that halves
-##       in 3.1 periods halves in 1.9, 1.0 or 0.4 -- slow against fast dynamics
-##   S3  the spatial field becomes local: the practical range falls from 2 to
-##       1, 0.5 or 0.25 and the nugget share rises from 0.5 to 0.6, 0.7 or 0.8,
-##       the total residual variance staying the same -- a regime dominated by
-##       micro-scale variation, as urban sites are against rural ones
 ## ---------------------------------------------------------------------------
 dgp_psi <- function(scenario, level = 2L, K = 2L, base = dgp_base()) {
 
-  tot <- base$sigma2eps + base$sigma2omega
+  res_sd <- sqrt(base$sigma2eps + base$sigma2omega)
+  tot    <- base$sigma2eps + base$sigma2omega
 
   ## the contrast of the extreme regime
-  mult_beta  <- c(1.25, 1.50, 2.00)[level]  # effect of the covariate, x baseline
-  G_last     <- c(0.70, 0.50, 0.20)[level]  # against 0.80
-  share_last <- c(0.60, 0.70, 0.80)[level]  # nugget share, against 0.50
-  range_last <- c(1.00, 0.50, 0.25)[level]  # practical range, against 2
+  delta_beta <- c(0.25, 0.5, 1.0)[level]   # in residual standard deviations
+  G_last     <- c(0.80, 0.60, 0.30)[level] # against 0.90 in the baseline
+  share_last <- c(0.70, 0.50, 0.30)[level] # nugget share, against 0.836
+  range_last <- c(60, 30, 15)[level]       # km, against 123 km
 
   ## regime g sits at fraction w of the way from the baseline to the extreme
   w_of <- function(g) if (K == 1L) 0 else (g - 1) / (K - 1)
@@ -843,17 +815,17 @@ dgp_psi <- function(scenario, level = 2L, K = 2L, base = dgp_base()) {
     w <- w_of(g)
     p <- base
     if (scenario %in% c("S1", "S4")) {
-      p$beta <- c(base$beta[1], base$beta[2] * (1 + w * (mult_beta - 1)))
+      p$beta <- c(base$beta[1], base$beta[2] + w * delta_beta * res_sd)
     }
     if (scenario %in% c("S2", "S4")) {
       p$G <- base$G + w * (G_last - base$G)
     }
     if (scenario %in% c("S3", "S4")) {
       share <- (base$sigma2eps / tot) + w * (share_last - base$sigma2eps / tot)
-      p$range       <- base$range + w * (range_last - base$range)
+      rng   <- (1 / base$theta / 1000) + w * (range_last - 1 / base$theta / 1000)
       p$sigma2eps   <- tot * share
       p$sigma2omega <- tot * (1 - share)
-      p$theta       <- 3 / p$range
+      p$theta       <- 1 / (rng * 1000)
     }
     p
   })
@@ -882,7 +854,7 @@ dgp_simulate <- function(labels, psi, x, coords, rho = 1, seed = 1,
 
   TN <- nrow(x); d <- ncol(x)
   k  <- length(psi)
-  dm <- as.matrix(stats::dist(coords))
+  dm <- geodist::geodist(coords, measure = "geodesic")
 
   set.seed(seed)
 
@@ -946,35 +918,25 @@ dgp_simulate <- function(labels, psi, x, coords, rho = 1, seed = 1,
 ## rho = 1 throughout except for the reference cell S5, which reproduces the
 ## model-consistent generator of the first design so that the contribution of
 ## the latent split can be read off directly.
-##
-## S0b is the null with the error field drawn regime by regime. No parameter
-## differs, so whatever it recovers comes from the block structure of the field
-## alone: the regimes are independent of one another, which is what SC-STEM
-## assumes and what a single field over the network is not. That information
-## comes for free in every scenario whose covariance differs between regimes
-## (S3, S4, S5), where the field cannot be drawn globally, and S0b measures how
-## much of their recovery it accounts for.
 ## ---------------------------------------------------------------------------
 dgp_scenarios <- function() {
   rbind(
     data.frame(id = "S0", scenario = "S0", level = 2L, rho = 1, force_block = FALSE,
                label = "null: no regime at all"),
-    data.frame(id = "S0b", scenario = "S0", level = 2L, rho = 1, force_block = TRUE,
-               label = "null, with the error field drawn by regime"),
     data.frame(id = "S1a", scenario = "S1", level = 1L, rho = 1, force_block = FALSE,
-               label = "coefficients, effect x1.25"),
+               label = "coefficients, 0.25 residual sd"),
     data.frame(id = "S1b", scenario = "S1", level = 2L, rho = 1, force_block = FALSE,
-               label = "coefficients, effect x1.5"),
+               label = "coefficients, 0.50 residual sd"),
     data.frame(id = "S1c", scenario = "S1", level = 3L, rho = 1, force_block = FALSE,
-               label = "coefficients, effect x2"),
+               label = "coefficients, 1.00 residual sd"),
     data.frame(id = "S2a", scenario = "S2", level = 1L, rho = 1, force_block = FALSE,
-               label = "persistence, G = 0.80 vs 0.70"),
+               label = "persistence, G = 0.90 vs 0.80"),
     data.frame(id = "S2b", scenario = "S2", level = 3L, rho = 1, force_block = FALSE,
-               label = "persistence, G = 0.80 vs 0.20"),
+               label = "persistence, G = 0.90 vs 0.30"),
     data.frame(id = "S3a", scenario = "S3", level = 1L, rho = 1, force_block = FALSE,
-               label = "covariance, nugget share .5 vs .6, range 2 vs 1"),
+               label = "covariance, nugget share .84 vs .70, range 123 vs 60 km"),
     data.frame(id = "S3b", scenario = "S3", level = 3L, rho = 1, force_block = FALSE,
-               label = "covariance, nugget share .5 vs .8, range 2 vs 0.25"),
+               label = "covariance, nugget share .84 vs .30, range 123 vs 15 km"),
     data.frame(id = "S4", scenario = "S4", level = 2L, rho = 1, force_block = FALSE,
                label = "all three contrasts, middle level"),
     data.frame(id = "S5", scenario = "S4", level = 2L, rho = 0, force_block = TRUE,
@@ -1105,11 +1067,6 @@ sim_cells <- function(lv = SIM_LEVELS,
 ## meant for budgeting, not for reporting; once replications are recorded, the
 ## "dry" mode recalibrates it on them.
 ## ---------------------------------------------------------------------------
-## NOTE. These times were measured on the Po Valley design, since archived in
-## dev/archive/sim-design-povalley. The generic design fits faster -- a pooled
-## fit at n = 100 and T = 120 takes 0.2 s against 0.9 s -- so the estimate below
-## is pessimistic until the table is measured again on the generic design.
-##
 ## MEASURED on 2026-09-26, one replication of every cell of the core and null
 ## blocks, on the author's machine, averaged over the three overlaps. The times
 ## are heavy-tailed -- a replication in which the EM struggles can take ten times
@@ -1223,7 +1180,7 @@ sim_one <- function(cell, rep) {
   ## grid records it among the failed configurations, and the selection rule
   ## never sees it.
   ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
-                        distance = "euclidean", verbose = FALSE, knn = cell$knn,
+                        distance = "geo", verbose = FALSE, knn = cell$knn,
                         min_cluster_size = N_MIN,
                         alpha = CFG$alpha[1], lambda = CFG$lambda[1])
   sel <- Stem::SCSTEM_Select(ic)
@@ -1374,7 +1331,7 @@ sim_one <- function(cell, rep) {
 
   station <- cbind(key[rep(1L, cell$n), ], data.frame(
     station  = seq_len(cell$n),
-    sx = dat$coordinates[, 1], sy = dat$coordinates[, 2],
+    lon = dat$coordinates[, 1], lat = dat$coordinates[, 2],
     g_true   = dat$labels,
     g_hat    = g_true_hat,
     g_hat_sel = g_sel_hat,
@@ -1393,7 +1350,7 @@ sim_one <- function(cell, rep) {
     tt <- rep(seq_len(cell$TN), times = cell$n)
     obs <- cbind(key[rep(1L, cell$n * cell$TN), ], data.frame(
       t = tt, station = ii,
-      sx = dat$coordinates[ii, 1], sy = dat$coordinates[ii, 2],
+      lon = dat$coordinates[ii, 1], lat = dat$coordinates[ii, 2],
       x = as.vector(dat$x), z = as.vector(dat$z), mu = as.vector(dat$mu),
       g_true = dat$labels[ii], g_hat = g_true_hat[ii], g_hat_sel = g_sel_hat[ii],
       mu_hat = if (is.null(mh_true)) NA_real_ else as.vector(mh_true),
@@ -1487,7 +1444,7 @@ cov_one <- function(cell, rep) {
 
   t0 <- proc.time()[["elapsed"]]
   fit <- Stem::SCSTEM_Estimation(mod, k = cell$K, phi_penalty = SIM_COVERAGE$phi,
-                                 distance = "euclidean", verbose = FALSE,
+                                 distance = "geo", verbose = FALSE,
                                  min_cluster_size = N_MIN,
                                  alpha = CFG$alpha[1], lambda = CFG$lambda[1])
   boot <- Stem::SCSTEM_Bootstrap(fit, B = CFG$boot_B[1],

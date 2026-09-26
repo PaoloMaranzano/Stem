@@ -1,0 +1,18 @@
+\begin{tabular}{llllllrrl}
+\toprule
+& & \multicolumn{5}{c}{regime parameters, regimes 1 / 2 / 3} & & \\
+\cmidrule(lr){3-7}
+id & differs in & $\beta_1$ & $\Delta\beta_1/\sigma$ & $G$ & nugget share & range (km) & $\rho$ & error field \\
+\midrule
+S0 & nothing & 0.60 & 0.00 & 0.90 & 0.84 & 123 & 1 & one \\
+S1a & $\beta_1$ & \textbf{0.60 / 1.23 / 1.86} & 0.25 & 0.90 & 0.84 & 123 & 1 & one \\
+S1b & $\beta_1$ & \textbf{0.60 / 1.86 / 3.13} & 0.50 & 0.90 & 0.84 & 123 & 1 & one \\
+S1c & $\beta_1$ & \textbf{0.60 / 3.13 / 5.66} & 1.00 & 0.90 & 0.84 & 123 & 1 & one \\
+S2a & $G$ & 0.60 & 0.00 & \textbf{0.90 / 0.85 / 0.80} & 0.84 & 123 & 1 & one \\
+S2b & $G$ & 0.60 & 0.00 & \textbf{0.90 / 0.60 / 0.30} & 0.84 & 123 & 1 & one \\
+S3a & covariance & 0.60 & 0.00 & 0.90 & \textbf{0.84 / 0.77 / 0.70} & \textbf{123 / 92 / 60} & 1 & by regime \\
+S3b & covariance & 0.60 & 0.00 & 0.90 & \textbf{0.84 / 0.57 / 0.30} & \textbf{123 / 69 / 15} & 1 & by regime \\
+S4 & all three & \textbf{0.60 / 1.86 / 3.13} & 0.50 & \textbf{0.90 / 0.75 / 0.60} & \textbf{0.84 / 0.67 / 0.50} & \textbf{123 / 77 / 30} & 1 & by regime \\
+S5 & all three & \textbf{0.60 / 1.86 / 3.13} & 0.50 & \textbf{0.90 / 0.75 / 0.60} & \textbf{0.84 / 0.67 / 0.50} & \textbf{123 / 77 / 30} & 0 & by regime \\
+\bottomrule
+\end{tabular}
