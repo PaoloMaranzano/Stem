@@ -86,6 +86,25 @@ test_that("SCSTEM_Select applies the two-step rule", {
   expect_true(sel$phi_selected %in% ic$table$phi)
   ### the selected configuration must itself be admissible
   expect_true(sel$selected_row$admissible)
+
+  ### the pooled model competes in (S1): when no partition improves on it, it
+  ### is the answer, and when a partition does, it is not
+  best <- min(ic$table$BIC)
+  ic1 <- ic
+  ic1$table$BIC[ic1$table$k == 1] <- best - 1
+  sel1 <- SCSTEM_Select(ic1, band = c(0.5, 1))
+  expect_equal(sel1$k_selected, 1L)
+  expect_null(sel1$step2)
+  expect_identical(sel1$fit, ic$fits[[paste0("k=1, phi=", sel1$phi_selected)]])
+  expect_output(print(sel1), "pooled model")
+  ic2 <- ic
+  ic2$table$BIC[ic2$table$k == 1] <- max(ic$table$BIC) + 1
+  expect_gt(SCSTEM_Select(ic2, band = c(0.5, 1))$k_selected, 1L)
+
+  ### with no admissible partition at all the pooled model is selected
+  ic3 <- ic
+  ic3$table$admissible[ic3$table$k > 1] <- FALSE
+  expect_equal(SCSTEM_Select(ic3, band = c(0.5, 1))$k_selected, 1L)
 })
 
 test_that("the fit records the ridge settings the bootstrap refits with", {

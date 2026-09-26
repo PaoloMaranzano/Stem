@@ -57,8 +57,9 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   hyperparameters: **(S1)** the modal BIC-minimizing `k` inside a
   moderate-penalty band, ties resolved towards the smaller `k`; **(S2)** the
   smallest `phi` on the stability plateau of the Adjusted Rand Index between
-  neighboring grid partitions. Only admissible configurations enter the rule,
-  and the pooled `k = 1` model is always retained as the reference.
+  neighboring grid partitions. Only admissible configurations enter the rule.
+  The pooled `k = 1` model competes in (S1) and is returned when no partition
+  improves on it.
 * `SCSTEM_Bootstrap()` is now a **refit-with-clustering** parametric bootstrap:
   data are generated cluster by cluster from the fitted model and the *entire*
   procedure, endogenous partitioning included, is re-estimated on every draw, so

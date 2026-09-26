@@ -30,13 +30,15 @@ of \code{"BIC"} (default), \code{"AIC"} or \code{"KIC"}.}
 An object of class \dQuote{SCSTEM_Select}, a list with
 \itemize{
   \item \code{k_selected}, \code{phi_selected}: the selected
-    hyperparameters.
-  \item \code{fit}: the corresponding \dQuote{SCSTEM_Estimation} object, taken
-    from \code{infocrit$fits} without refitting.
+    hyperparameters. When \eqn{\hat{k} = 1}, \code{phi_selected} is the grid
+    value at which the pooled fit is stored, which has no effect on it.
+  \item \code{fit}: the corresponding fitted object, taken from
+    \code{infocrit$fits} without refitting.
   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
     each penalty in the band.
   \item \code{step2}: data frame with the stability index \eqn{S(\phi)} at
-    \eqn{k = \hat{k}} and the plateau threshold.
+    \eqn{k = \hat{k}} and the plateau threshold; \code{NULL} when
+    \eqn{\hat{k} = 1}.
   \item \code{ari_to_selected}: Adjusted Rand Index between every admissible
     partition on the grid and the selected one.
   \item \code{reference}: the pooled \eqn{k = 1} row of the criteria table,
@@ -63,8 +65,11 @@ proceeds in two steps:
 \describe{
   \item{(S1) Number of clusters, by BIC within the band.}{For each
     \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{k} among the
-    admissible configurations; select the modal winner \eqn{\hat{k}} across
-    the band, resolving ties towards the smaller \eqn{k}. Excluding
+    admissible configurations at that \eqn{\phi} and the pooled model
+    \eqn{k = 1}, whose criterion does not depend on \eqn{\phi}; select the
+    modal winner \eqn{\hat{k}} across the band, resolving ties towards the
+    smaller \eqn{k}. If \eqn{\hat{k} = 1} the data do not support a
+    partition: the pooled fit is returned and (S2) does not apply. Excluding
     \eqn{\phi \approx 0} removes the region where the optimism bias is
     largest. Under-selection is the harmful direction, while residual
     over-selection is comparatively benign for prediction, because
@@ -85,9 +90,10 @@ proceeds in two steps:
 }
 
 Only admissible configurations, in the sense of
-\code{\link{SCSTEM_Infocrit}}, enter the rule, and the pooled model
-\eqn{k = 1} is always retained as the reference against which the selected
-configuration must be justified.
+\code{\link{SCSTEM_Infocrit}}, enter the rule. The pooled model enters it
+whenever \code{k_grid} contains 1, as it should: it is the answer when no
+partition improves on it, and it is selected when no configuration with
+\eqn{k > 1} is admissible.
 }
 \examples{
 # Daily PM2.5 at 36 background stations of the Po Valley. The first 180

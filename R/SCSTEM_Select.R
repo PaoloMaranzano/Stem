@@ -19,8 +19,11 @@
 #' \describe{
 #'   \item{(S1) Number of clusters, by BIC within the band.}{For each
 #'     \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{k} among the
-#'     admissible configurations; select the modal winner \eqn{\hat{k}} across
-#'     the band, resolving ties towards the smaller \eqn{k}. Excluding
+#'     admissible configurations at that \eqn{\phi} and the pooled model
+#'     \eqn{k = 1}, whose criterion does not depend on \eqn{\phi}; select the
+#'     modal winner \eqn{\hat{k}} across the band, resolving ties towards the
+#'     smaller \eqn{k}. If \eqn{\hat{k} = 1} the data do not support a
+#'     partition: the pooled fit is returned and (S2) does not apply. Excluding
 #'     \eqn{\phi \approx 0} removes the region where the optimism bias is
 #'     largest. Under-selection is the harmful direction, while residual
 #'     over-selection is comparatively benign for prediction, because
@@ -41,9 +44,10 @@
 #' }
 #'
 #' Only admissible configurations, in the sense of
-#' \code{\link{SCSTEM_Infocrit}}, enter the rule, and the pooled model
-#' \eqn{k = 1} is always retained as the reference against which the selected
-#' configuration must be justified.
+#' \code{\link{SCSTEM_Infocrit}}, enter the rule. The pooled model enters it
+#' whenever \code{k_grid} contains 1, as it should: it is the answer when no
+#' partition improves on it, and it is selected when no configuration with
+#' \eqn{k > 1} is admissible.
 #'
 #' @param infocrit an object of class \dQuote{SCSTEM_Infocrit} returned by
 #'   \code{\link{SCSTEM_Infocrit}}.
@@ -59,13 +63,15 @@
 #' @return An object of class \dQuote{SCSTEM_Select}, a list with
 #' \itemize{
 #'   \item \code{k_selected}, \code{phi_selected}: the selected
-#'     hyperparameters.
-#'   \item \code{fit}: the corresponding \dQuote{SCSTEM_Estimation} object, taken
-#'     from \code{infocrit$fits} without refitting.
+#'     hyperparameters. When \eqn{\hat{k} = 1}, \code{phi_selected} is the grid
+#'     value at which the pooled fit is stored, which has no effect on it.
+#'   \item \code{fit}: the corresponding fitted object, taken from
+#'     \code{infocrit$fits} without refitting.
 #'   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
 #'     each penalty in the band.
 #'   \item \code{step2}: data frame with the stability index \eqn{S(\phi)} at
-#'     \eqn{k = \hat{k}} and the plateau threshold.
+#'     \eqn{k = \hat{k}} and the plateau threshold; \code{NULL} when
+#'     \eqn{\hat{k} = 1}.
 #'   \item \code{ari_to_selected}: Adjusted Rand Index between every admissible
 #'     partition on the grid and the selected one.
 #'   \item \code{reference}: the pooled \eqn{k = 1} row of the criteria table,
@@ -144,12 +150,16 @@ SCSTEM_Select <- function(infocrit,
   tab <- infocrit$table
   reference <- tab[tab$k == 1, , drop = FALSE]
 
-  ### Only admissible, multi-cluster configurations enter the rule
+  ### Only admissible configurations enter the rule. The pooled model is fitted
+  ### once, at the first grid value of phi, and competes at every phi of the
+  ### band, since its criterion does not depend on the penalty.
   adm <- tab[tab$admissible & tab$k > 1, , drop = FALSE]
-  if (!nrow(adm)) {
-    stop("No admissible configuration with k > 1 is available: every fit on the grid ",
-         "collapsed at least one cluster. Consider a smaller k_grid, a smaller ",
-         "min_cluster_size, or a stronger phi_penalty.", call. = FALSE)
+  pooled <- tab[tab$admissible & tab$k == 1 & is.finite(tab[[criterion]]), , drop = FALSE]
+  pooled <- pooled[seq_len(min(1L, nrow(pooled))), , drop = FALSE]
+  if (!nrow(adm) && !nrow(pooled)) {
+    stop("No admissible configuration is available: every fit on the grid ",
+         "collapsed at least one cluster and the grid holds no pooled fit. ",
+         "Include k = 1 in k_grid.", call. = FALSE)
   }
 
   ##############################################
@@ -158,7 +168,7 @@ SCSTEM_Select <- function(infocrit,
 
   phis <- sort(unique(adm$phi))
   in_band <- phis[phis >= band[1] & phis <= band[2]]
-  if (length(in_band) < 2L) {
+  if (length(phis) && length(in_band) < 2L) {
     warning("The moderate-penalty band [", band[1], ", ", band[2], "] contains ",
             length(in_band), " admissible grid value(s); the whole grid is used instead.",
             call. = FALSE)
@@ -166,13 +176,17 @@ SCSTEM_Select <- function(infocrit,
   }
 
   step1 <- do.call(rbind, lapply(in_band, function(p) {
-    sub <- adm[adm$phi == p, , drop = FALSE]
-    if (!nrow(sub)) return(NULL)
+    sub <- rbind(adm[adm$phi == p, , drop = FALSE], pooled)
     ### ties resolved towards the smaller k
     sub <- sub[order(sub[[criterion]], sub$k), , drop = FALSE]
     data.frame(phi = p, k_best = sub$k[1], value = sub[[criterion]][1],
                stringsAsFactors = FALSE)
   }))
+  if (is.null(step1)) {
+    ### no admissible partition at all: the pooled model is the answer
+    step1 <- data.frame(phi = pooled$phi, k_best = 1L, value = pooled[[criterion]],
+                        stringsAsFactors = FALSE)
+  }
 
   votes <- table(step1$k_best)
   top <- as.integer(names(votes)[votes == max(votes)])
@@ -182,14 +196,19 @@ SCSTEM_Select <- function(infocrit,
   ########## (S2) spatial penalty ##############
   ##############################################
 
+  tag_of <- function(kk, pp) paste0("k=", kk, ", phi=", pp)
+
   sub_k <- adm[adm$k == k_sel & adm$phi %in% in_band, , drop = FALSE]
   sub_k <- sub_k[order(sub_k$phi), , drop = FALSE]
   phis_k <- sub_k$phi
 
-  tag_of <- function(kk, pp) paste0("k=", kk, ", phi=", pp)
   grp <- function(pp) infocrit$groups[, tag_of(k_sel, pp)]
 
-  if (length(phis_k) == 1L) {
+  if (k_sel == 1L) {
+    ### one regime: there is no partition to stabilize and no penalty to choose
+    phi_sel <- pooled$phi[1]
+    step2 <- NULL
+  } else if (length(phis_k) == 1L) {
     phi_sel <- phis_k
     step2 <- data.frame(phi = phis_k, stability = NA_real_,
                         threshold = NA_real_, on_plateau = TRUE,
@@ -261,14 +280,19 @@ print.SCSTEM_Select <- function(x, digits = 3, ...) {
   s1$value <- round(s1$value, digits)
   print(s1, row.names = FALSE)
 
-  cat("\n(S2) stability of the partition at k = ", x$k_selected, "\n", sep = "")
-  s2 <- x$step2
-  s2$stability <- round(s2$stability, digits)
-  s2$threshold <- round(s2$threshold, digits)
-  print(s2, row.names = FALSE)
+  if (is.null(x$step2)) {
+    cat("\n(S2) not applicable: no partition improves on the pooled model\n")
+    cat("\nSelected configuration: k = 1 (the pooled model)\n")
+  } else {
+    cat("\n(S2) stability of the partition at k = ", x$k_selected, "\n", sep = "")
+    s2 <- x$step2
+    s2$stability <- round(s2$stability, digits)
+    s2$threshold <- round(s2$threshold, digits)
+    print(s2, row.names = FALSE)
 
-  cat("\nSelected configuration: k = ", x$k_selected,
-      " , phi = ", x$phi_selected, "\n", sep = "")
+    cat("\nSelected configuration: k = ", x$k_selected,
+        " , phi = ", x$phi_selected, "\n", sep = "")
+  }
   if (nrow(x$selected_row)) {
     sr <- x$selected_row
     cat("  loglik = ", round(sr$loglik, digits),

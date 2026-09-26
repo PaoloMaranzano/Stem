@@ -16,6 +16,24 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26 (sixth entry)
+
+**`SCSTEM_Select()` can select the pooled model.** Step (S1) ranked only the
+configurations with `k > 1`, because step (S2) has no meaning at `k = 1`; the
+exclusion was applied to the whole rule rather than to (S2) alone, so the rule
+could never say that a network has no regimes and left that comparison to the
+user. The pooled fit now competes in (S1) at every penalty of the band (its
+criterion does not depend on `phi`); when it wins, it is returned with
+`step2 = NULL`, and it is also returned when no configuration with `k > 1` is
+admissible, where the function used to stop. Checked in a scratch script before
+adoption, on 8 replications of five cells: on homogeneous networks (`K = 1`,
+`n = 50` and `100`, `T = 120`) the old rule selected `k = 2` in 16 of 16 cases,
+the new one `k = 1` in 16 of 16, the pooled BIC being lower by 350 to 900; with
+`K = 3` the two rules agree in 23 of 24 replications. The runner drops
+`bic_beats_pooled` and `gain_over_pooled`, which only stood in for this; the
+analysis reads the null block off `k_hat`; the application skips the bootstrap
+when `k = 1` is selected and no longer caches the selection.
+
 ### 2026-09-26 (fifth entry)
 
 **The replication scripts keep Stem in step with GitHub.** On a second machine

@@ -552,15 +552,13 @@ if ("results" %in% AN$parts) {
     ## -----------------------------------------------------------------------
     ## B2. The null: how often a homogeneous network is split
     ## -----------------------------------------------------------------------
-    ## SCSTEM_Select() chooses among k > 1 only, so k_hat > 1 always and says
-    ## nothing here. A homogeneous network is declared split when the selected
-    ## configuration beats the pooled model, which the runner records.
+    ## A homogeneous network is split when the rule selects k > 1 instead of
+    ## the pooled model.
     nul <- S[S$block_null, ]
-    if (nrow(nul) && !is.null(nul$bic_beats_pooled)) {
+    if (nrow(nul)) {
       tn <- agg(nul, c("TN", "n"), function(s) {
-        k <- mc(s$bic_beats_pooled)
-        data.frame(M = k[["M"]], false_split = k[["mean"]], se = k[["se"]],
-                   gain = stats::median(s$gain_over_pooled, na.rm = TRUE))
+        k <- mc(as.integer(s$k_hat > 1))
+        data.frame(M = k[["M"]], false_split = k[["mean"]], se = k[["se"]])
       })
       cat("\nNULL (K = 1): how often the procedure splits a homogeneous network\n")
       print(tn[order(tn$TN, tn$n), ], row.names = FALSE, digits = 3)

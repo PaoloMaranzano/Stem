@@ -200,9 +200,9 @@ grid <- cached("grid", {
 
 ## ---- D: selection -----------------------------------------------------------
 message("D. two-step selection")
-sel <- cached("selection", {
-  Stem::SCSTEM_Select(grid, band = CFG$band, criterion = "BIC", delta = 0.05)
-})
+## Not cached: it takes no time, and it has to follow the rule of the installed
+## Stem rather than of whichever version wrote a cache.
+sel <- Stem::SCSTEM_Select(grid, band = CFG$band, criterion = "BIC", delta = 0.05)
 best <- sel$fit
 stopifnot(inherits(best, "SCSTEM_Estimation"))
 
@@ -216,13 +216,21 @@ if ("--no-bootstrap" %in% commandArgs(trailingOnly = TRUE)) {
 }
 
 ## ---- E: bootstrap -----------------------------------------------------------
-message("E. refit-with-clustering bootstrap")
-boot <- cached("bootstrap", {
-  Stem::SCSTEM_Bootstrap(best, B = CFG$B[1], seed = CFG$seed[1], verbose = TRUE)
-})
-inf <- cached("bootinference", {
-  Stem::SCSTEM_BootInference(boot, level = 0.95)
-})
+## With k = 1 the rule finds no partition that improves on the pooled model,
+## and there is no clustering to bootstrap.
+boot <- inf <- NULL
+if (sel$k_selected == 1L) {
+  message("E. skipped: the selection rule chooses k = 1, no partition ",
+          "improves on the pooled model")
+} else {
+  message("E. refit-with-clustering bootstrap")
+  boot <- cached("bootstrap", {
+    Stem::SCSTEM_Bootstrap(best, B = CFG$B[1], seed = CFG$seed[1], verbose = TRUE)
+  })
+  inf <- cached("bootinference", {
+    Stem::SCSTEM_BootInference(boot, level = 0.95)
+  })
+}
 
 ## ---- F: outputs -------------------------------------------------------------
 message("F. outputs")
@@ -233,7 +241,8 @@ utils::write.csv(grid$table, file.path(OUT, "grid.csv"), row.names = FALSE)
 utils::write.csv(data.frame(location = seq_len(d), lon = coords[, 1],
                             lat = coords[, 2], regime = best$group),
                  file.path(OUT, "regimes.csv"), row.names = FALSE)
-utils::write.csv(inf$summary, file.path(OUT, "estimates.csv"), row.names = FALSE)
+if (!is.null(inf))
+  utils::write.csv(inf$summary, file.path(OUT, "estimates.csv"), row.names = FALSE)
 
 message("\nSelected configuration: k = ", sel$k_selected, ", phi = ", sel$phi_selected)
 print(table(best$group))

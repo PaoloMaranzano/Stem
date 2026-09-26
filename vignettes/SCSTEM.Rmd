@@ -188,8 +188,8 @@ sel <- SCSTEM_Select(ic, band = c(0.5, 1))
 sel
 ```
 
-The selected model should always be judged against the pooled $k = 1$ reference,
-which `SCSTEM_Select()` reports.
+The pooled $k = 1$ model competes in the first step: when no partition improves
+on it, `SCSTEM_Select()` returns it and the second step does not apply.
 
 ## Uncertainty: the refit-with-clustering bootstrap
 

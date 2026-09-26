@@ -1264,21 +1264,6 @@ sim_one <- function(cell, rep) {
   summ <- cbind(key, data.frame(
     k_hat = sel$k_selected, phi_hat = sel$phi_selected,
     k_correct = as.integer(sel$k_selected == cell$K),
-    ## SCSTEM_Select() chooses among k > 1 only and never returns the pooled
-    ## model, so on its own it cannot say that a network has no regimes. The
-    ## comparison it leaves to the user is recorded here: is the selected
-    ## configuration better than k = 1 on the BIC, and by how much
-    ## log-likelihood? The pooled fit is in the grid, so this costs nothing.
-    bic_beats_pooled = {
-      b1 <- ic$table$BIC[ic$table$k == 1][1]
-      bs <- ic$table$BIC[ic$table$k == sel$k_selected &
-                         abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
-      as.integer(is.finite(b1) && is.finite(bs) && bs < b1) },
-    gain_over_pooled = {
-      l1 <- ic$table$loglik[ic$table$k == 1][1]
-      ls <- ic$table$loglik[ic$table$k == sel$k_selected &
-                            abs(ic$table$phi - sel$phi_selected) < 1e-8][1]
-      ls - l1 },
     ari_sel = a_sel[["ari"]],   share_sel = a_sel[["share"]],
     ari_true = a_true[["ari"]], share_true = a_true[["share"]],
     rmse_true = r_true, rmse_pooled = r_pool, rmse_ratio = r_true / r_pool,
@@ -1393,7 +1378,6 @@ sim_failed <- function(cell, rep, msg) {
     stringsAsFactors = FALSE)
   list(summary = cbind(k0, data.frame(
          k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
-         bic_beats_pooled = NA_integer_, gain_over_pooled = NA_real_,
          ari_sel = NA_real_, share_sel = NA_real_,
          ari_true = NA_real_, share_true = NA_real_,
          rmse_true = NA_real_, rmse_pooled = NA_real_, rmse_ratio = NA_real_,
