@@ -9,6 +9,8 @@
 ##     Rscript analyse-simulations.R                    everything it can
 ##     Rscript analyse-simulations.R --parts=design     the design only
 ##     Rscript analyse-simulations.R --tag=pilot        another set of results
+##     Rscript analyse-simulations.R --tag=p1,p2,p3     several, stacked: the
+##                                                      processes of a parallel run
 ##     Rscript analyse-simulations.R --out=D:/paper/Figures
 ##
 ## Two parts.
@@ -440,7 +442,13 @@ if ("results" %in% AN$parts) {
   f_sta <- file.path(RES, sprintf("%s-stations.csv", AN$tag))
   f_cov <- file.path(RES, sprintf("%s-coverage.csv", AN$tag))
   f_stb <- file.path(RES, sprintf("%s-stability.csv", AN$tag))
-  rd <- function(f) if (file.exists(f)) utils::read.csv(f, stringsAsFactors = FALSE) else NULL
+  ## --tag may name several sets of results -- one per process when the study
+  ## was run in parallel -- and they are read and stacked
+  rd <- function(f) {
+    f <- f[file.exists(f)]
+    if (!length(f)) return(NULL)
+    do.call(rbind, lapply(f, utils::read.csv, stringsAsFactors = FALSE))
+  }
   S  <- rd(f_sum); P <- rd(f_par); ST <- rd(f_sta); CV <- rd(f_cov); SB <- rd(f_stb)
   have <- c(summary = !is.null(S), params = !is.null(P), stations = !is.null(ST),
             coverage = !is.null(CV), stability = !is.null(SB))

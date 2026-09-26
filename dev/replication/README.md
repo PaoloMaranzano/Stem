@@ -65,6 +65,33 @@ files, so several designs sit side by side. The other options are `--nrep`,
 A replication that fails says why, both on the console and in the `error`
 column of the results.
 
+## Running on several cores
+
+The runner is one R process and uses one core. To use eight, start eight
+processes, each on its own slice of replications and with its own `--tag`, so
+that no two processes ever write to the same file:
+
+```
+Rscript run-simulations.R --rep_from=1  --rep_to=13  --tag=p1 --out=D:/stem/results
+Rscript run-simulations.R --rep_from=14 --rep_to=25  --tag=p2 --out=D:/stem/results
+...
+Rscript run-simulations.R --rep_from=89 --rep_to=100 --tag=p8 --out=D:/stem/results
+```
+
+Every process covers the whole design for its replications, so the load is
+balanced. Write to a LOCAL folder, as above, and copy the results to the Drive
+at the end: a file that a synchronization client is uploading while eight
+processes append to it is how conflicted copies are made. The analysis reads the
+slices together:
+
+```
+Rscript analyse-simulations.R --tag=p1,p2,p3,p4,p5,p6,p7,p8 --results=D:/stem/results
+```
+
+If R on that machine uses a multithreaded BLAS (MKL, OpenBLAS), set
+`OMP_NUM_THREADS=1` before starting the processes, otherwise eight processes
+each try to use every core.
+
 ## The outputs
 
 `results/<tag>.csv`, `<tag>-params.csv`, `<tag>-stations.csv` and the folder
