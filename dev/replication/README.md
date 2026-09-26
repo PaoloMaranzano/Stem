@@ -10,7 +10,6 @@ disconnected from its sources.
 | `run-simulations.R` | runs the simulation study: the Monte Carlo, and with `--coverage` the bootstrap coverage experiment |
 | `analyse-simulations.R` | turns the results into the tables and figures of the paper, and draws the design |
 | `run-application.R` | runs the application, staged and cached |
-| `check-theory.R` | verifies numerically the Lemma and the Propositions of the paper, with a verdict for each claim, and writes their tables (`theory/`) |
 
 ## Requirements
 
@@ -61,9 +60,7 @@ Everything is appended and keyed on (cell, replication), so an interrupted run
 keeps what it produced and a resumed one skips it. `--tag=` names the output
 files, so several designs sit side by side. The other options are `--nrep`,
 `--only_n`, `--only_TN`, `--only_K`, `--only_omega`, `--only_knn`,
-`--only_scenario`, `--only_balance`, `--out`, and `--score=conditional` for the
-assignment score that conditions on the other members of a regime (run it under
-its own `--tag`).
+`--only_scenario`, `--only_balance` and `--out`.
 
 A replication that fails says why, both on the console and in the `error`
 column of the results.

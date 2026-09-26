@@ -191,7 +191,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                      ### they were carried over, a fit with a ridge on the
                      ### coefficients was resampled WITHOUT it, so the bootstrap
                      ### described a different estimator from the one reported.
-                     score = args$score, alpha = args$alpha,
+                     alpha = args$alpha,
                      lambda = args$lambda, penalize = args$penalize,
                      lambda_scale = args$lambda_scale,
                      lambda_by = args$lambda_by, latent = args$latent,

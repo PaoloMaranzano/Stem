@@ -55,7 +55,7 @@ app_stem_ok <- function() {
   ns <- asNamespace("Stem")
   have <- c("STEM_Model", "STEM_Estimation", "STEM_Signal", "SCSTEM_Infocrit",
             "SCSTEM_Select", "SCSTEM_Bootstrap", "SCSTEM_BootInference",
-            "scstem_neighbors", "scstem_cond_scores")
+            "scstem_neighbors")
   all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
 }

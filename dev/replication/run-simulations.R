@@ -13,9 +13,6 @@
 ##     Rscript run-simulations.R --rep_from=51 --rep_to=100
 ##     Rscript run-simulations.R --dry                 price it, run nothing
 ##     Rscript run-simulations.R --coverage            the bootstrap experiment
-##     Rscript run-simulations.R --score=conditional --tag=conditional
-##                                                     the same study under the
-##                                                     conditional assignment score
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package. It is deliberately disconnected from it: Stem is a dependency like
@@ -111,7 +108,7 @@ sim_stem_ok <- function() {
   ns <- asNamespace("Stem")
   have <- c("STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "SCSTEM_Bootstrap", "scstem_neighbors", "scstem_align_labels",
-            "scstem_ari", "scstem_cond_scores")
+            "scstem_ari")
   all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
 }
@@ -266,13 +263,6 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
   k_grid   = 1:4,
   phi_grid = c(0, 0.5, 1),
   phi_ref  = 0.5,
-
-  ## The score the label step ranks the regimes with. "marginal" is the
-  ## default of the package and of the paper; "conditional" conditions on the
-  ## residuals of the other members of the regime, and is better when the
-  ## regimes are independent sub-networks but not when one error field spans
-  ## them. Run it under its own --tag so the two sets of results sit side by side.
-  score    = "marginal",
 
   ## Regularization of the regression coefficients; 0, 0 is the unpenalized
   ## estimator, which is what the paper reports.
@@ -1192,7 +1182,7 @@ sim_main <- function() {
     ## never sees it.
     ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
                           distance = "geo", verbose = FALSE, knn = cell$knn,
-                          min_cluster_size = N_MIN, score = CFG$score[1],
+                          min_cluster_size = N_MIN,
                           alpha = CFG$alpha[1], lambda = CFG$lambda[1])
     sel <- Stem::SCSTEM_Select(ic)
     secs <- proc.time()[["elapsed"]] - t0
@@ -1269,7 +1259,7 @@ sim_main <- function() {
     key <- data.frame(cell = cell_id, rep = rep,
                       n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
                       id = cell$id, balance = cell$balance, knn = cell$knn,
-                      alpha = CFG$alpha[1], lambda = CFG$lambda[1], score = CFG$score[1],
+                      alpha = CFG$alpha[1], lambda = CFG$lambda[1],
                       stringsAsFactors = FALSE)
 
     summ <- cbind(key, data.frame(
@@ -1440,7 +1430,7 @@ sim_main <- function() {
                          CFG$alpha[1], CFG$lambda[1]),
           rep = r, n = cell$n, TN = cell$TN, K = cell$K, omega = cell$omega,
           id = cell$id, balance = cell$balance, knn = cell$knn,
-          alpha = CFG$alpha[1], lambda = CFG$lambda[1], score = CFG$score[1],
+          alpha = CFG$alpha[1], lambda = CFG$lambda[1],
           stringsAsFactors = FALSE)
         list(summary = cbind(k0, data.frame(
                k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
@@ -1545,7 +1535,7 @@ sim_coverage <- function() {
     t0 <- proc.time()[["elapsed"]]
     fit <- Stem::SCSTEM_Estimation(mod, k = cell$K, phi_penalty = cv$phi,
                                    distance = "geo", verbose = FALSE,
-                                   min_cluster_size = N_MIN, score = CFG$score[1],
+                                   min_cluster_size = N_MIN,
                                    alpha = CFG$alpha[1], lambda = CFG$lambda[1])
     boot <- Stem::SCSTEM_Bootstrap(fit, B = CFG$boot_B[1],
                                    seed = CFG$seed0[1] + 5000L + rep,

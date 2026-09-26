@@ -87,3 +87,13 @@ test_that("SCSTEM_Select applies the two-step rule", {
   ### the selected configuration must itself be admissible
   expect_true(sel$selected_row$admissible)
 })
+
+test_that("the fit records the ridge settings the bootstrap refits with", {
+  mod <- po_model(Tn = 60L)
+  f <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+                         precision = 0.05, max_iter = 3, lambda = 0.2)
+  expect_equal(f$input_args$lambda, 0.2)
+  expect_equal(f$input_args$alpha, 0)
+  expect_true(isTRUE(f$input_args$latent))
+  expect_true(isTRUE(f$input_args$spatial))
+})

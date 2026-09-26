@@ -14,7 +14,6 @@ SCSTEM_Estimation(
   init_method = c("kmeans", "coordinates"),
   init_partition = NULL,
   label_update = c("ICM", "simultaneous"),
-  score = c("marginal", "conditional", "corrected"),
   precision = 0.1,
   precision_full_dataset = 0.01,
   regularization = 0.01,
@@ -78,21 +77,6 @@ violates \code{min_cluster_size}.}
 \item{label_update}{character, \code{"ICM"} (default) for the sequential
 Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 update of all labels.}
-
-\item{score}{character, the score a location is ranked against each regime
-with in the label update. \code{"marginal"} (default) is the density of
-its residual series with the marginal error variance, as if it were
-independent of the other members of the regime. \code{"conditional"} is
-its density given the residuals of the other members, under the spatial
-covariance of the regime: the exact change in the within-regime
-log-likelihood when the location joins the regime, other labels and
-parameters fixed. \code{"corrected"} adds to the marginal score the
-expected value of that difference had the location belonged to the regime,
-\eqn{-\frac{T}{2}\log(1-\rho'R^{-1}\rho)}; it is provided for comparison
-only, since it rewards proximity to the members of a regime whether or not
-the data support membership. During a sweep the conditioning set of each
-regime is its membership at the start of the sweep, as the parameters are.
-With \code{spatial = FALSE} the three coincide.}
 
 \item{precision}{small positive number, the convergence tolerance of the EM
 algorithm in each cluster-wise fit. Default is 0.1.}

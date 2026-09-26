@@ -16,6 +16,30 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26 (third entry)
+
+**The theory of the assignment score is withdrawn from the package and the
+paper.** The `score` argument of `SCSTEM_Estimation()` (`"conditional"`,
+`"corrected"`), the internal `scstem_cond_scores()`, the diagnostics
+`score_last` and `objective_before`, their tests, `dev/replication/check-theory.R`
+and the `--score` option of the runner are removed. The label step is exactly
+what it was before. The Lemma and the propositions are removed from the
+manuscript: they did not change anything a user of the model does, and the
+correction that motivated them turned out not to be one. The entry below is
+kept as the record of what was tried.
+
+Kept, because they have practical consequences:
+
+* the bootstrap fix: the refits carry `alpha`, `lambda`, `penalize`,
+  `lambda_scale`, `lambda_by`, `latent` and `spatial` from the original fit,
+  so a fit with a ridge is resampled with it (tested);
+* the runner records `bic_beats_pooled` and `gain_over_pooled`, because
+  `SCSTEM_Select()` ranks only configurations with `k > 1` and cannot by itself
+  declare that a network has no regimes;
+* in the paper, the argument for a Potts penalty on point-referenced data, in
+  prose, and the supplementary sections on the implementation of the ridge and
+  on the order of the hyperparameters.
+
 ### 2026-09-26 (second entry)
 
 **The theory of the assignment score, checked before it is adopted.** The
