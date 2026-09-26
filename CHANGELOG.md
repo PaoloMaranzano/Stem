@@ -16,6 +16,63 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26
+
+**The simulation study and the application become standalone replication
+material, in `dev/replication/`, disconnected from the package.** For the
+paper there will be a replication package of its own, separate from the CRAN
+package, so the scripts can no longer lean on the repository: they must run
+from whatever folder they sit in, with nothing but an installed Stem.
+
+| script | replaces |
+|---|---|
+| `run-simulations.R` | `07-simulation.R`, `14-bootstrap-coverage.R`, `design.R`, `06-dgp.R`, and the retired `02-simulation.R` |
+| `analyse-simulations.R` | `09-overlap-figures.R`, `12-dgp-illustration.R`, `13-dgp-table.R`, `15-design-figures.R`, and the simulation half of `03-figures.R` |
+| `run-application.R` | `01-application.R` |
+
+* **One script runs the study, one analyses it.** `run-simulations.R` carries
+  the generator, the design and the driver; `--coverage` runs the bootstrap
+  experiment instead of the Monte Carlo, `--dry` prices a run without fitting
+  anything. `analyse-simulations.R` draws the design and turns the results
+  into tables and figures; it takes the generator and the design from the
+  runner beside it, in a definitions-only mode, so the two cannot disagree.
+* **The design is the SETUP block** near the top of the runner: levels,
+  reference cell, blocks. Every factor can also be restricted from the command
+  line with `--only_<factor>`.
+* **Each script writes beside itself**, in `results/`, `output/` and
+  `application/`, so a folder copied to another machine is a working unit.
+* **Stem is checked on its features, not its version number.** The development
+  builds all report 2.0.0, and the first standalone run proved the point: the
+  Stem installed in this machine's library was an old build, without the
+  fitted-signal functions and with the planar neighbour graph, and every
+  replication failed. The runner now verifies what it needs and installs the
+  current version from GitHub when it is missing or stale. `SIM_STEM_REF`
+  should be pinned to a commit once the study is run.
+* **A failed replication says why**, on the console and in a new `error` column.
+  It used to leave a row of NA and nothing else, which on a long run on another
+  machine is a day lost.
+
+**The estimator is held to the generator's size floor.** Probing the first cell
+showed that at `n = 20` a `k = 4` fit, with regimes of four and five locations,
+took 364 s and 125 s where `k = 3` took one second, and one replication took 658
+s instead of two. Those regimes are below `N_MIN = 6`, the floor the design
+itself sets because a range is not identified on fewer locations. The runner
+now passes `min_cluster_size = N_MIN` to the estimator, so the package refuses
+such a `k` at once, the grid records it among the failed configurations and the
+selection rule never sees it. The same replication now takes two seconds.
+
+**The Drive.** `dev/sync-gdrive.R` delivers `dev/replication` to a folder of its
+own beside the mirror, `STEM_Cameletti/SC-STEM-replication/`, with the opposite
+rules: nothing is ever deleted there, and a script edited on the Drive is not
+overwritten -- the repository version is written beside it as
+`<name>.from-repo` and the conflict is reported. The mirror itself protects
+`dev/replication/{results,output,application}/` and `dev/paper/cache/` from its
+deletion pass.
+
+`dev/paper` keeps only the development diagnostics (`03`, `04`, `05`, `08`,
+`10`, `11`) and `00-setup.R`, which now diverts their outputs out of the mirror
+when they are run from it.
+
 ### 2026-09-25 (fourth entry)
 
 **The intermediate overlap is rounded to `omega = 0.70`, and the design is

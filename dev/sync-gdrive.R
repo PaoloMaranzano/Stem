@@ -69,8 +69,14 @@ for (f in tracked) {
 ## --- remove what is no longer tracked ---------------------------------------
 existing <- list.files(dest, recursive = TRUE, all.files = TRUE,
                        no.. = TRUE, full.names = FALSE)
-## never touch the RStudio project state or anything the user keeps there by hand
-protect <- grepl("^\\.Rproj\\.user/|^\\.Rhistory$|^\\.RData$", existing)
+## Never touch the RStudio project state, anything the user keeps there by hand,
+## or the results of a run launched from the mirror. 00-setup.R diverts those to
+## a sibling folder precisely so they cannot land here, but a run started with
+## STEM_CACHE pointing inside the mirror would still put them here, and deleting
+## somebody's simulation output to keep a mirror tidy is not a trade worth making.
+protect <- grepl(paste0("^\\.Rproj\\.user/|^\\.Rhistory$|^\\.RData$|^dev/paper/cache/|",
+                        "^dev/replication/(results|output|application)/"),
+                 existing)
 stale <- setdiff(existing[!protect], tracked)
 if (length(stale)) {
   file.remove(file.path(dest, stale))
@@ -93,3 +99,68 @@ writeLines(c(
 
 message("copied ", copied, " changed file(s) of ", length(tracked), " tracked")
 message("mirror now at commit ", sha)
+
+
+## ===========================================================================
+## THE REPLICATION MATERIAL
+##
+## dev/replication is also delivered to a folder of its own on the Drive,
+## BESIDE the mirror rather than inside it, because it is used differently:
+## the scripts there are run, from the other machine too, and they write their
+## results beside themselves. So this second copy follows opposite rules.
+##
+##   * nothing is ever deleted there: results, logs and whatever else a run
+##     leaves are the point of the folder;
+##   * a script is updated from the repository only if nobody has edited it
+##     there since the last sync. The setup block of run-simulations.R is meant
+##     to be edited, and an edit made on the other machine must not be silently
+##     overwritten. When both sides changed, the repository version is written
+##     beside it as <name>.from-repo and the conflict is reported.
+##
+## What was delivered last time is recorded in .synced, one md5 per script,
+## which is how an edit made on the Drive is told apart from a stale copy.
+## ===========================================================================
+repl_src <- file.path(repo, "dev", "replication")
+repl_dst <- if (length(args) >= 2) args[2] else
+  file.path(dirname(dest), "SC-STEM-replication")
+if (dir.exists(repl_src)) {
+  if (!dir.exists(repl_dst)) dir.create(repl_dst, recursive = TRUE)
+  manifest <- file.path(repl_dst, ".synced")
+  last <- if (file.exists(manifest)) {
+    m <- utils::read.csv(manifest, stringsAsFactors = FALSE)
+    stats::setNames(m$md5, m$file)
+  } else character(0)
+
+  files <- tracked[startsWith(tracked, "dev/replication/")]
+  files <- sub("^dev/replication/", "", files)
+  n_new <- 0L; conflicts <- character(0); now <- character(0)
+  for (f in files) {
+    src <- file.path(repl_src, f)
+    tgt <- file.path(repl_dst, f)
+    if (!dir.exists(dirname(tgt))) dir.create(dirname(tgt), recursive = TRUE)
+    md5_src <- unname(tools::md5sum(src))
+    if (!file.exists(tgt)) {
+      file.copy(src, tgt, copy.date = TRUE); n_new <- n_new + 1L
+      now[f] <- md5_src; next
+    }
+    md5_tgt <- unname(tools::md5sum(tgt))
+    if (identical(md5_tgt, md5_src)) { now[f] <- md5_src; next }
+    edited_there <- !is.na(last[f]) && !identical(md5_tgt, unname(last[f]))
+    if (edited_there) {
+      file.copy(src, paste0(tgt, ".from-repo"), overwrite = TRUE, copy.date = TRUE)
+      conflicts <- c(conflicts, f)
+      now[f] <- if (is.na(last[f])) md5_tgt else unname(last[f])
+    } else {
+      file.copy(src, tgt, overwrite = TRUE, copy.date = TRUE)
+      n_new <- n_new + 1L; now[f] <- md5_src
+    }
+  }
+  utils::write.csv(data.frame(file = names(now), md5 = unname(now)),
+                   manifest, row.names = FALSE)
+  message("\nreplication material: ", repl_dst)
+  message("updated ", n_new, " of ", length(files), " script(s); nothing deleted")
+  if (length(conflicts))
+    message("EDITED ON THE DRIVE, left as they are: ",
+            paste(conflicts, collapse = ", "),
+            "\n  the repository version is beside each as <name>.from-repo")
+}

@@ -13,7 +13,7 @@
 ## or, more simply and equivalently from a script run with Rscript,
 ##
 ##     source("00-setup.R")            # when the working directory is dev/paper
-##     Rscript dev/paper/07-simulation.R   # from anywhere: the script finds itself
+##     Rscript dev/paper/04-cv.R           # from anywhere: the script finds itself
 ##
 ## Environment variables, all optional:
 ##
@@ -59,25 +59,66 @@ stem_root <- local({
 
 stem_paper_dir <- function() file.path(stem_root(), "dev", "paper")
 
-stem_cache_dir <- function() {
-  p <- Sys.getenv("STEM_CACHE", file.path(stem_paper_dir(), "cache"))
-  dir.create(p, recursive = TRUE, showWarnings = FALSE)
-  normalizePath(p, winslash = "/")
+## ---------------------------------------------------------------------------
+## Running from the Google Drive mirror
+##
+## The mirror is regenerated from the repository by dev/sync-gdrive.R, which
+## DELETES whatever it finds there and does not track: that is what makes it a
+## mirror rather than a copy. Results written inside it would therefore survive
+## only until the next sync. So when the scripts notice they are running from a
+## mirror -- a root carrying a MIRROR.txt -- the outputs are diverted to a
+## sibling folder that the sync never touches:
+##
+##     .../STEM_Cameletti/Stem/         the mirror, code only, rewritten
+##     .../STEM_Cameletti/Stem-runs/    the results, never touched
+##
+## STEM_CACHE and STEM_FIGURES always win, so a run can still be pointed
+## anywhere. Nothing changes on a machine that works in the repository itself.
+## ---------------------------------------------------------------------------
+stem_is_mirror <- function() file.exists(file.path(stem_root(), "MIRROR.txt"))
+
+stem_runs_dir <- function() {
+  file.path(dirname(stem_root()), paste0(basename(stem_root()), "-runs"))
 }
+
+stem_out_dir <- local({
+  warned <- FALSE
+  function(env, inside, leaf) {
+    p <- Sys.getenv(env, "")
+    if (!nzchar(p)) {
+      if (stem_is_mirror()) {
+        p <- file.path(stem_runs_dir(), leaf)
+        if (!warned) {
+          warned <<- TRUE
+          message("running from the mirror: results go to ", stem_runs_dir(),
+                  "\n  (the mirror itself is rewritten by dev/sync-gdrive.R)")
+        }
+      } else {
+        p <- inside
+      }
+    }
+    dir.create(p, recursive = TRUE, showWarnings = FALSE)
+    normalizePath(p, winslash = "/")
+  }
+})
+
+stem_cache_dir <- function()
+  stem_out_dir("STEM_CACHE", file.path(stem_paper_dir(), "cache"), "cache")
 
 ## The figure directory. The Overleaf folder when it is there, so that a run on
 ## the author's machine writes straight into the paper; a folder inside the
 ## repository otherwise, so that a run on a virtual machine still produces
 ## something.
 stem_fig_dir <- function() {
-  p <- Sys.getenv("STEM_FIGURES", "")
-  if (!nzchar(p)) {
-    ov <- file.path(Sys.getenv("USERPROFILE", Sys.getenv("HOME")), "Dropbox",
-                    "Applicazioni", "Overleaf", "SC-STEM package paper", "Figures")
-    p <- if (dir.exists(ov)) ov else file.path(stem_paper_dir(), "figures")
+  ov <- file.path(Sys.getenv("USERPROFILE", Sys.getenv("HOME")), "Dropbox",
+                  "Applicazioni", "Overleaf", "SC-STEM package paper", "Figures")
+  inside <- if (dir.exists(ov)) ov else file.path(stem_paper_dir(), "figures")
+  if (dir.exists(ov) && !nzchar(Sys.getenv("STEM_FIGURES", ""))) {
+    ## Overleaf is on this machine: write straight into the paper, mirror or not
+    dir.create(ov, recursive = TRUE, showWarnings = FALSE)
+    return(normalizePath(ov, winslash = "/"))
   }
-  dir.create(p, recursive = TRUE, showWarnings = FALSE)
-  normalizePath(p, winslash = "/")
+  stem_out_dir("STEM_FIGURES", inside, "figures")
 }
 
 ## Load the package from source when pkgload is available, from the library
@@ -99,10 +140,14 @@ stem_load <- function() {
 ## the command line; a value is split on commas and coerced to the type of the
 ## default, so
 ##
-##     Rscript 07-simulation.R --balance=balanced --n=40,100 --nrep=25
+##     Rscript some-script.R --n=50,100 --nrep=25
 ##
-## keeps only the balanced cells, only two network sizes, and 25 replications.
+## sets those two options, whatever the defaults were, and leaves the rest.
 ## Passing --name= with nothing after the equals sign keeps the default.
+##
+## The simulation study and the application no longer use this file: they are
+## the standalone scripts of dev/replication, which need nothing but an
+## installed Stem. What remains here are the development diagnostics.
 ## ---------------------------------------------------------------------------
 stem_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
   kv <- grep("^--[^=]+=", args, value = TRUE)

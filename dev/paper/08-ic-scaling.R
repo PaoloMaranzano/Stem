@@ -22,14 +22,17 @@
 ##   the null gain does not -- while widening the network HURTS them, because
 ##   the null gain grows linearly in d and the penalty only logarithmically.
 ##
-## This script measures both, on the generator of 06-dgp.R.
+## This script measures both, on the generator of the simulation study, which
+## lives in the replication material and is taken from there so that the two
+## cannot drift apart.
 ##
 ##   Rscript dev/paper/08-ic-scaling.R [--reps 30] [--cores 15]
 ## ---------------------------------------------------------------------------
 
 PKG <- "C:/Users/paulm/OneDrive/Documenti/GitHub/Stem"
 suppressMessages(pkgload::load_all(PKG, quiet = TRUE))
-source(file.path("dev", "paper", "06-dgp.R"))
+SIM_DEFINE_ONLY <- TRUE
+source(file.path(PKG, "dev", "replication", "run-simulations.R"))
 
 CACHE <- file.path("dev", "paper", "cache")
 dir.create(CACHE, recursive = TRUE, showWarnings = FALSE)
