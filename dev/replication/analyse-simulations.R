@@ -275,8 +275,8 @@ if ("design" %in% AN$parts) {
                    lty = c(1, 1, 1, NA, 1, 2, 3), lwd = 1.7, seg.len = 1.8)
   graphics::mtext(sprintf("What the neighbourhood graph does, K = %d", KTRUE),
                   outer = TRUE, side = 3, line = 0.9, cex = 1.1, font = 2, col = INK)
-  graphics::mtext(paste("knn multiplies the number of edges, and so the weight the penalty carries at a given phi,",
-                        "but from n = 100 on it leaves the information the graph holds about the partition unchanged"),
+  graphics::mtext(paste("knn multiplies the number of edges, but from n = 100 on it leaves unchanged the information",
+                        "the graph holds about the partition; under the default penalty scale it also leaves its weight unchanged"),
                   outer = TRUE, side = 1, line = -0.2, cex = 0.76, col = GREY)
   pdf_close("fig_design_graph.pdf")
   cat("\nthe graph in numbers\n")

@@ -16,6 +16,66 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-26 (second entry)
+
+**The theory of the assignment score, checked before it is adopted.** The
+paper's Lemma -- the expected gap between the exact within-regime log-density
+and the pseudo-likelihood of the label step is `-(T/2) log|R_h|`, that is `T`
+times the Kullback-Leibler divergence of the regime's error law from its
+independence approximation -- is proved and verified by simulation to within
+2.2 standard errors over twelve configurations, together with its variance.
+Its per-location form, `Delta_i(h) = -(T/2) log(1 - q_ih)`, is the Schur
+complement of the regime's correlation matrix.
+
+What does NOT survive is the reading first proposed for it. Three statements
+were wrong and are corrected in the paper:
+
+* the marginal score does not over-credit a location entering a correlated
+  regime: relative to the exact criterion it UNDER-credits the right regime by
+  `Delta_i(h)` in expectation, and over-credits the wrong ones;
+* the discarded term is not the same for every regime when the covariance
+  parameters are shared: `q_ih` depends on where the members of the regime are;
+* adding `Delta_i(h)` to the score is not a correction. It is the expected gain
+  of the exact score under the hypothesis that the location belongs to the
+  regime, granted whether or not the hypothesis holds: a reward for proximity.
+  With the parameters known it helps where regimes are spatially compact and
+  harms where they are mixed and at their boundaries.
+
+The object that does pay the price is the CONDITIONAL score, the density of a
+location's residuals given those of the other members of the regime, which is
+the exact change of the block likelihood when the location joins. With the
+parameters known it halves the misassignment when the regimes are independent
+sub-networks, as the model assumes, and it sees covariance-only differences to
+which the marginal score is blind (chance level there). But when one error
+field spans the regimes it reads co-movement as membership and loses exactly
+where proximity misleads -- mixed regimes and boundaries -- while the marginal
+score is immune. And with the latent path smoothed rather than known, the
+realized gap of the Lemma is close to zero: the latent process absorbs the
+common part of the spatial error.
+
+* `SCSTEM_Estimation()` gains `score = c("marginal", "conditional",
+  "corrected")`. The default is unchanged. The new internal
+  `scstem_cond_scores()` computes the conditional score and `Delta_i(h)` for
+  every location against one regime, grouping the periods by the set of
+  members observed, and is pinned by tests against a brute-force computation
+  from the joint Gaussian density, with and without missing data.
+* The fit returns two diagnostics of the label step: `objective_before` in
+  `obj_trace`, the objective at the new parameters and the old labels, which
+  isolates what the label step and the parameter step each did; and
+  `score_last`, the score matrix of the last label step.
+* The four propositions of the paper -- ascent and finite termination of the
+  label step and non-monotonicity of the alternation; non-identifiability of
+  the partition under S0; the two thresholds of the penalty; the gain of a
+  spurious regime, `d/pi` in the canonical case -- are proved in the paper and
+  checked by `dev/replication/check-theory.R`.
+
+**A bug in the bootstrap.** `SCSTEM_Bootstrap()` rebuilt the arguments of its
+refits from a list that did not carry `alpha`, `lambda`, `penalize`,
+`lambda_scale`, `lambda_by`, `latent` or `spatial`, so a fit with a ridge on
+the coefficients was resampled WITHOUT the ridge: the bootstrap described a
+different estimator from the one reported. The fit now stores those settings,
+and the score, and the bootstrap passes them on.
+
 ### 2026-09-26
 
 **The simulation study and the application become standalone replication

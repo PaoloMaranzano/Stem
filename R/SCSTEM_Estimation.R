@@ -204,6 +204,20 @@
 #' @param label_update character, \code{"ICM"} (default) for the sequential
 #'   Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 #'   update of all labels.
+#' @param score character, the score a location is ranked against each regime
+#'   with in the label update. \code{"marginal"} (default) is the density of
+#'   its residual series with the marginal error variance, as if it were
+#'   independent of the other members of the regime. \code{"conditional"} is
+#'   its density given the residuals of the other members, under the spatial
+#'   covariance of the regime: the exact change in the within-regime
+#'   log-likelihood when the location joins the regime, other labels and
+#'   parameters fixed. \code{"corrected"} adds to the marginal score the
+#'   expected value of that difference had the location belonged to the regime,
+#'   \eqn{-\frac{T}{2}\log(1-\rho'R^{-1}\rho)}; it is provided for comparison
+#'   only, since it rewards proximity to the members of a regime whether or not
+#'   the data support membership. During a sweep the conditioning set of each
+#'   regime is its membership at the start of the sweep, as the parameters are.
+#'   With \code{spatial = FALSE} the three coincide.
 #' @param precision small positive number, the convergence tolerance of the EM
 #'   algorithm in each cluster-wise fit. Default is 0.1.
 #' @param precision_full_dataset small positive number, the convergence
@@ -358,6 +372,7 @@ SCSTEM_Estimation <- function(StemModel,
                          init_method = c("kmeans", "coordinates"),
                          init_partition = NULL,
                          label_update = c("ICM", "simultaneous"),
+                         score = c("marginal", "conditional", "corrected"),
                          precision = 0.1,
                          precision_full_dataset = 0.01,
                          regularization = 0.01,
@@ -413,6 +428,7 @@ SCSTEM_Estimation <- function(StemModel,
   distance <- match.arg(distance)
   init_method <- match.arg(init_method)
   label_update <- match.arg(label_update)
+  score <- match.arg(score)
 
   if (length(k) != 1L || is.na(k) || k < 1 || k != round(k)) {
     stop("'k' must be a single positive integer.", call. = FALSE)
@@ -505,7 +521,10 @@ SCSTEM_Estimation <- function(StemModel,
                         swap_pass = swap_pass,
                         share2conv = share2conv, seed = seed,
                         Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
-                        npar_g = npar_g, Nobs = Nobs)
+                        npar_g = npar_g, Nobs = Nobs,
+                        score = score, alpha = alpha, lambda = lambda,
+                        penalize = penalize, lambda_scale = lambda_scale,
+                        lambda_by = lambda_by, latent = latent, spatial = spatial)
     )
     class(out) <- c("SCSTEM_Estimation", "list")
     return(out)
@@ -556,7 +575,15 @@ SCSTEM_Estimation <- function(StemModel,
   ##########################################
 
   beta_g <- matrix(NA_real_, nrow = k, ncol = ncov)
-  s2eps_g <- s2omega_g <- rep(NA_real_, k)
+  s2eps_g <- s2omega_g <- theta_g <- rep(NA_real_, k)
+
+  ### The conditional scores need the distances, in the units the fitted range
+  ### is expressed in -- those of the covariance of STEM_Estimation().
+  dm_score <- if (score == "marginal") NULL else if (distance == "geo") {
+    as.matrix(geodist::geodist(coordinates, measure = "geodesic"))
+  } else {
+    as.matrix(stats::dist(coordinates, diag = TRUE))
+  }
   ysm_g <- vector("list", k)
   fit <- vector("list", k)
   has_valid <- rep(FALSE, k)
@@ -567,8 +594,10 @@ SCSTEM_Estimation <- function(StemModel,
   best_labels <- labels
   label_history <- character(0)
   obj_trace <- data.frame(iter = integer(0), objective = numeric(0), swaps = integer(0),
-                          label_changes = integer(0), min_cluster = integer(0))
+                          label_changes = integer(0), min_cluster = integer(0),
+                          objective_before = numeric(0))
   convergence <- "Maximum number of iterations reached"
+  LL_last <- NULL
 
   for (it in seq_len(max_iter)) {
 
@@ -600,6 +629,7 @@ SCSTEM_Estimation <- function(StemModel,
           beta_g[g, ] <- as.numeric(fit_g$estimates$phi.hat$beta)
           s2eps_g[g] <- as.numeric(fit_g$estimates$phi.hat$sigma2eps)
           s2omega_g[g] <- as.numeric(fit_g$estimates$phi.hat$sigma2omega)
+          theta_g[g] <- as.numeric(fit_g$estimates$phi.hat$theta)
           ysm_g[[g]] <- as.matrix(fit_g$estimates$y.smoothed)
           has_valid[g] <- TRUE
         }
@@ -636,6 +666,21 @@ SCSTEM_Estimation <- function(StemModel,
         )
       }
     }
+    ### The conditional score, and the corrected marginal one, replace the
+    ### column of each valid regime. The conditioning set is the membership at
+    ### the start of the sweep, held fixed through it as the parameters are, so
+    ### the sweep still maximizes a fixed function of the labels.
+    if (score != "marginal") {
+      for (g in seq_len(k)) {
+        if (!has_valid[g]) next
+        cs <- scstem_cond_scores(
+          z = z, covariates = covariates, Tobs = Tobs, beta = beta_g[g, ],
+          ysm = ysm_g[[g]], Kmat = Kmat, sigma2eps = s2eps_g[g],
+          sigma2omega = s2omega_g[g], theta = theta_g[g],
+          members = which(labels == g), dm = dm_score, spatial = spatial)
+        LL[, g] <- if (score == "conditional") cs$cond else LL[, g] + cs$delta
+      }
+    }
     LL[!is.finite(LL)] <- -Inf
 
     ### Data-driven penalty scale, fixed once at the first sweep so that the
@@ -662,6 +707,15 @@ SCSTEM_Estimation <- function(StemModel,
 
     ### Clusters that never obtained a valid fit cannot receive locations.
     LL[, !has_valid] <- -Inf
+
+    ### The objective at the NEW parameters and the OLD labels. Compared with
+    ### the objective after the label step it isolates what the label step did
+    ### (never a decrease, for ICM), and compared with the objective of the
+    ### previous iteration what the parameter step did (possibly a decrease: the
+    ### parameter step maximizes the exact likelihood, not this objective).
+    obj_before <- sum(LL[cbind(seq_len(d), labels)]) +
+      phi_eff * scstem_potts_pairs(labels, nb)
+    LL_last <- LL
 
     if (label_update == "ICM") {
       ### Sequential (Gauss-Seidel) sweep: each label maximizes its own
@@ -734,7 +788,8 @@ SCSTEM_Estimation <- function(StemModel,
                        data.frame(iter = it, objective = obj,
                                   label_changes = n_changes,
                                   swaps = n_swap,
-                                  min_cluster = min(tabulate(labels, nbins = k))))
+                                  min_cluster = min(tabulate(labels, nbins = k)),
+                                  objective_before = obj_before))
     if (is.finite(obj) && obj > best_obj) {
       best_obj <- obj
       best_labels <- labels
@@ -889,6 +944,9 @@ SCSTEM_Estimation <- function(StemModel,
     loglik_g = loglik_g,
     final_refit = final_refit,
     obj_trace = obj_trace,
+    ### the d x k matrix of assignment scores of the last label step, for
+    ### diagnostics of the label step
+    score_last = LL_last,
     convergence = convergence,
     penalized_obj = if (is.finite(best_obj)) best_obj else NA_real_,
     best_objective = if (is.finite(best_obj)) best_obj else NA_real_,
@@ -907,7 +965,10 @@ SCSTEM_Estimation <- function(StemModel,
                       swap_pass = swap_pass,
                       share2conv = share2conv, seed = seed,
                       Tobs = Tobs, d = d, ncov = ncov, pdim = pdim,
-                      npar_g = npar_g, Nobs = Nobs)
+                      npar_g = npar_g, Nobs = Nobs,
+                      score = score, alpha = alpha, lambda = lambda,
+                      penalize = penalize, lambda_scale = lambda_scale,
+                      lambda_by = lambda_by, latent = latent, spatial = spatial)
   )
   class(out) <- c("SCSTEM_Estimation", "list")
   out

@@ -186,7 +186,16 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                      min_cluster_size = args$min_cluster_size,
                      enforce_min_size = args$enforce_min_size,
                      swap_pass = args$swap_pass, share2conv = args$share2conv,
-                     seed = args$seed, verbose = FALSE)
+                     seed = args$seed, verbose = FALSE,
+                     ### The settings that shape the estimator itself. Before
+                     ### they were carried over, a fit with a ridge on the
+                     ### coefficients was resampled WITHOUT it, so the bootstrap
+                     ### described a different estimator from the one reported.
+                     score = args$score, alpha = args$alpha,
+                     lambda = args$lambda, penalize = args$penalize,
+                     lambda_scale = args$lambda_scale,
+                     lambda_by = args$lambda_by, latent = args$latent,
+                     spatial = args$spatial)
   user_args <- list(...)
   refit_args[names(user_args)] <- user_args
   ### Keep only what SCSTEM_Estimation() actually accepts. The settings are carried

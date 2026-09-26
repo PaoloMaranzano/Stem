@@ -102,8 +102,8 @@
 ###   l_ik = sum_t log N( z_it ; x_it beta_k + K_i yhat_t(k) ,
 ###                       sigma2eps_k + sigma2omega_k )
 ###
-### which is the exact conditional density of the series of location i given the
-### latent state, with the marginal error variance
+### which is the density of the series of location i given the latent state and
+### MARGINAL over the errors of the other locations, with the error variance
 ### sigma2eps_k + sigma2omega_k = diag(Sigma_e_k) (the exponential correlation
 ### function equals 1 at distance zero). It plays the role that the per-unit
 ### density plays in clusterwise regression, and it is used ONLY to rank
@@ -142,6 +142,132 @@
   out <- -0.5 * Tobs * log(2 * pi * v) - 0.5 * sum(res^2) / v
   if (!is.finite(out)) return(-Inf)
   out
+}
+
+
+### ---------------------------------------------------------------------------
+### The conditional assignment score, and the expected-gap correction
+### ---------------------------------------------------------------------------
+### scstem_loglike_i() scores location i against regime g with the MARGINAL
+### density of its residual series, as if it were independent of the other
+### members of g. Under the model it is not: within a regime the measurement
+### error is spatially correlated. With the parameters and the other labels
+### fixed, the exact change in the within-regime log-likelihood when i joins g
+### is the CONDITIONAL log-density of its residuals given those of the other
+### members J = I_g \ {i},
+###
+###   lc_i(g) = sum_t log N( r_ti ; w' r_tJ , v ),
+###   w = Sigma_JJ^{-1} sigma_Ji ,   v = sigma_ii - sigma_iJ Sigma_JJ^{-1} sigma_Ji ,
+###
+### r being the residuals under the mean of regime g. When i belongs to g its
+### expectation exceeds that of the marginal score by
+###
+###   Delta_i(g) = -(1/2) sum_t log( v_t / sigma_ii )  >= 0 ,
+###
+### the per-location form of the expected gap of the pseudo-likelihood; when i
+### does not belong to g it falls below it. The function returns, for every
+### location against one regime, both the conditional score `cond` and the
+### deterministic term `delta`.
+###
+### The conditioning set at time t is the members of g observed at t, so times
+### are grouped by that set and each distinct set costs one factorization. For
+### a member, the leave-one-out quantities come from the precision matrix of the
+### set that contains it: v = 1 / P_ii and w' r_J = r_i - (P r)_i / P_ii.
+### With spatial = FALSE the covariance is diagonal, v = sigma_ii, w = 0, and the
+### conditional score coincides with the marginal one.
+###
+### Arguments
+###   z           T x d observations, NA where missing
+###   covariates  (d T) x ncov, stacked by location
+###   Tobs        number of periods
+###   beta        ncov regression coefficients of the regime
+###   ysm         T x pdim smoothed latent state of the regime
+###   Kmat        d x pdim loading matrix
+###   sigma2eps, sigma2omega, theta   covariance parameters of the regime
+###   members     indices of the locations currently in the regime
+###   dm          d x d distance matrix, in the units theta is expressed in
+###   spatial     FALSE when the model was fitted without spatial correlation
+`scstem_cond_scores` <- function(z, covariates, Tobs, beta, ysm, Kmat,
+                                 sigma2eps, sigma2omega, theta, members, dm,
+                                 spatial = TRUE) {
+
+  z <- as.matrix(z)
+  d <- ncol(z)
+  s_ii <- as.numeric(sigma2eps) + as.numeric(sigma2omega)
+  cond  <- rep(0, d)
+  delta <- rep(0, d)
+  if (!is.finite(s_ii) || s_ii <= 0) {
+    return(list(cond = rep(-Inf, d), delta = rep(0, d)))
+  }
+
+  ### residuals of every location under the mean of this regime
+  xb <- matrix(as.numeric(as.matrix(covariates) %*% matrix(as.numeric(beta), ncol = 1)),
+               nrow = Tobs, ncol = d)
+  lat <- as.matrix(ysm) %*% t(as.matrix(Kmat))
+  R <- z - xb - lat
+
+  marg_add <- function(i, t_idx, m, v) {
+    r <- R[t_idx, i]
+    ok <- !is.na(r)
+    if (!any(ok)) return(invisible(NULL))
+    cond[i]  <<- cond[i] + sum(-0.5 * log(2 * pi * v) - 0.5 * (r[ok] - m[ok])^2 / v)
+    delta[i] <<- delta[i] - 0.5 * sum(ok) * log(v / s_ii)
+    invisible(NULL)
+  }
+
+  members <- sort(unique(as.integer(members)))
+  if (!isTRUE(spatial) || !length(members) || !is.finite(theta) || theta <= 0 ||
+      !is.finite(sigma2omega) || sigma2omega <= 0) {
+    ### no spatial correlation to condition on: the conditional score is the
+    ### marginal one and the gap is zero
+    for (i in seq_len(d)) marg_add(i, seq_len(Tobs), rep(0, Tobs), s_ii)
+    return(list(cond = cond, delta = delta))
+  }
+
+  ### times grouped by the set of members observed at each
+  obsJ <- !is.na(R[, members, drop = FALSE])
+  key <- apply(obsJ, 1, function(o) paste(as.integer(o), collapse = ""))
+  for (kk in unique(key)) {
+    tt <- which(key == kk)
+    Jp <- members[obsJ[tt[1], ]]
+    others <- setdiff(seq_len(d), Jp)
+
+    if (!length(Jp)) {
+      for (i in seq_len(d)) marg_add(i, tt, rep(0, length(tt)), s_ii)
+      next
+    }
+
+    S <- sigma2omega * exp(-theta * dm[Jp, Jp, drop = FALSE])
+    diag(S) <- s_ii
+    U <- tryCatch(chol(S), error = function(e) NULL)
+    if (is.null(U)) U <- chol(S + diag(1e-10 * s_ii, length(Jp)))
+    P <- chol2inv(U)
+    RJ <- R[tt, Jp, drop = FALSE]
+
+    ### members observed at these times: leave-one-out through the precision
+    if (length(Jp) == 1L) {
+      marg_add(Jp, tt, rep(0, length(tt)), s_ii)
+    } else {
+      RP <- RJ %*% P
+      for (a in seq_along(Jp)) {
+        i <- Jp[a]
+        v <- 1 / P[a, a]
+        m <- RJ[, a] - RP[, a] / P[a, a]
+        marg_add(i, tt, m, v)
+      }
+    }
+
+    ### everyone else, members missing at these times having no residual
+    if (length(others)) {
+      C  <- sigma2omega * exp(-theta * dm[Jp, others, drop = FALSE])
+      Wm <- P %*% C
+      v_out <- pmax(s_ii - colSums(C * Wm), 1e-12 * s_ii)
+      M_out <- RJ %*% Wm
+      for (b in seq_along(others)) marg_add(others[b], tt, M_out[, b], v_out[b])
+    }
+  }
+
+  list(cond = cond, delta = delta)
 }
 
 

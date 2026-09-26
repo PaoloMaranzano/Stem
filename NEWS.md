@@ -135,6 +135,23 @@ The contribution is now an explicit conditional pseudo-likelihood, documented as
 such, and used *only* to rank clusters: coefficients, variance components and
 information criteria all come from the exact cluster-wise likelihoods.
 
+* New argument `score` of `SCSTEM_Estimation()`. `"marginal"`, the default, is
+  the score above. `"conditional"` scores a location by the density of its
+  residuals given those of the other members of the regime, under the regime's
+  spatial covariance: the exact change of the within-regime likelihood when the
+  location joins. It assigns markedly better when the regimes are independent
+  sub-networks, as the model assumes, and worse where one error field spans
+  them; the marginal score is kept as the default because it is immune to that
+  misspecification. `"corrected"` adds to the marginal score the expected gain
+  of the conditional one; it is provided for comparison only, since it acts as
+  a reward for proximity rather than as a correction.
+* The fit now records `objective_before` in `obj_trace` and returns
+  `score_last`, the score matrix of the last label step, as diagnostics of the
+  label step.
+* `SCSTEM_Bootstrap()` now refits with the same `alpha`, `lambda`, `penalize`,
+  `lambda_scale`, `lambda_by`, `latent`, `spatial` and `score` as the original
+  fit. Before, a fit with a ridge on the coefficients was resampled without it.
+
 ### Information criteria
 
 * AIC, BIC and KIC are computed on the exact total log-likelihood of the final
