@@ -133,7 +133,8 @@ if (dir.exists(repl_src)) {
 
   files <- tracked[startsWith(tracked, "dev/replication/")]
   files <- sub("^dev/replication/", "", files)
-  n_new <- 0L; conflicts <- character(0); now <- character(0)
+  n_new <- 0L; conflicts <- character(0); kept <- character(0)
+  now <- character(0)
   for (f in files) {
     src <- file.path(repl_src, f)
     tgt <- file.path(repl_dst, f)
@@ -143,24 +144,34 @@ if (dir.exists(repl_src)) {
       file.copy(src, tgt, copy.date = TRUE); n_new <- n_new + 1L
       now[f] <- md5_src; next
     }
-    md5_tgt <- unname(tools::md5sum(tgt))
+    md5_tgt  <- unname(tools::md5sum(tgt))
+    md5_last <- if (is.na(last[f])) NA_character_ else unname(last[f])
     if (identical(md5_tgt, md5_src)) { now[f] <- md5_src; next }
-    edited_there <- !is.na(last[f]) && !identical(md5_tgt, unname(last[f]))
-    if (edited_there) {
-      file.copy(src, paste0(tgt, ".from-repo"), overwrite = TRUE, copy.date = TRUE)
-      conflicts <- c(conflicts, f)
-      now[f] <- if (is.na(last[f])) md5_tgt else unname(last[f])
-    } else {
+    drive_edited <- is.na(md5_last) || !identical(md5_tgt, md5_last)
+    repo_changed <- is.na(md5_last) || !identical(md5_src, md5_last)
+    if (!drive_edited) {
+      ## untouched on the Drive: the repository version simply replaces it
       file.copy(src, tgt, overwrite = TRUE, copy.date = TRUE)
       n_new <- n_new + 1L; now[f] <- md5_src
+    } else if (!repo_changed) {
+      ## edited on the Drive, nothing new in the repository: leave it alone
+      kept <- c(kept, f); now[f] <- md5_last
+    } else {
+      ## both sides changed, or a file of unknown origin: never overwrite
+      file.copy(src, paste0(tgt, ".from-repo"), overwrite = TRUE, copy.date = TRUE)
+      conflicts <- c(conflicts, f)
+      now[f] <- if (is.na(md5_last)) md5_src else md5_last
     }
   }
   utils::write.csv(data.frame(file = names(now), md5 = unname(now)),
                    manifest, row.names = FALSE)
   message("\nreplication material: ", repl_dst)
   message("updated ", n_new, " of ", length(files), " script(s); nothing deleted")
+  if (length(kept))
+    message("edited on the Drive and unchanged in the repository, kept: ",
+            paste(kept, collapse = ", "))
   if (length(conflicts))
-    message("EDITED ON THE DRIVE, left as they are: ",
-            paste(conflicts, collapse = ", "),
+    message("CONFLICT -- changed both on the Drive and in the repository, left as ",
+            "they are on the Drive: ", paste(conflicts, collapse = ", "),
             "\n  the repository version is beside each as <name>.from-repo")
 }
