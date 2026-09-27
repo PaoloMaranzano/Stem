@@ -10,6 +10,10 @@ kept here in full:
 | `supplement-before-sim-removal.tex` | the supplement, with the data-generating process as an algorithm, the constants, the regime sizes, the fitted grid, and the placeholders for the per-scenario results and the bootstrap coverage |
 | `Figures/` | the tables and figures Section 3 input: `tab_overlap`, `tab_dgp`, `fig_design_omega`, `fig_dgp_examples`, `fig_design_knn`, `fig_design_graph` |
 
-The runner that implements this design is `dev/replication/run-simulations.R`
-at commit f2a0ad8. The design before it, calibrated on the Po Valley network,
-is in `dev/archive/sim-design-povalley`.
+| `run-simulations.R` | the runner that implemented this design (scenarios S0, S0b, S1a-c, S2a-b, S3a-b, S4, S5; blocks core, null, scenarios, graph, balance; the bootstrap coverage experiment) |
+| `analyse-simulations.R` | its analysis script, which sources the runner beside it for the generator and the design |
+
+The two scripts were moved here when the study was redesigned from the model
+(see `simulation-design.tex` in the Overleaf project and the CHANGELOG entry of
+2026-09-27). To run them, keep them side by side. The design before this one,
+calibrated on the Po Valley network, is in `dev/archive/sim-design-povalley`.

@@ -16,6 +16,34 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-27 (second entry)
+
+**The simulation study is redesigned from the model.** The scenarios of the
+previous design separated the regimes one component at a time around a
+baseline, with the latent paths coupled at rho = 1 by default; the question
+they answered was what has to differ for the difference to be found, not
+whether the procedure recovers the model it is built for. The new design starts
+from SC-STEM itself, with every block of parameters regime-specific, and is
+written up in `simulation-design.tex` in the Overleaf project of the paper:
+S1 complete heterogeneity at two levels of separation; S2 the pooled STEM
+model, for the false positives; S3 one block common to the regimes (beta, G,
+Sigma_eta, theta, or the whole error), the others as S1-strong. Every scenario
+comes in an independent variant (rho = 0, error fields by regime: exactly the
+SC-STEM model) and a shared one (rho = 1, one field where theta is common),
+plus the two mixed combinations where theta is common: 19 scenario-variants.
+The runner is rewritten around them as the full factorial of margins set at its
+top; the previous runner and its analysis script are kept in
+`dev/archive/sim-design-generic`, with the paper text they supported.
+
+**Why the independent variant is not the whole study.** With independent
+regimes the latent paths separate the regimes on their own: the expected gap in
+the assignment score between the true regime and the nearest wrong one is at
+least (v_g + v_h) / (2 s^2) per period whatever the parameters, 45 to 132
+log-likelihood units per location over 120 periods in this design. The
+parameter contrasts then govern the estimation of the regimes and the choice of
+k, hardly the partition, which is why the shared variant, where the same
+measure is 4.5 (weak) and 24.6 (strong), is needed to see them act.
+
 ### 2026-09-27
 
 **The simulation design is generic.** The baseline regime was the pooled fit of

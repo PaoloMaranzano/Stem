@@ -7,9 +7,14 @@ disconnected from its sources.
 
 | script | what it does |
 |---|---|
-| `run-simulations.R` | runs the simulation study: the Monte Carlo, or the bootstrap coverage experiment |
-| `analyse-simulations.R` | turns the results into the tables and figures of the paper, and draws the design |
+| `run-simulations.R` | runs the simulation study |
 | `run-application.R` | runs the application, staged and cached |
+
+The design of the simulation study is described in full in
+`simulation-design.tex`, in the Overleaf project of the paper. The script that
+turns the results into tables and figures is still to be written for this
+design; the one of the previous design is archived in
+`dev/archive/sim-design-generic`.
 
 ## Requirements
 
@@ -28,11 +33,14 @@ CRAN release.
 
 1. Open `run-simulations.R` in RStudio, from wherever it sits (the Google Drive
    folder included).
-2. If you want, change the SETUP block near the top. In "4. THE RUN":
-   - `mode`: `"run"` (the Monte Carlo), `"coverage"` (the bootstrap coverage
-     experiment) or `"dry"` (print the design and its cost, run nothing);
-   - `cores`: all the physical cores but one by default, or a number;
-   - `rep_from`, `rep_to`: the replications to run.
+2. If you want, change the SETUP block near the top:
+   - "1. THE MARGINS": the levels of every factor (scenario-variants, `n`,
+     `TN`, `omega`, `balance`, `knn`). The design is the full factorial of
+     these lists: add a value to `TN` and every scenario is run at that length
+     too;
+   - "2. THE PARAMETER VALUES": the baseline regime and the scenarios;
+   - "3. THE RUN": `mode` (`"run"`, or `"dry"` to print the cells and the cost
+     and run nothing), `cores`, `nrep`, `rep_from`, `rep_to`.
 3. Press **Source** (Ctrl+Shift+S).
 
 The replications are handed to the cores one at a time, as each core frees up,
@@ -44,10 +52,13 @@ pressing Source again: everything is keyed on (cell, replication), so what was
 recorded is skipped. Keep the RStudio session open while it runs, and keep the
 machine from going to sleep.
 
+To know what a design costs before running it: run the first replication of
+every cell (`rep_to = 1`), then `mode = "dry"`. The cost printed is measured on
+those replications, for `nrep` replications on `cores` cores.
+
 Do not run the same `tag` on two machines at once: they would write to the same
 files. To share the work between machines, give each its own `tag` and its own
-range of replications, and analyse them together with
-`analyse-simulations.R --tag=a,b`.
+range of replications.
 
 If R on that machine uses a multithreaded BLAS (MKL, OpenBLAS), set
 `OMP_NUM_THREADS=1` in `~/.Renviron` before starting, otherwise every core
@@ -55,50 +66,19 @@ tries to use every core.
 
 ## Running from a terminal
 
-Every SETUP setting can also be given on the command line, which overrides it:
+Every SETUP setting of sections 1 and 3 can also be given on the command line,
+which overrides it; lists are separated by commas:
 
 ```
-Rscript run-simulations.R --mode=dry         # the design and its cost
-Rscript run-simulations.R --cores=8          # the whole study   -> results/
-Rscript run-simulations.R --mode=coverage    # the coverage      -> results/
-Rscript analyse-simulations.R                # tables, figures   -> output/
-Rscript run-application.R                    # the application   -> application/
+Rscript run-simulations.R --mode=dry                  # the cells and the cost
+Rscript run-simulations.R --cores=8                   # the whole study -> results/
+Rscript run-simulations.R --TN=60,120,365 --n=50,100  # other margins
+Rscript run-application.R                             # the application -> application/
 ```
-
-Slices of the design compose: `--blocks=`, `--rep_from=`, `--rep_to=`,
-`--tag=`, `--nrep=`, `--only_n=`, `--only_TN=`, `--only_K=`, `--only_omega=`,
-`--only_knn=`, `--only_scenario=`, `--only_balance=` and `--out=`.
-
-`analyse-simulations.R` takes the generator and the design from
-`run-simulations.R`, so the two have to sit in the same folder; that is also
-what guarantees they cannot disagree.
-
-## The design
-
-It is the SETUP block near the top of `run-simulations.R`: the levels of every
-factor, the reference cell, the blocks. Edit the numbers there, and run with
-`mode = "dry"` to read the number of cells and the cost before committing to it.
-
-The study is not a full factorial. It is a factorial in the three factors that
-interact -- number of locations, separation of the regimes, length of the
-series -- plus one-factor-at-a-time margins around a reference cell for the
-factors that are there to show the results do not turn on them.
-
-The design is generic: no value is calibrated on the application. The plane is
-used with Euclidean distances in its own units, the response is standardized,
-and every parameter has a reading of its own (see `dgp_base()` and `dgp_psi()`
-in the runner). The earlier design, calibrated on the Po Valley network of the
-application, is kept in `dev/archive/sim-design-povalley` of the repository.
-
-The cost table of the runner was measured on that earlier design and is
-pessimistic for the generic one, which fits faster; trust the time left printed
-on the console over the "dry" estimate until it is measured again.
-
-A replication that fails says why, both on the console and in the `error`
-column of the results.
 
 ## The outputs
 
-`results/<tag>.csv`, `<tag>-params.csv`, `<tag>-stations.csv` and the folder
-`<tag>-obs/` share the primary key (cell, rep) and join on it and on nothing
-else. What each holds is described at the top of `run-simulations.R`.
+`results/<tag>.csv`, `<tag>-params.csv`, `<tag>-grid.csv`,
+`<tag>-stations.csv` and the folder `<tag>-obs/` share the primary key
+(cell, rep) and join on it and on nothing else. What each holds is described at
+the top of `run-simulations.R`.
