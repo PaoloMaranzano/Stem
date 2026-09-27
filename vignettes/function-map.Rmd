@@ -118,9 +118,9 @@ mod <- STEM_Model(z = ..., covariates = ..., coordinates = ...,
 pooled <- STEM_Estimation(mod, distance = "geo")
 
 # 3. explore the (k, phi) grid and select
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = seq(0, 1, by = 0.25),
+ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
                        distance = "geo")
-sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
 
 # 4. quantify the uncertainty, partition included
 boot <- SCSTEM_Bootstrap(sel$fit, B = 200, seed = 1)

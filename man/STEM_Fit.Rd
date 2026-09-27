@@ -14,7 +14,7 @@ STEM_Fit(
   lambda_by = c("common", "size"),
   latent = TRUE,
   spatial = TRUE,
-  phi_penalty = 1,
+  phi_penalty = 0.05,
   distance = NULL,
   verbose = FALSE,
   ...

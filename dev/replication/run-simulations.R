@@ -294,8 +294,8 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## What the estimator searches over. phi_ref is the penalty at which the
     ## recovery at the true number of regimes is read, a point of phi_grid.
     k_grid   = 1:4,
-    phi_grid = c(0, 0.5, 1),
-    phi_ref  = 0.5,
+    phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
+    phi_ref  = 0.05,
 
     ## How many replications per cell keep their full per-observation record
     keep_obs = 5L,

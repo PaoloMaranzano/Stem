@@ -112,10 +112,19 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 * New `phi_scale` argument. Each location contributes `T` observations to the
   likelihood, so a penalty calibrated for cross-sectional models is not
   transferable. The default `"auto"` normalizes the penalty by the median spread
-  of the location-wise log-likelihood contributions, making a grid
-  `phi` in `[0, 2]` informative on any dataset; `"per-observation"` and `"raw"`
-  are also available. The penalty actually applied is reported in
+  of the location-wise log-likelihood contributions; `"per-observation"` and
+  `"raw"` are also available. The penalty actually applied is reported in
   `phi_effective`.
+* A fit with `phi_penalty > 0` **starts from the solution of the unpenalized
+  fit** at the same `k` (`SCSTEM_Estimation()` fits `phi = 0` first;
+  `SCSTEM_Infocrit()` passes on the partition of the `phi = 0` fit it already
+  has). A penalty that is strong from the first sweep froze whatever partition
+  it was given, so a start unrelated to the regimes stayed where it was. The
+  automatic scale, computed at the first sweep, is then the one of the
+  unpenalized fit and no longer depends on the initialization. Measured there
+  it is several times larger than before, so the defaults are recalibrated:
+  `phi_penalty = 0.05`, `phi_grid = c(0, 0.025, 0.05, 0.1, 0.2)` and the
+  band `c(0.025, 0.2)` of `SCSTEM_Select()`.
 * On convergence the cluster-wise models are **re-estimated once** on the final
   partition, and every reported quantity comes from that refit.
 

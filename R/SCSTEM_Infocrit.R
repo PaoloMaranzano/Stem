@@ -42,7 +42,9 @@
 #' @param k_grid integer vector of candidate numbers of clusters. Default is
 #'   \code{1:3}. The pooled model \eqn{k = 1} is always a useful reference.
 #' @param phi_grid numeric vector of candidate non-negative spatial penalties.
-#'   Default is \code{c(0, 0.25, 0.5, 1)}.
+#'   Default is \code{c(0, 0.025, 0.05, 0.1, 0.2)}. At every \eqn{k} the fit at
+#'   \eqn{\phi = 0} starts the penalized ones (see
+#'   \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.
 #' @param mink,maxk deprecated scalars kept for backward compatibility with
 #'   versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
 #'   missing, the grid is set to \code{mink:maxk}.
@@ -107,7 +109,7 @@
 #'                   phi = phi, K = matrix(1, d, 1))
 #'
 #' \donttest{
-#' ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.5),
+#' ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.05),
 #'                       distance = 'geo')
 #' ic
 #' }
@@ -119,7 +121,7 @@
 #' @export
 SCSTEM_Infocrit <- function(StemModel,
                             k_grid = 1:3,
-                            phi_grid = c(0, 0.25, 0.5, 1),
+                            phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
                             mink = NULL,
                             maxk = NULL,
                             verbose = FALSE,
@@ -162,6 +164,11 @@ SCSTEM_Infocrit <- function(StemModel,
   failed <- data.frame(k = integer(0), phi = numeric(0),
                        message = character(0), stringsAsFactors = FALSE)
 
+  ### A penalized fit starts from the solution of the unpenalized fit at the
+  ### same k (see SCSTEM_Estimation()). The grid visits phi = 0 first at every
+  ### k and hands its partition on, so it is not fitted again for every phi.
+  start_k <- list()
+
   for (j in seq_len(nconf)) {
 
     kk <- grid$k[j]
@@ -172,9 +179,13 @@ SCSTEM_Infocrit <- function(StemModel,
       message("[", j, "/", nconf, "] fitting ", tag, " ...")
     }
 
+    args_j <- c(list(StemModel = StemModel, k = kk, phi_penalty = pp,
+                     verbose = FALSE), list(...))
+    if (pp > 0 && !is.null(start_k[[as.character(kk)]])) {
+      args_j$init_partition <- start_k[[as.character(kk)]]
+    }
     fit <- tryCatch(
-      suppressWarnings(SCSTEM_Estimation(StemModel = StemModel, k = kk,
-                                    phi_penalty = pp, verbose = FALSE, ...)),
+      suppressWarnings(do.call(SCSTEM_Estimation, args_j)),
       error = function(e) e
     )
 
@@ -199,6 +210,9 @@ SCSTEM_Infocrit <- function(StemModel,
       convergence = fit$convergence,
       stringsAsFactors = FALSE
     ))
+    if (kk > 1 && pp == 0 && length(unique(fit$group)) == kk) {
+      start_k[[as.character(kk)]] <- fit$group
+    }
     fits[[tag]] <- fit
     groups <- cbind(groups, fit$group)
     gnames <- c(gnames, tag)

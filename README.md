@@ -221,7 +221,7 @@ fit0 <- STEM_Fit(mod)                                  # classical STEM
 fitr <- STEM_Fit(mod, alpha = 0,   lambda = 0.3)       # ridge
 fitl <- STEM_Fit(mod, alpha = 1,   lambda = 0.3)       # lasso
 fite <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3)       # elastic net
-fitc <- STEM_Fit(mod, k = 3, phi_penalty = 0.5,        # SC-STEM, ridge per regime
+fitc <- STEM_Fit(mod, k = 3, phi_penalty = 0.05,       # SC-STEM, ridge per regime
                  alpha = 0, lambda = 0.3)
 ```
 
@@ -391,9 +391,9 @@ mod <- STEM_Model(z = povalley[["z"]][seq_len(Tn), ],
 fit <- STEM_Fit(mod, distance = "geo")                 # classical STEM
 
 # explore the grid and let the two-step rule choose k and phi
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = seq(0, 1, by = 0.25),
+ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
                        distance = "geo")
-sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
 sel
 
 # the same clustered model with a ridge on the coefficients of every regime

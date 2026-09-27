@@ -7,7 +7,7 @@
 SCSTEM_Infocrit(
   StemModel,
   k_grid = 1:3,
-  phi_grid = c(0, 0.25, 0.5, 1),
+  phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
   mink = NULL,
   maxk = NULL,
   verbose = FALSE,
@@ -22,7 +22,9 @@ the \code{\link{STEM_Model}} function.}
 \code{1:3}. The pooled model \eqn{k = 1} is always a useful reference.}
 
 \item{phi_grid}{numeric vector of candidate non-negative spatial penalties.
-Default is \code{c(0, 0.25, 0.5, 1)}.}
+Default is \code{c(0, 0.025, 0.05, 0.1, 0.2)}. At every \eqn{k} the fit at
+\eqn{\phi = 0} starts the penalized ones (see
+\code{\link{SCSTEM_Estimation}}), so the grid should contain 0.}
 
 \item{mink, maxk}{deprecated scalars kept for backward compatibility with
 versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
@@ -116,7 +118,7 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   phi = phi, K = matrix(1, d, 1))
 
 \donttest{
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.5),
+ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.05),
                       distance = 'geo')
 ic
 }

@@ -222,7 +222,7 @@ STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
                      lambda_scale = c("relative", "absolute"),
                      lambda_by = c("common", "size"),
                      latent = TRUE, spatial = TRUE,
-                     phi_penalty = 1, distance = NULL, verbose = FALSE, ...) {
+                     phi_penalty = 0.05, distance = NULL, verbose = FALSE, ...) {
 
   if (!inherits(StemModel, "STEM_Model")) {
     stop("'StemModel' must be an object of class 'STEM_Model'.", call. = FALSE)

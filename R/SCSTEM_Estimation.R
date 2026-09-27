@@ -51,9 +51,14 @@
 #'     divided by the average number of neighbors. With this normalization
 #'     \eqn{\phi = 1} is the point at which full agreement with the
 #'     neighborhood is worth about as much as the typical gain from picking the
-#'     best-fitting cluster, so that a grid \eqn{\phi \in [0, 2]} is informative
-#'     on any dataset. The factor is computed once, at the first sweep, and is
-#'     returned in \code{phi_multiplier}.
+#'     best-fitting cluster. The factor is computed once, at the first sweep, and
+#'     is returned in \code{phi_multiplier}. Since a penalized fit starts from
+#'     the unpenalized solution (see below), the first sweep scores the
+#'     locations with the parameters of the unpenalized fit: the factor is
+#'     measured on the fitted clusters, does not depend on \code{init_method},
+#'     and is of the order of the whole gain of the right regime over the
+#'     wrong ones, so the informative range of \eqn{\phi} is small, a grid such
+#'     as \eqn{\phi \in \{0, 0.025, 0.05, 0.1, 0.2\}}.
 #'   \item \code{phi_scale = "per-observation"} sets \eqn{c = T}, which makes
 #'     \eqn{\phi} invariant to the length of the series and directly comparable
 #'     with the cross-sectional literature, but leaves it dependent on the scale
@@ -63,6 +68,16 @@
 #' }
 #' The effective penalty actually applied is always reported in
 #' \code{phi_effective}.
+#'
+#' \strong{Penalized fits start from the unpenalized one.} With
+#' \code{phi_penalty > 0} the fit with \code{phi_penalty = 0} at the same
+#' \eqn{k} is run first, and its solution is the starting partition. A penalty
+#' that is strong from the first sweep freezes whatever partition it is given,
+#' so a start unrelated to the regimes would stay where it is; from the
+#' unpenalized solution the penalty only has to decide how much spatial
+#' smoothing that solution can afford. \code{\link{SCSTEM_Infocrit}} fits
+#' \eqn{\phi = 0} once per \eqn{k} and passes its partition on, so a single fit
+#' and the corresponding member of a grid coincide.
 #'
 #' \strong{Algorithm.} The two steps are iterated until convergence:
 #' \enumerate{
@@ -177,7 +192,7 @@
 #'   pooled STEM fit. Default is 3.
 #' @param phi_penalty non-negative number, the weight of the Potts spatial
 #'   penalty. \code{phi_penalty = 0} gives non-spatial clusterwise STEM.
-#'   Default is 1.
+#'   Default is 0.05.
 #' @param phi_scale character, one of \code{"auto"} (default),
 #'   \code{"per-observation"} or \code{"raw"}, setting the scale factor of the
 #'   spatial penalty. See \code{Details}.
@@ -200,7 +215,12 @@
 #'   externally computed initialization; for instance the AMKM partition used
 #'   by versions of the package before 2.0.0 can be reproduced by passing
 #'   \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
-#'   violates \code{min_cluster_size}.
+#'   violates \code{min_cluster_size}. With \code{phi_penalty > 0} and no
+#'   \code{init_partition}, the fit starts from the solution of the
+#'   unpenalized fit at the same \eqn{k}, itself started from
+#'   \code{init_method}; a given \code{init_partition} is taken as that start,
+#'   which is how \code{\link{SCSTEM_Infocrit}} passes the partition of its
+#'   unpenalized fit.
 #' @param label_update character, \code{"ICM"} (default) for the sequential
 #'   Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 #'   update of all labels.
@@ -334,7 +354,7 @@
 #'
 #' \donttest{
 #' # three spatial regimes with a moderate spatial penalty
-#' fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.05, distance = 'geo')
 #' fit
 #'
 #' # the estimated regimes on the map
@@ -351,7 +371,7 @@
 #' @export
 SCSTEM_Estimation <- function(StemModel,
                          k = 3,
-                         phi_penalty = 1,
+                         phi_penalty = 0.05,
                          phi_scale = c("auto", "per-observation", "raw"),
                          knn = 5,
                          distance = c("geo", "euclidean"),
@@ -377,6 +397,9 @@ SCSTEM_Estimation <- function(StemModel,
                          latent = TRUE,
                          spatial = TRUE,
                          verbose = FALSE) {
+
+  ### the arguments as given, for the unpenalized fit that starts a penalized one
+  call_args <- as.list(environment())
 
   ##############################
   ########## Checks ###########
@@ -518,6 +541,32 @@ SCSTEM_Estimation <- function(StemModel,
   nbinfo <- scstem_neighbors(coordinates, knn = knn, distance = distance)
   nb <- nbinfo$nb
   W <- nbinfo$W
+
+  ### A penalized fit starts from the solution of the unpenalized fit at the
+  ### same k. A penalty that is strong from the first sweep freezes whatever
+  ### partition it is given, so a start unrelated to the regimes would stay
+  ### where it is; from the unpenalized solution the penalty only has to decide
+  ### how much spatial smoothing that solution can afford. The same start also
+  ### fixes the scale of the penalty: the first sweep scores the locations with
+  ### the parameters of the unpenalized fit, so the factor of phi_scale = "auto"
+  ### is the one of the unpenalized fit and does not depend on init_method.
+  ### A given init_partition is taken as that start (SCSTEM_Infocrit() passes
+  ### the partition of its unpenalized fit).
+  if (phi_penalty > 0 && is.null(init_partition)) {
+    if (isTRUE(verbose)) message("* Fitting phi = 0 first: its solution is the start ...")
+    args0 <- call_args
+    args0$phi_penalty <- 0
+    args0$verbose <- FALSE
+    fit0 <- tryCatch(suppressWarnings(do.call(SCSTEM_Estimation, args0)),
+                     error = function(e) NULL)
+    if (!is.null(fit0) && length(unique(fit0$group)) == k) {
+      init_partition <- fit0$group
+    } else {
+      warning("SCSTEM_Estimation: the unpenalized fit at k = ", k, " failed or ",
+              "lost a cluster; the penalized fit starts from init_method.",
+              call. = FALSE)
+    }
+  }
 
   ### Initial partition. The seed is applied through scstem_with_seed(), which
   ### restores the RNG stream on exit so that the user's workspace is left

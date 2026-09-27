@@ -6,7 +6,7 @@
 \usage{
 SCSTEM_Select(
   infocrit,
-  band = c(0.25, 1),
+  band = c(0.025, 0.2),
   criterion = c("BIC", "AIC", "KIC"),
   delta = 0.05
 )
@@ -16,7 +16,8 @@ SCSTEM_Select(
 \code{\link{SCSTEM_Infocrit}}.}
 
 \item{band}{numeric vector of length two giving the moderate-penalty band
-\eqn{\Phi_M}. Default is \code{c(0.25, 1)}. Grid values falling inside the
+\eqn{\Phi_M}. Default is \code{c(0.025, 0.2)}, the non-zero values of the
+default grid of \code{\link{SCSTEM_Infocrit}}. Grid values falling inside the
 closed interval are used. If the band contains fewer than two grid values,
 the whole grid is used and a warning is issued.}
 
@@ -123,9 +124,9 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 
 \donttest{
 ic <- SCSTEM_Infocrit(mod, k_grid = 1:3,
-                      phi_grid = c(0, 0.25, 0.5, 0.75, 1),
+                      phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
                       distance = 'geo')
-sel <- SCSTEM_Select(ic, band = c(0.25, 1))
+sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
 sel
 }
 

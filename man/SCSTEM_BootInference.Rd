@@ -108,7 +108,7 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   phi = phi, K = matrix(1, d, 1))
 
 \donttest{
-fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
 boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 inf <- SCSTEM_BootInference(boot)
 inf

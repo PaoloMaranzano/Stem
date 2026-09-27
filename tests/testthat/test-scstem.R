@@ -141,3 +141,22 @@ test_that("the Adjusted Rand Index behaves at its boundaries", {
   ### relabeling must not change the index
   expect_equal(Stem:::scstem_ari(a, c(3, 3, 1, 1, 2, 2)), 1)
 })
+
+
+test_that("a penalized fit starts from the unpenalized solution", {
+  mod <- po_model(Tn = 60L)
+  f0 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0, distance = "geo",
+                          precision = 0.05)
+  f1 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+                          precision = 0.05)
+  ## the same as starting it explicitly from the unpenalized partition
+  f1b <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+                           precision = 0.05, init_partition = f0$group)
+  expect_equal(f1$group, f1b$group)
+  expect_equal(f1$phi_multiplier, f1b$phi_multiplier)
+  ## and the same as the member of a grid, which passes that partition on
+  ic <- SCSTEM_Infocrit(mod, k_grid = 2, phi_grid = c(0, 0.05), distance = "geo",
+                        precision = 0.05)
+  expect_equal(ic$fits[["k=2, phi=0.05"]]$group, f1$group)
+  expect_equal(ic$fits[["k=2, phi=0.05"]]$phi_effective, f1$phi_effective)
+})

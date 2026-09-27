@@ -16,6 +16,51 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-27 (third entry)
+
+**A penalized fit starts from the unpenalized solution.** With
+`phi_penalty > 0`, `SCSTEM_Estimation()` now fits `phi = 0` at the same `k`
+first, with the same arguments, and starts the penalized alternation from its
+partition; `SCSTEM_Infocrit()`, which visits `phi = 0` first at every `k`,
+passes that partition on through `init_partition`, so no fit is repeated and a
+single fit coincides with the member of the grid. The alternating algorithm is
+unchanged, and no argument is added: this is a rule of initialization.
+
+**Why.** Verifying the initialization M (k-means on the departures of each
+location from the pooled fit) on the new simulation design showed that a better
+start gave a worse result: M started at an ARI of 0.78 against 0.04 for the
+default, and ended at 0.83 against 0.87, choosing k = 2 twice as often. The
+cause was the automatic scale of the penalty, fixed at the first sweep from the
+spread of the location scores across the STARTING clusters: nearly identical
+clusters under the default gave a multiplier of 1.3 to 3.8, distinct clusters
+under M one of 10.6 to 28.3, so the same phi was a penalty five to ten times
+stronger. Measuring the scale on the unpenalized fit alone made things worse
+(ARI at the true k 0.41 with the default start): a penalty strong from the
+first sweep freezes whatever partition it is given, 0.40 on average over twelve
+checked cases against 0.81 when the same penalty starts from the unpenalized
+solution, and 0.95 at phi = 0.05. Starting from the unpenalized solution fixes
+both: the first sweep then scores the locations with the parameters of the
+unpenalized fit, so the scale computed there, by the same code, is the one of
+the unpenalized fit and does not depend on the start.
+
+**Recalibrated defaults.** Measured on fitted clusters the scale is of the order
+of the whole gain of the right regime over the wrong ones, several times larger
+than the first-sweep scale on a poor start, and the old grid `phi` in `[0, 1]`
+became far too strong: the grid of `SCSTEM_Infocrit()` is now
+`c(0, 0.025, 0.05, 0.1, 0.2)`, the band of `SCSTEM_Select()` `c(0.025, 0.2)`,
+and the default `phi_penalty` 0.05 (also in `STEM_Fit()`); examples, vignettes,
+README and the simulation runner follow. A bootstrap refit with `phi > 0` now
+fits `phi = 0` first on every draw, which doubles its cost: that is the
+estimator reproduced.
+
+**Status of the verification.** On the first 63 of 190 cells-by-replications
+of the design (19 scenario-variants x 10 replications), the new rule gives an
+ARI at the true k of 0.97 and the right k in 90% of cases with the M start,
+0.87 and 74% with the default start (which chooses k = 4 in a quarter of
+them), against 0.87/76% and 0.83/60% before; S2 selects k = 1 always. The rule
+selects phi = 0.025, the bottom of the band, every time. The full results, and
+whether M becomes the default initialization, are still to come.
+
 ### 2026-09-27 (second entry)
 
 **The simulation study is redesigned from the model.** The scenarios of the
