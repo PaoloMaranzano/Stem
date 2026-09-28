@@ -7,8 +7,7 @@
 SCSTEM_Select(
   infocrit,
   band = c(0.025, 0.2),
-  criterion = c("BIC", "AIC", "KIC"),
-  delta = 0.05
+  criterion = c("BIC", "AIC", "KIC")
 )
 }
 \arguments{
@@ -16,16 +15,15 @@ SCSTEM_Select(
 \code{\link{SCSTEM_Infocrit}}.}
 
 \item{band}{numeric vector of length two giving the moderate-penalty band
-\eqn{\Phi_M}. Default is \code{c(0.025, 0.2)}, the non-zero values of the
-default grid of \code{\link{SCSTEM_Infocrit}}. Grid values falling inside the
-closed interval are used. If the band contains fewer than two grid values,
-the whole grid is used and a warning is issued.}
+\eqn{\Phi_M} of step (S1). Default is \code{c(0.025, 0.2)}, the moderate
+non-zero values of the default grid of \code{\link{SCSTEM_Infocrit}}; its
+strong values 0.5 and 1 lie outside the band and enter step (S2) only.
+Grid values falling inside the closed interval are used. If the band
+contains fewer than two grid values, the whole grid is used and a warning
+is issued.}
 
-\item{criterion}{character, the information criterion used in step (S1). One
-of \code{"BIC"} (default), \code{"AIC"} or \code{"KIC"}.}
-
-\item{delta}{small positive tolerance defining the stability plateau in step
-(S2). Default is 0.05.}
+\item{criterion}{character, the information criterion used in both steps.
+One of \code{"BIC"} (default), \code{"AIC"} or \code{"KIC"}.}
 }
 \value{
 An object of class \dQuote{SCSTEM_Select}, a list with
@@ -37,14 +35,14 @@ An object of class \dQuote{SCSTEM_Select}, a list with
     \code{infocrit$fits} without refitting.
   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
     each penalty in the band.
-  \item \code{step2}: data frame with the stability index \eqn{S(\phi)} at
-    \eqn{k = \hat{k}} and the plateau threshold; \code{NULL} when
+  \item \code{step2}: data frame with the criterion of every admissible fit
+    at \eqn{k = \hat{k}}, one row per penalty; \code{NULL} when
     \eqn{\hat{k} = 1}.
   \item \code{ari_to_selected}: Adjusted Rand Index between every admissible
     partition on the grid and the selected one.
   \item \code{reference}: the pooled \eqn{k = 1} row of the criteria table,
     when available.
-  \item \code{band}, \code{criterion}, \code{delta}: the settings used.
+  \item \code{band}, \code{criterion}: the settings used.
 }
 }
 \description{
@@ -60,7 +58,7 @@ that the parameter count does not fully correct, and the cluster-wise
 variance components shrink as the assignment step pursues within-cluster
 homogeneity. Both effects are strongest at \eqn{\phi \approx 0}, where
 in-sample criteria systematically overselect \eqn{k}. The rule therefore
-restricts the criterion to a \emph{moderate-penalty band} \eqn{\Phi_M} and
+chooses \eqn{k} within a \emph{moderate-penalty band} \eqn{\Phi_M} and
 proceeds in two steps:
 
 \describe{
@@ -76,18 +74,21 @@ proceeds in two steps:
     over-selection is comparatively benign for prediction, because
     supernumerary clusters are either small or near-duplicates of existing
     regimes.}
-  \item{(S2) Spatial penalty, at the onset of the stability plateau.}{At
-    \eqn{k = \hat{k}}, compute for each \eqn{\phi \in \Phi_M} the stability
-    index \eqn{S(\phi)}, the average Adjusted Rand Index between the
-    partition estimated at \eqn{\phi} and those estimated at the adjacent
-    grid values. Since a stronger penalty makes the partition more rigid,
-    \eqn{S(\phi)} increases with \eqn{\phi} almost by construction and its
-    maximizer would be biased towards over-smoothing. The rule therefore
-    selects the \emph{smallest} penalty on the plateau,
-    \eqn{\hat{\phi} = \min\{\phi \in \Phi_M : S(\phi) \ge \max_{\Phi_M} S -
-    \delta\}}, that is the minimal amount of spatial forcing that already
-    delivers a reproducible partition -- a clustering-stability argument in
-    the spirit of von Luxburg (2010).}
+  \item{(S2) Spatial penalty, by the same criterion at \eqn{\hat{k}}.}{Among
+    the admissible fits with \eqn{k = \hat{k}} on the whole grid, select the
+    one with the smallest criterion, resolving ties towards the smaller
+    \eqn{\phi}. At a given \eqn{k} the parameter count does not depend on
+    \eqn{\phi} (up to the effective degrees of freedom of a penalty on the
+    coefficients), so the step compares the likelihoods reached by the
+    partitions estimated at different penalties. Every penalized fit starts
+    from the unpenalized one at the same \eqn{k} (see
+    \code{\link{SCSTEM_Estimation}}): a penalty is selected only when it has
+    moved the partition to one with a higher likelihood than the
+    unpenalized solution, and the optimism bias, which favors
+    \eqn{\phi = 0}, makes the step conservative. Penalties outside the band
+    can therefore be kept on the grid: they are selected only when the
+    likelihood supports them. This is the rule of Cerqueti, Maranzano and
+    Mattera (2025).}
 }
 
 Only admissible configurations, in the sense of
@@ -123,18 +124,13 @@ mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   phi = phi, K = matrix(1, d, 1))
 
 \donttest{
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:3,
-                      phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
-                      distance = 'geo')
-sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
+ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, distance = 'geo')
+sel <- SCSTEM_Select(ic)
 sel
 }
 
 }
 \references{
-von Luxburg, U. (2010) \emph{Clustering stability: an overview}. Foundations
-and Trends in Machine Learning, 2, 235--274. \doi{10.1561/2200000008}
-
 Cerqueti, R., Maranzano, P., Mattera, R. (2025) \emph{Spatially-clustered
 spatial autoregressive models with application to agricultural market
 concentration in Europe}. Journal of Agricultural, Biological and

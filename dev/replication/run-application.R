@@ -119,8 +119,8 @@ app_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
 CFG <- app_config(list(
   data     = "",                                  # empty: Stem's povalley
   k_grid   = 1:4,
-  phi_grid = c(0, 0.25, 0.5, 0.75, 1, 1.5, 2),
-  band     = c(0.25, 2),     # the moderate-penalty band of the tuning rule
+  phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
+  band     = c(0.025, 0.2),  # the band in which the tuning rule chooses k
   knn      = 5L,
   alpha    = 0,              # 0 is ridge; with lambda = 0 no penalty at all
   lambda   = 0,
@@ -202,7 +202,7 @@ grid <- cached("grid", {
 message("D. two-step selection")
 ## Not cached: it takes no time, and it has to follow the rule of the installed
 ## Stem rather than of whichever version wrote a cache.
-sel <- Stem::SCSTEM_Select(grid, band = CFG$band, criterion = "BIC", delta = 0.05)
+sel <- Stem::SCSTEM_Select(grid, band = CFG$band, criterion = "BIC")
 best <- sel$fit
 stopifnot(inherits(best, "SCSTEM_Estimation"))
 

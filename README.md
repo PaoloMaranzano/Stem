@@ -339,7 +339,7 @@ uncertainty, prediction) or an engine below.
 | Function | Purpose |
 |---|---|
 | `SCSTEM_Infocrit()` | fit a grid of `(k, phi)` and return the criteria, with the effective degrees of freedom when a penalty is in force |
-| `SCSTEM_Select()` | the two-step rule: `k` by the modal criterion in a band, `phi` by the stability plateau |
+| `SCSTEM_Select()` | the two-step rule: `k` by the modal criterion in a band, `phi` by the smallest criterion at that `k` |
 
 **After the fit**
 
@@ -352,6 +352,7 @@ uncertainty, prediction) or an engine below.
 | `STEM_Bootstrap()` | parametric bootstrap for the pooled model |
 | `SCSTEM_Bootstrap()` | refit-with-clustering bootstrap: the partition is re-estimated on every draw |
 | `SCSTEM_BootInference()` | standard errors, intervals and between-regime tests |
+| `SCSTEM_CV()` | optional validation: blocked cross-validation (locations, times, both, random cells) of one or more fits on the same folds, ranked by predictive error; it does not choose `(k, phi)` |
 
 **The two engines**, which `STEM_Fit()` dispatches to. Call them directly only
 if you want to bypass the dispatch; the arguments and the return values are the
@@ -391,9 +392,8 @@ mod <- STEM_Model(z = povalley[["z"]][seq_len(Tn), ],
 fit <- STEM_Fit(mod, distance = "geo")                 # classical STEM
 
 # explore the grid and let the two-step rule choose k and phi
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
-                       distance = "geo")
-sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
+ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, distance = "geo")
+sel <- SCSTEM_Select(ic)
 sel
 
 # the same clustered model with a ridge on the coefficients of every regime
@@ -428,7 +428,13 @@ make the same $\phi$ mean different things for different initializations. On a
 grid the rule costs nothing: `SCSTEM_Infocrit()` passes the partition of its
 $\phi = 0$ fit on. Measured on fitted regimes the scale is of the order of the
 whole gain of the right regime over the wrong ones, so the useful values of
-$\phi$ are small: the default grid is $\phi \in \{0, 0.025, 0.05, 0.1, 0.2\}$.
+$\phi$ are small: the default grid is
+$\phi \in \{0, 0.025, 0.05, 0.1, 0.2, 0.5, 1\}$. `SCSTEM_Select()` chooses $k$
+by the modal BIC over the moderate values $[0.025, 0.2]$, the pooled model
+competing, and then $\phi$ by the smallest BIC at that $k$ over the whole grid:
+since every penalized fit starts from the unpenalized one, a penalty is chosen
+only when it leads to a partition with a higher likelihood, and the strong
+values $0.5$ and $1$ are kept on the grid for data on which they do.
 
 **Labels are updated sequentially (ICM).** Each location maximizes its own
 penalized contribution given the current labels of all the others, so a sweep

@@ -87,6 +87,21 @@ test_that("SCSTEM_Select applies the two-step rule", {
   ### the selected configuration must itself be admissible
   expect_true(sel$selected_row$admissible)
 
+  ### (S2) takes the penalty with the smallest criterion at the selected k, on
+  ### the whole grid; a penalty can win it only by the criterion
+  ic4 <- ic
+  at_k <- ic4$table$k == 2
+  ic4$table$admissible[at_k] <- TRUE
+  ic4$table$BIC[ic4$table$k != 2] <- max(ic$table$BIC) + 1
+  ic4$table$BIC[at_k] <- c(3, 1, 2)[rank(ic4$table$phi[at_k])]
+  sel4 <- SCSTEM_Select(ic4, band = c(0.5, 1))
+  expect_equal(sel4$k_selected, 2L)
+  expect_equal(sel4$phi_selected, 0.5)
+  expect_equal(sel4$step2$phi[sel4$step2$selected], 0.5)
+  expect_output(print(sel4), "criterion over the penalties at k = 2")
+  ic4$table$BIC[at_k] <- 1
+  expect_equal(SCSTEM_Select(ic4, band = c(0.5, 1))$phi_selected, 0)
+
   ### the pooled model competes in (S1): when no partition improves on it, it
   ### is the answer, and when a partition does, it is not
   best <- min(ic$table$BIC)

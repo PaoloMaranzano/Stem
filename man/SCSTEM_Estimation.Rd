@@ -244,8 +244,11 @@ factor \eqn{c} restores a comparable interpretation:
     locations with the parameters of the unpenalized fit: the factor is
     measured on the fitted clusters, does not depend on \code{init_method},
     and is of the order of the whole gain of the right regime over the
-    wrong ones, so the informative range of \eqn{\phi} is small, a grid such
-    as \eqn{\phi \in \{0, 0.025, 0.05, 0.1, 0.2\}}.
+    wrong ones, so the informative range of \eqn{\phi} is small: the
+    default grid of \code{\link{SCSTEM_Infocrit}} is
+    \eqn{\phi \in \{0, 0.025, 0.05, 0.1, 0.2, 0.5, 1\}}, and its last two
+    values already override the likelihood for most locations near a
+    border.
   \item \code{phi_scale = "per-observation"} sets \eqn{c = T}, which makes
     \eqn{\phi} invariant to the length of the series and directly comparable
     with the cross-sectional literature, but leaves it dependent on the scale

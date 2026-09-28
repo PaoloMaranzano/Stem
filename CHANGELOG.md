@@ -16,6 +16,88 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-28 (fourth entry)
+
+**`SCSTEM_CV()`: blocked cross-validation as an optional validation.** The
+function takes one `SCSTEM_Estimation` fit or a named list of them, refits each
+on the folds of one or more schemes (`"LKLO"`, `"LKTO"`, `"LKLHTO"`,
+`"random"`, as in Otto, Fasso and Maranzano, 2024), predicts the removed cells
+and returns the root mean squared and mean absolute errors, fold by fold and
+over the scored cells, with the rank of each model within each scheme. The
+models must share the response, the locations and the time points; their
+covariates, number of regimes and penalty may differ, so the pooled model, the
+selected one and models with other covariates are compared on the same folds.
+The folds depend only on the seed, the scheme and the dimensions of the data,
+so separate calls with the same seed use the same folds (tested).
+
+A removed cell of a retained location is predicted by `SCSTEM_Complete()`. A
+removed location inherits the regime of its nearest retained location and is
+predicted by the conditional mean given the retained locations of that regime
+at the same time point (`scstem_predict_new()`, internal): `STEM_Complete()`
+on the regime augmented by the new locations. The test checks the two against
+each other to machine precision.
+
+**Why, and why it does not select.** The two-step rule of `SCSTEM_Select()`
+chooses `(k, phi)` in sample: which partition describes the monitored
+locations best. An application often needs something else, prediction at
+unmonitored sites or in missing periods, and the partition exists only at the
+monitored locations. The cross-validation answers that question for a model
+already chosen, and ranks alternative models by it; it is never used to choose
+the hyperparameters, and it costs one refit per fold and model, which is why it
+is optional and separate. It replaces, in the package, the development script
+`dev/paper/04-cv.R`, whose four schemes it implements; the script predicted a
+removed location with the full inverse covariance and zeros for the missing
+residuals, while the function conditions exactly on what is observed at each
+time point.
+
+### 2026-09-28 (third entry)
+
+**Step (S2) of `SCSTEM_Select()` chooses `phi` by the criterion.** At the `k`
+chosen in (S1), the rule now takes the admissible fit with the smallest
+criterion (BIC by default) over the whole grid, ties towards the smaller `phi`,
+in place of the smallest `phi` on the stability plateau of the Adjusted Rand
+Index. (S1) is unchanged: the modal BIC winner over the band, the pooled model
+competing. The argument `delta` of the plateau is removed, and `step2` now
+holds the criterion of every fit at the selected `k`. The default grid of
+`SCSTEM_Infocrit()` gains the strong values 0.5 and 1, which lie outside the
+default band `c(0.025, 0.2)` and so compete only in (S2).
+
+**Why.** Under the warm start the plateau rule picked the bottom of the band in
+359 of 360 replications: it could not find where the penalty helps. The rules
+were compared on the same grids, `k = 1..6` by
+`phi = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1)`, in 190 replications of the 19
+scenario-variants (18 with three regimes, S2 with one):
+
+| rule | k correct | k = 2 | k > 3 | ARI | ARI, independent | ARI, shared | S2: k = 1 |
+|---|---|---|---|---|---|---|---|
+| (S1) + plateau (before) | 91.1% | 5.0% | 3.9% | 0.948 | 0.996 | 0.918 | 100% |
+| (S1) + smallest BIC at that k (now) | 91.1% | 5.0% | 3.9% | 0.952 | 0.996 | 0.925 | 100% |
+| smallest BIC over the whole grid | 90.0% | 5.6% | 4.4% | 0.953 | 0.996 | 0.926 | 100% |
+| elbow per phi, then smallest BIC | 85.6% | 13.3% | 1.1% | 0.925 | 0.987 | 0.885 | 100% |
+| phi of the smallest BIC, then elbow | 83.9% | 15.0% | 1.1% | 0.918 | 0.988 | 0.873 | 100% |
+| (S1) by EBIC, gamma = 1, then smallest BIC | 91.7% | 5.0% | 3.3% | 0.953 | 0.996 | 0.925 | 100% |
+
+The elbow rules under-select, in the shared variants; the extended BIC with
+`gamma <= 0.5` changes no choice and with `gamma = 1` one in 180, so (S1) stays
+as it was. On `phi` the two rules are equivalent: at the true `k` the ARI is
+0.954 at `phi = 0`, 0.955 at 0.025, 0.952 with the smallest BIC, and 0.960 for
+the best `phi` chosen knowing the truth, so the warm start and the departures
+initialization leave the penalty little to correct. The smallest BIC gains in
+the two cells of low separation (+0.03) and loses in S3Seta (-0.04 and -0.07),
+where a penalized fit reaches a higher likelihood with a partition further from
+the truth. The rule is kept because it is the one of the published
+spatially-clustered regression papers (phi chosen by the criterion), because it
+drops a step that did nothing, and because it lets strong penalties sit on the
+grid harmlessly: at the true `k` the ARI is 0.865 at `phi = 0.5` and 0.629 at 1,
+and the rule chose 0.5 once in 164 replications and 1 never. The two strong
+values raise the fits of a grid over `k = 1..6` from 26 to 36; one grid took
+106 seconds on average at `d = 100`, `T = 120`. The scripts and results are in
+`dev/replication/results/init-verification/` (`rules-*.R`, `rules/`).
+
+The application script and the paper figure of the selection follow the new
+rule; the application grid and band, still on the scale that preceded the warm
+start, are set to the package defaults.
+
 ### 2026-09-28 (second entry)
 
 **The default initialization is the departures from the pooled fit.**

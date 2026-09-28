@@ -1,4 +1,11 @@
 ## ---------------------------------------------------------------------------
+## Superseded by Stem::SCSTEM_CV() (2026-09-28), which implements the same four
+## schemes as an optional validation of chosen models, not as a selection rule;
+## (k, phi) are chosen by SCSTEM_Select(). The argument below, that information
+## criteria cannot arbitrate, compared the BIC penalty with the likelihood gain
+## under the alternative instead of the null, and is withdrawn. The script is kept
+## because 05-respecification.R sources its definitions.
+##
 ## Spatio-temporal cross-validation for the choice of k and phi.
 ##
 ## Information criteria cannot arbitrate here. With n = dT observations the BIC

@@ -7,7 +7,7 @@
 SCSTEM_Infocrit(
   StemModel,
   k_grid = 1:3,
-  phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
+  phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   mink = NULL,
   maxk = NULL,
   verbose = FALSE,
@@ -22,9 +22,11 @@ the \code{\link{STEM_Model}} function.}
 \code{1:3}. The pooled model \eqn{k = 1} is always a useful reference.}
 
 \item{phi_grid}{numeric vector of candidate non-negative spatial penalties.
-Default is \code{c(0, 0.025, 0.05, 0.1, 0.2)}. At every \eqn{k} the fit at
-\eqn{\phi = 0} starts the penalized ones (see
-\code{\link{SCSTEM_Estimation}}), so the grid should contain 0.}
+Default is \code{c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1)}: the moderate values
+up to 0.2 form the band in which \code{\link{SCSTEM_Select}} chooses
+\eqn{k}, and the strong values 0.5 and 1 compete only in the choice of
+\eqn{\phi}. At every \eqn{k} the fit at \eqn{\phi = 0} starts the penalized
+ones (see \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.}
 
 \item{mink, maxk}{deprecated scalars kept for backward compatibility with
 versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
@@ -48,8 +50,8 @@ An object of class \dQuote{SCSTEM_Infocrit}: a list with
     \code{"k=<k>, phi=<phi>"}, so that the selected configuration can be used
     without refitting.
   \item \code{groups}: matrix of the estimated partitions, one column per
-    configuration, used by the stability step of
-    \code{\link{SCSTEM_Select}}.
+    configuration, which \code{\link{SCSTEM_Select}} compares with the
+    selected one.
   \item \code{failed}: a data frame listing the configurations whose fit
     raised an error, with the error message.
 }
@@ -88,8 +90,8 @@ tend to favor small \eqn{\phi} and large \eqn{k}. Second, the cluster-wise
 variance components shrink as the assignment step pursues within-cluster
 homogeneity, which inflates the likelihood of the configurations with the
 weakest spatial regularization. Both effects are strongest at
-\eqn{\phi \approx 0}, which is why \code{\link{SCSTEM_Select}} restricts the
-criterion to a moderate band of penalties.
+\eqn{\phi \approx 0}, which is why \code{\link{SCSTEM_Select}} chooses
+\eqn{k} within a moderate band of penalties.
 }
 \examples{
 # Daily PM2.5 at 36 background stations of the Po Valley. The first 180

@@ -56,8 +56,8 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 * `SCSTEM_Select()` implements a two-step rule for choosing the
   hyperparameters: **(S1)** the modal BIC-minimizing `k` inside a
   moderate-penalty band, ties resolved towards the smaller `k`; **(S2)** the
-  smallest `phi` on the stability plateau of the Adjusted Rand Index between
-  neighboring grid partitions. Only admissible configurations enter the rule.
+  `phi` with the smallest BIC at that `k` over the whole grid, ties resolved
+  towards the smaller `phi`. Only admissible configurations enter the rule.
   The pooled `k = 1` model competes in (S1) and is returned when no partition
   improves on it.
 * `SCSTEM_Bootstrap()` is now a **refit-with-clustering** parametric bootstrap:
@@ -73,8 +73,16 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   percentile and bias-corrected confidence intervals; pairwise percentile tests
   for the differences between clusters; the co-clustering matrix; and the ARI of
   each refit against the original partition.
+* `SCSTEM_CV()` is an optional validation of predictive accuracy, separate
+  from the choice of `(k, phi)`: blocked cross-validation leaving out
+  locations (`"LKLO"`), time blocks (`"LKTO"`), both (`"LKLHTO"`) or random
+  cells, of one fit or of a named list of fits on the same data (the pooled
+  model, the selected one, models with different covariates), all refitted on
+  the same folds and ranked by root mean squared error. A removed location
+  inherits the regime of its nearest retained location and is kriged within it.
 * New classes `SCSTEM_Estimation`, `SCSTEM_Infocrit`, `SCSTEM_Select`,
-  `SCSTEM_Bootstrap` and `SCSTEM_BootInference`, each with a `print()` method.
+  `SCSTEM_Bootstrap`, `SCSTEM_BootInference` and `SCSTEM_CV`, each with a
+  `print()` method.
 
 ### Algorithmic changes in the SC-STEM assignment step
 
@@ -132,8 +140,9 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   automatic scale, computed at the first sweep, is then the one of the
   unpenalized fit and no longer depends on the initialization. Measured there
   it is several times larger than before, so the defaults are recalibrated:
-  `phi_penalty = 0.05`, `phi_grid = c(0, 0.025, 0.05, 0.1, 0.2)` and the
-  band `c(0.025, 0.2)` of `SCSTEM_Select()`.
+  `phi_penalty = 0.05`, `phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1)` and
+  the band `c(0.025, 0.2)` of `SCSTEM_Select()`; the strong values 0.5 and 1
+  lie outside the band and compete only in the choice of `phi`.
 * On convergence the cluster-wise models are **re-estimated once** on the final
   partition, and every reported quantity comes from that refit.
 

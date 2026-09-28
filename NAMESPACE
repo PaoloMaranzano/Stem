@@ -2,11 +2,13 @@
 
 S3method(print,SCSTEM_BootInference)
 S3method(print,SCSTEM_Bootstrap)
+S3method(print,SCSTEM_CV)
 S3method(print,SCSTEM_Estimation)
 S3method(print,SCSTEM_Infocrit)
 S3method(print,SCSTEM_Select)
 export(SCSTEM_BootInference)
 export(SCSTEM_Bootstrap)
+export(SCSTEM_CV)
 export(SCSTEM_Complete)
 export(SCSTEM_Estimation)
 export(SCSTEM_Infocrit)

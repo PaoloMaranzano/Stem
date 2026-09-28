@@ -194,8 +194,12 @@ $k$ - and where fits often collapse a regime altogether, which is what the
 `admissible` column is for.
 
 `SCSTEM_Select()` therefore applies a two-step rule: pick $k$ by BIC *inside a
-moderate band* of penalties, then pick the smallest $\phi$ on the stability
-plateau of the Adjusted Rand Index.
+moderate band* of penalties, then pick the $\phi$ with the smallest BIC at that
+$k$ over the whole grid. Every penalized fit starts from the unpenalized one, so
+a penalty is chosen only when it leads to a partition with a higher likelihood.
+The default grid of `SCSTEM_Infocrit()` adds the strong values $0.5$ and $1$,
+which compete in the second step only; this example uses the moderate values
+to keep it fast.
 
 ```{r select}
 sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))

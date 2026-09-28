@@ -93,16 +93,18 @@ if (have("grid") && have("selection")) {
 
   st <- sel$step2
   if (!is.null(st) && nrow(st)) {
-    graphics::plot(st$phi, st$stability, type = "b", pch = 19, lwd = 1.8,
-                   col = COL[1], xlab = expression(phi),
-                   ylab = "stability S(phi)", ylim = c(min(st$stability, 0.9 * max(st$stability)), 1),
-                   main = "(b) stability plateau", cex.main = 1)
-    graphics::abline(h = max(st$stability) - sel$delta, lty = 3, col = GREY)
-    graphics::abline(v = sel$phi_selected, lty = 2, col = COL[2], lwd = 1.6)
-    graphics::legend("bottomright", bty = "n", cex = 0.8,
-                     legend = c("plateau threshold",
-                                bquote(hat(phi) == .(sel$phi_selected))),
-                     lty = c(3, 2), col = c(GREY, COL[2]))
+    ## the grid is roughly logarithmic, so the penalties are equally spaced
+    ## and labelled with their values
+    x <- seq_len(nrow(st))
+    graphics::plot(x, st$value, type = "b", pch = 19, lwd = 1.8, xaxt = "n",
+                   col = COL[1], xlab = expression(phi), ylab = "BIC",
+                   main = bquote("(b) BIC over" ~ phi ~ "at" ~ hat(k) == .(sel$k_selected)),
+                   cex.main = 1)
+    graphics::axis(1, at = x, labels = format(st$phi, drop0trailing = TRUE))
+    graphics::abline(v = x[st$selected], lty = 2, col = COL[2], lwd = 1.6)
+    graphics::legend("topleft", bty = "n", cex = 0.8,
+                     legend = bquote(hat(phi) == .(sel$phi_selected)),
+                     lty = 2, col = COL[2])
   }
   grDevices::dev.off()
   message("wrote app_selection.pdf")

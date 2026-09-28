@@ -95,14 +95,20 @@ ordinary `STEM_Model` estimated by `STEM_Estimation()`.
   (the parameter count behind the information criteria).
 * `SCSTEM_Infocrit()` loops `SCSTEM_Estimation()` over a grid of $(k, \phi)$ and
   collects the criteria and the admissibility flags.
-* `SCSTEM_Select()` applies the two-step tuning rule to that grid, using
-  `scstem_ari()` for the stability step.
+* `SCSTEM_Select()` applies the two-step tuning rule to that grid, and uses
+  `scstem_ari()` to compare every partition on it with the selected one.
 * `SCSTEM_Bootstrap()` regenerates the data regime by regime with
   `STEM_Simulation()` and re-runs the whole of `SCSTEM_Estimation()` on every draw,
   so the uncertainty of the partition is propagated.
 * `SCSTEM_BootInference()` aligns the refits with `scstem_align_labels()` and
   turns the draws into standard errors, confidence intervals and between-regime
   tests.
+* `SCSTEM_CV()` is an optional validation, separate from the choice of
+  $(k, \phi)$: it refits one or more models on blocked folds (locations, time
+  blocks, both, or random cells), predicts the removed cells with
+  `SCSTEM_Complete()` and, at removed locations, with `scstem_predict_new()`,
+  which kriges within the regime of the nearest retained location, and ranks
+  the models by their predictive error on the same folds.
 
 ## A typical session
 
@@ -118,9 +124,8 @@ mod <- STEM_Model(z = ..., covariates = ..., coordinates = ...,
 pooled <- STEM_Estimation(mod, distance = "geo")
 
 # 3. explore the (k, phi) grid and select
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
-                       distance = "geo")
-sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
+ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, distance = "geo")
+sel <- SCSTEM_Select(ic)
 
 # 4. quantify the uncertainty, partition included
 boot <- SCSTEM_Bootstrap(sel$fit, B = 200, seed = 1)

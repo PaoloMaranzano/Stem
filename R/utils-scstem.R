@@ -230,7 +230,7 @@
 
 
 ### ---------------------------------------------------------------------------
-### Adjusted Rand Index (used by the stability step of the tuning rule)
+### Adjusted Rand Index (compares the partitions on the grid of the tuning rule)
 ### ---------------------------------------------------------------------------
 `scstem_ari` <- function(x, y) {
   x <- as.integer(as.factor(x))
