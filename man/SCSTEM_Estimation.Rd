@@ -11,7 +11,7 @@ SCSTEM_Estimation(
   phi_scale = c("auto", "per-observation", "raw"),
   knn = 5,
   distance = c("geo", "euclidean"),
-  init_method = c("kmeans", "coordinates"),
+  init_method = c("departures", "kmeans", "coordinates"),
   init_partition = NULL,
   label_update = c("ICM", "simultaneous"),
   precision = 0.1,
@@ -61,11 +61,18 @@ measurement error and the nearest neighbors of the penalty graph. Use
 \code{"geo"} only when the coordinates are longitude/latitude. Default is
 \code{"geo"}.}
 
-\item{init_method}{character, either \code{"kmeans"} (default) or
-\code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed
-location-wise covariate means, with multiple restarts and a
-minimum-cluster-size filter; \code{"coordinates"} clusters the spatial
-coordinates instead, which is also the fallback for intercept-only models.}
+\item{init_method}{character, one of \code{"departures"} (default),
+\code{"kmeans"} or \code{"coordinates"}, the starting partition of an
+unpenalized fit. \code{"departures"} fits the pooled model and runs
+k-means on how each location departs from it: the mean of its residual
+from the pooled signal, the slopes of that residual on its covariates, and
+the lag-one autocorrelation and log-variance of what the slopes leave.
+\code{"kmeans"} runs k-means on the location-wise covariate means, which
+carry no information on the regimes when the covariates are exogenous to
+them; \code{"coordinates"} clusters the spatial coordinates, which is also
+the fallback for intercept-only models. In every case the features are
+compressed by principal components, with multiple restarts and a
+minimum-cluster-size filter.}
 
 \item{init_partition}{optional integer vector of length \eqn{d} giving a
 starting partition, overriding \code{init_method}. Use it to supply an

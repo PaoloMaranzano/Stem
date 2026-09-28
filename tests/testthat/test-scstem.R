@@ -160,3 +160,26 @@ test_that("a penalized fit starts from the unpenalized solution", {
   expect_equal(ic$fits[["k=2, phi=0.05"]]$group, f1$group)
   expect_equal(ic$fits[["k=2, phi=0.05"]]$phi_effective, f1$phi_effective)
 })
+
+
+test_that("the default initialization starts from the departures from the pooled fit", {
+  mod <- po_model(Tn = 60L)
+  expect_identical(eval(formals(SCSTEM_Estimation)$init_method)[1], "departures")
+
+  pooled <- STEM_Estimation(mod, precision = 0.01, distance = "geo")
+  feat <- Stem:::scstem_departures(mod$data$z, mod$data$covariates,
+                                   STEM_Signal(pooled), nrow(mod$data$z))
+  expect_equal(dim(feat), c(ncol(mod$data$z), 1L + 2L + 2L))
+  expect_false(anyNA(feat))
+
+  ## the grid computes the departures once, from its pooled fit, and its fits
+  ## coincide with the single ones, which fit the pooled model themselves
+  f0 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0, distance = "geo",
+                          precision = 0.05)
+  f1 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+                          precision = 0.05)
+  ic <- SCSTEM_Infocrit(mod, k_grid = 1:2, phi_grid = c(0, 0.05), distance = "geo",
+                        precision = 0.05)
+  expect_equal(ic$fits[["k=2, phi=0"]]$group, f0$group)
+  expect_equal(ic$fits[["k=2, phi=0.05"]]$group, f1$group)
+})

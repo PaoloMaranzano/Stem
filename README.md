@@ -407,9 +407,17 @@ SCSTEM_BootInference(boot)
 
 ## Design notes
 
-Five points make the implementation behave sensibly in practice. The first four
-concern SC-STEM and are documented in detail in `?SCSTEM_Estimation`; the fifth is
+Six points make the implementation behave sensibly in practice. The first five
+concern SC-STEM and are documented in detail in `?SCSTEM_Estimation`; the sixth is
 what makes a large network fittable at all.
+
+**An unpenalized fit starts from the departures from the pooled model.** The
+default `init_method = "departures"` fits the pooled model and clusters the
+locations on how they depart from it: the mean of the residual, its slopes on
+the covariates, and the autocorrelation and variance of what is left. Locations
+of one regime share their departures; the covariate means, the earlier default
+and still an option, say nothing about the regimes when the covariates are
+exogenous to them.
 
 **A penalized fit starts from the unpenalized one.** A fit with $\phi > 0$
 starts from the partition of the fit with $\phi = 0$ at the same $k$, and the

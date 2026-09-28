@@ -111,6 +111,13 @@ others. Because the penalty is recomputed on the fly, the sweep cannot decrease
 $Q$ *at fixed parameters* and cannot cycle - unlike the simultaneous update,
 still available through `label_update = "simultaneous"`.
 
+Where the alternation starts depends on the penalty. An unpenalized fit starts
+from the k-means of how each location departs from the pooled model - the mean
+of its residual, the slopes of the residual on the covariates, and the
+autocorrelation and variance of what is left (`init_method = "departures"`, the
+default). A penalized fit such as the one above fits $\phi = 0$ first and
+starts from its solution.
+
 The alternation as a whole, however, is not guaranteed to be monotone, and the
 trace below may well show a dip. The reason is structural: $\ell_{ik}$ is a
 conditional *pseudo*-likelihood, because the spatial covariance couples the

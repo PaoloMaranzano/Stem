@@ -169,6 +169,20 @@ SCSTEM_Infocrit <- function(StemModel,
   ### k and hands its partition on, so it is not fitted again for every phi.
   start_k <- list()
 
+  ### Under init_method = "departures" (the default) an unpenalized fit starts
+  ### from the k-means of the departures of the locations from the pooled fit.
+  ### The grid visits k = 1 first, so the departures are computed once from its
+  ### pooled fit and every unpenalized fit at k > 1 starts from their k-means,
+  ### exactly as it would on its own, without fitting the pooled model again.
+  dots <- list(...)
+  dep_start <- is.null(dots$init_partition) &&
+    (is.null(dots$init_method) || identical(dots$init_method[1], "departures"))
+  dep_feat <- NULL
+  seed0 <- if ("seed" %in% names(dots)) dots$seed else formals(SCSTEM_Estimation)$seed
+  ms0 <- if (is.null(dots$min_cluster_size)) ncol(StemModel$data$covariates) + 2L else
+    dots$min_cluster_size
+  ms0 <- max(2L, as.integer(ms0))
+
   for (j in seq_len(nconf)) {
 
     kk <- grid$k[j]
@@ -183,6 +197,12 @@ SCSTEM_Infocrit <- function(StemModel,
                      verbose = FALSE), list(...))
     if (pp > 0 && !is.null(start_k[[as.character(kk)]])) {
       args_j$init_partition <- start_k[[as.character(kk)]]
+    }
+    if (kk > 1 && pp == 0 && dep_start && !is.null(dep_feat)) {
+      args_j$init_partition <- scstem_with_seed(
+        seed0,
+        scstem_init(Xmeans = dep_feat, coords = StemModel$data$coordinates,
+                    k = kk, method = "kmeans", min_size = ms0))
     }
     fit <- tryCatch(
       suppressWarnings(do.call(SCSTEM_Estimation, args_j)),
@@ -212,6 +232,12 @@ SCSTEM_Infocrit <- function(StemModel,
     ))
     if (kk > 1 && pp == 0 && length(unique(fit$group)) == kk) {
       start_k[[as.character(kk)]] <- fit$group
+    }
+    if (kk == 1 && dep_start && is.null(dep_feat) && length(fit$fit_list) == 1L) {
+      dep_feat <- tryCatch(
+        scstem_departures(StemModel$data$z, StemModel$data$covariates,
+                          STEM_Signal(fit$fit_list[[1]]), nrow(StemModel$data$z)),
+        error = function(e) NULL)
     }
     fits[[tag]] <- fit
     groups <- cbind(groups, fit$group)

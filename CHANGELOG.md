@@ -16,28 +16,61 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-28 (second entry)
+
+**The default initialization is the departures from the pooled fit.**
+`init_method` gains the value `"departures"`, now the default: the pooled STEM
+model is fitted, and each location is described by the mean of its residual
+from the pooled signal, the slopes of that residual on its covariates, and the
+lag-one autocorrelation and log-variance of what the slopes leave
+(`scstem_departures()`); the starting partition is the k-means of these
+features, through the same PCA compression, restarts and admissibility filter
+as before. It initializes the unpenalized fits only: a penalized fit starts
+from the unpenalized solution.
+
+**Why.** The previous default clustered the time means of the covariates, which
+depend on the regime only when the covariates do. In the simulation design the
+covariate is exogenous, as a regressor usually is, and those starts had an ARI
+of 0.04 with the true partition, against 0.78 for the departures. Under the
+warm start of the previous entries the departures give an ARI at the true k of
+0.953 and the right k in 91% of the replications, against 0.898 and 81% for the
+covariate means (190 replications of the 19 scenario-variants). The
+covariate means remain available as `init_method = "kmeans"`.
+
+**Cost, and consistency with the grid.** A single fit at `k > 1` now fits the
+pooled model first. `SCSTEM_Infocrit()` visits `k = 1` first, computes the
+departures once from that fit and passes their k-means to the unpenalized fits
+at every `k > 1`, so the grid fits the pooled model once and each of its
+members still coincides with the single fit (tested). Should the pooled fit
+fail, the covariate means are used, with a warning. The pooled fit uses the
+`lambda` of the pooled model, so that it is the same fit as the member at
+`k = 1` also under `lambda_by = "size"`. Algorithm 1 of the paper already said
+"fit the pooled STEM model to initialize"; the code now does.
+
 ### 2026-09-28
 
-**Verification of the warm start, complete.** On 189 of the 190
+**Verification of the warm start, complete.** On the 190
 cells-by-replications of the simulation design (19 scenario-variants x 10
-replications; one replication of S3Seta-shr still running), grid
-`phi = c(0, 0.025, 0.05, 0.1, 0.2)`, band `c(0.025, 0.2)`:
+replications), grid `phi = c(0, 0.025, 0.05, 0.1, 0.2)`, band `c(0.025, 0.2)`:
 
 | rule, start of the phi = 0 fits | ARI at the true k | ARI = 1 | k correct | k = 2 | k = 4 | seconds |
 |---|---|---|---|---|---|---|
 | before (first-sweep scale), default | 0.868 | 64% | 76% | 15% | 9% | 49 |
 | before, M | 0.834 | 26% | 60% | 36% | 4% | 46 |
-| warm start, default | 0.900 | 72% | 81% | 8% | 11% | 27 |
-| warm start, M | 0.955 | 86% | 92% | 6% | 2% | 24 |
+| warm start, default | 0.898 | 72% | 81% | 8% | 12% | 39 |
+| warm start, M | 0.953 | 85% | 91% | 6% | 3% | 29 |
 
-With the warm start and the M start the independent variants are recovered
-almost exactly (ARI 0.999, k correct 96%) and the shared ones at 0.927 and 89%;
+(The mean time of the warm start with the default start carries one
+replication of S3Seta-shr that ran for about forty minutes; without it the two
+warm-start rows take 27 and 24 seconds.) With the warm start and the M start
+the independent variants are recovered almost exactly (ARI 0.999, k correct
+96%) and the shared ones at 0.924 and 88%;
 the two cells that stay low, S1w-shr (0.58) and S3beta-shr (0.64), are the two
 the separation measure of the design notes marks as hard (4.5 and 6.6
 log-likelihood units per location). S2 selects k = 1 in every replication. The
 warm-started penalized fits converge in one to three iterations, so a
 replication of the grid is also about half as long. The selection rule picks
-phi = 0.025, the bottom of the band, in 357 of 358 replications. The default
+phi = 0.025, the bottom of the band, in all replications but one. The default
 initialization is still the k-means on the covariate means; whether M replaces
 it is to be decided.
 

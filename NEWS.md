@@ -115,6 +115,15 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   of the location-wise log-likelihood contributions; `"per-observation"` and
   `"raw"` are also available. The penalty actually applied is reported in
   `phi_effective`.
+* The partition of an unpenalized fit is now initialized, by default, on the
+  **departures of each location from the pooled model**
+  (`init_method = "departures"`): the mean of its residual from the pooled
+  signal, the slopes of that residual on its covariates, and the lag-one
+  autocorrelation and log-variance of what the slopes leave. The covariate
+  means, the previous default, carry no information on the regimes when the
+  covariates are exogenous to them; they remain available as
+  `init_method = "kmeans"`. `SCSTEM_Infocrit()` computes the departures once,
+  from its fit at `k = 1`.
 * A fit with `phi_penalty > 0` **starts from the solution of the unpenalized
   fit** at the same `k` (`SCSTEM_Estimation()` fits `phi = 0` first;
   `SCSTEM_Infocrit()` passes on the partition of the `phi = 0` fit it already

@@ -205,11 +205,18 @@
 #'   measurement error and the nearest neighbors of the penalty graph. Use
 #'   \code{"geo"} only when the coordinates are longitude/latitude. Default is
 #'   \code{"geo"}.
-#' @param init_method character, either \code{"kmeans"} (default) or
-#'   \code{"coordinates"}. \code{"kmeans"} runs k-means on the PCA-compressed
-#'   location-wise covariate means, with multiple restarts and a
-#'   minimum-cluster-size filter; \code{"coordinates"} clusters the spatial
-#'   coordinates instead, which is also the fallback for intercept-only models.
+#' @param init_method character, one of \code{"departures"} (default),
+#'   \code{"kmeans"} or \code{"coordinates"}, the starting partition of an
+#'   unpenalized fit. \code{"departures"} fits the pooled model and runs
+#'   k-means on how each location departs from it: the mean of its residual
+#'   from the pooled signal, the slopes of that residual on its covariates, and
+#'   the lag-one autocorrelation and log-variance of what the slopes leave.
+#'   \code{"kmeans"} runs k-means on the location-wise covariate means, which
+#'   carry no information on the regimes when the covariates are exogenous to
+#'   them; \code{"coordinates"} clusters the spatial coordinates, which is also
+#'   the fallback for intercept-only models. In every case the features are
+#'   compressed by principal components, with multiple restarts and a
+#'   minimum-cluster-size filter.
 #' @param init_partition optional integer vector of length \eqn{d} giving a
 #'   starting partition, overriding \code{init_method}. Use it to supply an
 #'   externally computed initialization; for instance the AMKM partition used
@@ -375,7 +382,7 @@ SCSTEM_Estimation <- function(StemModel,
                          phi_scale = c("auto", "per-observation", "raw"),
                          knn = 5,
                          distance = c("geo", "euclidean"),
-                         init_method = c("kmeans", "coordinates"),
+                         init_method = c("departures", "kmeans", "coordinates"),
                          init_partition = NULL,
                          label_update = c("ICM", "simultaneous"),
                          precision = 0.1,
@@ -591,10 +598,32 @@ SCSTEM_Estimation <- function(StemModel,
                                         min_size = min_cluster_size)
     }
   } else {
+    ### "departures": k-means on how each location departs from the pooled fit
+    ### (see scstem_departures()); should the pooled fit fail, the covariate
+    ### means are used instead
+    feat <- Xmeans
+    method0 <- init_method
+    if (init_method == "departures") {
+      method0 <- "kmeans"
+      pooled0 <- tryCatch(
+        STEM_Estimation(StemModel, precision = precision_full_dataset,
+                        distance = distance, regularization = regularization,
+                        verbose = FALSE, alpha = alpha, lambda = lambda,
+                        penalize = penalize, lambda_scale = lambda_scale,
+                        latent = latent, spatial = spatial),
+        error = function(e) NULL)
+      if (is.null(pooled0)) {
+        warning("SCSTEM_Estimation: the pooled fit of init_method = \"departures\" ",
+                "failed; the partition is initialized on the covariate means.",
+                call. = FALSE)
+      } else {
+        feat <- scstem_departures(z, covariates, STEM_Signal(pooled0), Tobs)
+      }
+    }
     labels <- scstem_with_seed(
       seed,
-      scstem_init(Xmeans = Xmeans, coords = coordinates, k = k,
-                  method = init_method, min_size = min_cluster_size)
+      scstem_init(Xmeans = feat, coords = coordinates, k = k,
+                  method = method0, min_size = min_cluster_size)
     )
   }
   if (length(unique(labels)) < k) {

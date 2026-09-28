@@ -270,6 +270,60 @@
 
 
 ### ---------------------------------------------------------------------------
+### Per-location departures from the pooled fit (init_method = "departures")
+### ---------------------------------------------------------------------------
+### The residual of each location from the signal of the pooled fit,
+### r_i = z_i - muhat_i, summarized by four kinds of feature: its mean (how the
+### level of the location departs from the pooled one), the slopes of r_i on the
+### location's covariates (how its response to them departs), and the lag-one
+### autocorrelation and the log-variance of what that regression leaves (how its
+### dynamics and its noise depart). Locations of one regime share their
+### departures and locations of different regimes do not, which the covariate
+### means used by init_method = "kmeans" cannot see when the covariates are
+### exogenous to the regimes.
+###
+### Arguments
+###   z           T x d response, NA where missing
+###   covariates  (d T) x ncov covariates, stacked by location
+###   signal      T x d signal of the pooled fit (STEM_Signal())
+###   Tobs        number of time points
+### Returns a d x m matrix; a feature that cannot be computed at a location
+### (too few observations) takes the median across locations.
+`scstem_departures` <- function(z, covariates, signal, Tobs) {
+  d <- ncol(z)
+  X <- as.matrix(covariates)
+  ### the slopes are taken on the covariates that vary; the intercept is the
+  ### column of the regression below
+  vary <- apply(X, 2, function(v) isTRUE(stats::sd(v, na.rm = TRUE) > 0))
+  Xs <- X[, vary, drop = FALSE]
+  m <- 1L + ncol(Xs) + 2L
+  out <- matrix(NA_real_, nrow = d, ncol = m)
+  for (i in seq_len(d)) {
+    r <- z[, i] - signal[, i]
+    Xi <- Xs[scstem_rows(i, Tobs), , drop = FALSE]
+    ok <- !is.na(r) & stats::complete.cases(Xi)
+    if (sum(ok) < ncol(Xs) + 4L) next
+    fit <- stats::lm.fit(cbind(1, Xi[ok, , drop = FALSE]), r[ok])
+    b <- fit$coefficients[-1]
+    b[is.na(b)] <- 0
+    u <- rep(NA_real_, length(r))
+    u[ok] <- fit$residuals
+    lag_ok <- !is.na(u[-1]) & !is.na(u[-length(u)])
+    ar1 <- if (sum(lag_ok) >= 3L)
+      suppressWarnings(stats::cor(u[-1][lag_ok], u[-length(u)][lag_ok])) else NA_real_
+    out[i, ] <- c(mean(r[ok]), b, ar1,
+                  log(max(stats::var(u, na.rm = TRUE), .Machine$double.eps)))
+  }
+  for (j in seq_len(m)) {
+    miss <- !is.finite(out[, j])
+    if (any(miss)) out[miss, j] <- stats::median(out[!miss, j])
+  }
+  colnames(out) <- c("level", paste0("slope_", seq_len(ncol(Xs))), "ar1", "logvar")
+  out
+}
+
+
+### ---------------------------------------------------------------------------
 ### Row indices of a set of locations in the stacked covariate matrix
 ### ---------------------------------------------------------------------------
 `scstem_rows` <- function(idx, Tobs) {
