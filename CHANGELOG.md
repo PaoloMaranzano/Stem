@@ -16,6 +16,19 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-28 (fifth entry)
+
+**The simulation runner is ready for the main run.** `run-simulations.R` pins
+Stem to commit 4325536, records in `<tag>-grid.csv` the ARI of every partition
+of the grid (so that the recovery at any penalty, or under another rule, can be
+read without refitting), and checks the installed commit from the DESCRIPTION
+file without loading the package: loading it before the update made the session
+read the new files with the old index (`R_decompress1` warnings). One
+replication of the 19 cells on 13 cores: no failure, 22 fits per replication,
+14 minutes of core time per replication of the design (median 33 seconds per
+cell, 118 for S3Seta-shr), so 100 replications take about 23 core-hours, 1.8
+hours on 13 cores.
+
 ### 2026-09-28 (fourth entry)
 
 **`SCSTEM_CV()`: blocked cross-validation as an optional validation.** The

@@ -56,7 +56,8 @@
 ##                       true ones
 ##   <tag>-stations.csv  one row per replication and location
 ##   <tag>-grid.csv      one row per replication and (k, phi) of the fitted
-##                       grid: log-likelihood, parameters, criteria
+##                       grid: log-likelihood, parameters, criteria, and the
+##                       ARI of its partition with the truth
 ##   <tag>-obs/*.rds     the full observations of the first keep_obs
 ##                       replications of every cell
 ## ===========================================================================
@@ -111,7 +112,9 @@ sim_require <- function(pkgs) {
   }
 }
 
-SIM_STEM_REF <- "PaoloMaranzano/Stem"
+## Pinned to the commit of 2026-09-28 (departures initialization, warm start,
+## two-step rule with phi by the smallest BIC at the selected k)
+SIM_STEM_REF <- "PaoloMaranzano/Stem@4325536872218e27a39f9fd21ba533196c9ace50"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
@@ -126,24 +129,29 @@ sim_github_sha <- function(ref = SIM_STEM_REF) {
   if (length(m)) gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m)) else NA_character_
 }
 
-## The installed Stem carries what the study uses and, when GitHub can be
-## reached, is GitHub's commit. The version number cannot tell: the development
-## builds all say 2.0.0.
+## The installed Stem is GitHub's commit when GitHub can be reached, and
+## otherwise carries what the study uses. The version number cannot tell: the
+## development builds all say 2.0.0. The commit is read from the DESCRIPTION
+## file without loading the package: a namespace loaded before the update would
+## read the new files with the old index.
 sim_stem_ok <- function(latest = NA_character_) {
+  if (!nzchar(system.file(package = "Stem"))) return(FALSE)
+  if (!is.na(latest)) {
+    here <- utils::packageDescription("Stem")$RemoteSha
+    return(!is.null(here) && identical(here, latest))
+  }
   if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
   ns <- asNamespace("Stem")
   have <- c("STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "scstem_neighbors", "scstem_align_labels", "scstem_ari")
-  feats <- all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
+  all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
-  here <- utils::packageDescription("Stem")$RemoteSha
-  feats && (is.na(latest) || (!is.null(here) && identical(here, latest)))
 }
 
 SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) NA_character_ else sim_github_sha()
 if (!sim_stem_ok(SIM_STEM_SHA)) {
-  message(if (requireNamespace("Stem", quietly = TRUE))
-            "a newer Stem is on GitHub: updating it" else
+  message(if (nzchar(system.file(package = "Stem")))
+            "the installed Stem is not the pinned commit: installing it" else
             "Stem is not installed: installing it from GitHub")
   sim_require("remotes")
   if ("Stem" %in% loadedNamespaces()) try(unloadNamespace("Stem"), silent = TRUE)
@@ -729,8 +737,14 @@ sim_one <- function(cell, rep) {
   params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est)
   rownames(params) <- NULL
 
-  ## the fitted grid, one row per (k, phi)
+  ## the fitted grid, one row per (k, phi), with the ARI of every partition, so
+  ## that the recovery at any penalty, or under another selection rule, can be
+  ## read afterwards without refitting
   grid <- cbind(key[rep(1L, nrow(ic$table)), ], ic$table)
+  tags <- paste0("k=", ic$table$k, ", phi=", ic$table$phi)
+  grid$ari <- if (K == 1L) NA_real_ else vapply(tags, function(tg)
+    if (tg %in% colnames(ic$groups)) scstem_ari(ic$groups[, tg], dat$labels) else NA_real_,
+    numeric(1), USE.NAMES = FALSE)
   rownames(grid) <- NULL
 
   ## per location
