@@ -407,9 +407,20 @@ SCSTEM_BootInference(boot)
 
 ## Design notes
 
-Four points make the implementation behave sensibly in practice. The first three
-concern SC-STEM and are documented in detail in `?SCSTEM_Estimation`; the fourth is
+Five points make the implementation behave sensibly in practice. The first four
+concern SC-STEM and are documented in detail in `?SCSTEM_Estimation`; the fifth is
 what makes a large network fittable at all.
+
+**A penalized fit starts from the unpenalized one.** A fit with $\phi > 0$
+starts from the partition of the fit with $\phi = 0$ at the same $k$, and the
+automatic scale of the penalty is measured there, on regimes that are already
+fitted. A penalty that is strong from the first sweep would freeze whatever
+partition it is given, and a scale measured on the starting partition would
+make the same $\phi$ mean different things for different initializations. On a
+grid the rule costs nothing: `SCSTEM_Infocrit()` passes the partition of its
+$\phi = 0$ fit on. Measured on fitted regimes the scale is of the order of the
+whole gain of the right regime over the wrong ones, so the useful values of
+$\phi$ are small: the default grid is $\phi \in \{0, 0.025, 0.05, 0.1, 0.2\}$.
 
 **Labels are updated sequentially (ICM).** Each location maximizes its own
 penalized contribution given the current labels of all the others, so a sweep

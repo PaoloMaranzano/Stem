@@ -156,6 +156,13 @@ the location-wise log-likelihood contributions, so that $\phi \approx 1$ is the
 point where agreeing with one's neighbors is worth about as much as picking
 the best-fitting regime.
 
+A fit with $\phi > 0$ starts from the partition of the unpenalized fit at the
+same $k$, which `SCSTEM_Estimation()` computes first, and the spread is measured
+there, on fitted regimes. The scale is then the same for every $\phi$ at that
+$k$ and does not depend on the initialization, and it is large: it is of the
+order of the whole gain of the right regime over the wrong ones, so the useful
+values of $\phi$ are a few hundredths.
+
 ```{r scale}
 c(multiplier = fit$phi_multiplier, effective_phi = fit$phi_effective)
 ```
