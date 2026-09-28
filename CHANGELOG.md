@@ -16,6 +16,31 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-28
+
+**Verification of the warm start, complete.** On 189 of the 190
+cells-by-replications of the simulation design (19 scenario-variants x 10
+replications; one replication of S3Seta-shr still running), grid
+`phi = c(0, 0.025, 0.05, 0.1, 0.2)`, band `c(0.025, 0.2)`:
+
+| rule, start of the phi = 0 fits | ARI at the true k | ARI = 1 | k correct | k = 2 | k = 4 | seconds |
+|---|---|---|---|---|---|---|
+| before (first-sweep scale), default | 0.868 | 64% | 76% | 15% | 9% | 49 |
+| before, M | 0.834 | 26% | 60% | 36% | 4% | 46 |
+| warm start, default | 0.900 | 72% | 81% | 8% | 11% | 27 |
+| warm start, M | 0.955 | 86% | 92% | 6% | 2% | 24 |
+
+With the warm start and the M start the independent variants are recovered
+almost exactly (ARI 0.999, k correct 96%) and the shared ones at 0.927 and 89%;
+the two cells that stay low, S1w-shr (0.58) and S3beta-shr (0.64), are the two
+the separation measure of the design notes marks as hard (4.5 and 6.6
+log-likelihood units per location). S2 selects k = 1 in every replication. The
+warm-started penalized fits converge in one to three iterations, so a
+replication of the grid is also about half as long. The selection rule picks
+phi = 0.025, the bottom of the band, in 357 of 358 replications. The default
+initialization is still the k-means on the covariate means; whether M replaces
+it is to be decided.
+
 ### 2026-09-27 (third entry)
 
 **A penalized fit starts from the unpenalized solution.** With
