@@ -18,16 +18,15 @@ design; the one of the previous design is archived in
 
 ## Requirements
 
-R, and nothing else to set up. Each script installs Stem from GitHub
-(`PaoloMaranzano/Stem`) when it is missing, and installs it again whenever
-GitHub holds a newer commit than the installed one, so the study always runs on
-the current code. Offline, an installed Stem that carries what the scripts use
-is accepted as it is. The check is on the commit and on the features, not on
-the version number, because the development builds all report 2.0.0.
-
-For the paper the reference installed (`SIM_STEM_REF` and `APP_STEM_REF`) is
-to be pinned to the commit the results were produced with, or replaced by the
-CRAN release.
+R, and nothing else to set up. `run-simulations.R` installs Stem from GitHub
+at the commit it is pinned to (`SIM_STEM_REF`, currently 4325536), and
+reinstalls it whenever the installed Stem is a different commit; the commit is
+read from the installed DESCRIPTION file, without loading the package. Restart
+R before the first run on a machine where Stem is already loaded in the
+session. Offline, an installed Stem that carries what the script uses is
+accepted as it is. `run-application.R` installs the current GitHub commit
+(`APP_STEM_REF`), to be pinned in the same way before the results go into the
+paper.
 
 ## Running the simulations from RStudio
 
