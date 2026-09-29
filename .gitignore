@@ -21,4 +21,5 @@ dev/paper/cache/
 # What the replication scripts write beside themselves
 dev/replication/results/
 dev/replication/output/
+dev/replication/fuels/
 dev/replication/application/

@@ -10,6 +10,7 @@ disconnected from its sources.
 | `run-simulations.R` | runs the simulation study |
 | `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `run-application.R` | runs the application, staged and cached |
+| `run-fuels.R` | first version of the fuel-price application: Granger causality between gasoline and diesel at the pump, by province, on weekly changes; pooled STEM against SC-STEM and a pump-by-pump benchmark. Reads `App_FuelsITA/station_level.zip` beside it, writes to `fuels/` |
 
 The design of the simulation study is described in full in
 `simulation-design.tex`, in the Overleaf project of the paper. The analysis

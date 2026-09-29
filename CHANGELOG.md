@@ -16,6 +16,28 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-30
+
+**`dev/replication/run-fuels.R`, a first runner for the fuel-price
+application.** Province by province and in both directions, it builds the
+weekly panel of the self-service prices (the price in force at the end of the
+week by default, since averaging within the week blurs the timing a Granger test
+reads; non-highway pumps with both fuels on at least 95% of the weeks, gaps
+carried forward), and models the weekly changes in cents with the own lags, the
+lags of the other fuel, the lagged gasoline-diesel spread demeaned by pump and
+fiscal period (the error-correction term) and a pulse at each change of the
+excise duties. It fits the grid k = 1..3 with the default phi grid, selects by
+`SCSTEM_Select()`, and tests the lags of the other fuel by the likelihood ratio
+against the fit without them on the same partition (`max_iter = 0`), for the
+pooled model and regime by regime; the benchmark is the same test pump by pump
+by least squares, combined as Dumitrescu and Hurlin (2012). The Naples code
+"NA", read as missing in the data, is restored; pumps at the same point are
+moved by about a metre. Tested end to end on Isernia (36 pumps, 74 weeks): 76
+seconds. There the likelihood-ratio test of the model rejects in both
+directions while the pump-level tests reject at the nominal rate in one of
+them, a first sign that the model-based test may be anti-conservative, to be
+checked by bootstrap or placebo before any reading.
+
 ### 2026-09-29 (third entry)
 
 **`dev/replication/analyse-simulations.R`, the analysis of the new design.** It
