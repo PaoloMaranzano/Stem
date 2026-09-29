@@ -33,10 +33,14 @@ paper.
 1. Open `run-simulations.R` in RStudio, from wherever it sits (the Google Drive
    folder included).
 2. If you want, change the SETUP block near the top:
-   - "1. THE MARGINS": the levels of every factor (scenario-variants, `n`,
-     `TN`, `omega`, `balance`, `knn`). The design is the full factorial of
-     these lists: add a value to `TN` and every scenario is run at that length
-     too;
+   - "1. THE DESIGN": the scenario-variants (`SIM_SCENARIOS`), the reference
+     level of every margin (`SIM_REFERENCE`: `n`, `TN`, `omega`, `balance`,
+     `knn`) and the blocks (`SIM_BLOCKS`). Each block is the full factorial of
+     the margins it lists, every other margin at its reference level, crossed
+     with the scenario-variants; the design is the union of the blocks, and a
+     cell two blocks share is run once. The current design is a core crossing
+     `n`, `TN` and `omega`, plus blocks varying the balance, `knn` and a large
+     `n` one at a time around the reference: 260 cells;
    - "2. THE PARAMETER VALUES": the baseline regime and the scenarios;
    - "3. THE RUN": `mode` (`"run"`, or `"dry"` to print the cells and the cost
      and run nothing), `cores`, `nrep`, `rep_from`, `rep_to`.
@@ -71,9 +75,13 @@ which overrides it; lists are separated by commas:
 ```
 Rscript run-simulations.R --mode=dry                  # the cells and the cost
 Rscript run-simulations.R --cores=8                   # the whole study -> results/
-Rscript run-simulations.R --TN=60,120,365 --n=50,100  # other margins
+Rscript run-simulations.R --blocks=core               # some blocks only
+Rscript run-simulations.R --TN=60,120,365 --n=50,100  # one block of other margins
 Rscript run-application.R                             # the application -> application/
 ```
+
+Margins given on the command line replace the blocks with one factorial block
+of those margins around the reference.
 
 ## The outputs
 

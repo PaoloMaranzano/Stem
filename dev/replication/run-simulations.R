@@ -14,9 +14,10 @@
 ##
 ##   1. Open this file in RStudio.
 ##   2. If you want, change the SETUP below:
-##        - "1. THE MARGINS": the levels of every factor. The design is the full
-##          factorial of these lists, so adding a value to TN, say, adds that
-##          series length to every scenario;
+##        - "1. THE DESIGN": the scenario-variants, the reference level of every
+##          margin, and the blocks. Each block is the full factorial of the
+##          margins it lists, the others at the reference; the design is the
+##          union of the blocks;
 ##        - "2. THE PARAMETER VALUES": the baseline regime and the scenarios;
 ##        - "3. THE RUN": mode ("run" or "dry"), cores, replications.
 ##   3. Press Source (Ctrl+Shift+S).
@@ -40,6 +41,11 @@
 ## it; lists are separated by commas:
 ##
 ##     Rscript run-simulations.R --cores=8 --rep_from=51 --rep_to=100
+##     Rscript run-simulations.R --blocks=core --mode=dry
+##
+## Margins given this way (--n, --TN, --omega, --balance, --knn) replace the
+## blocks with one factorial block of those margins around the reference:
+##
 ##     Rscript run-simulations.R --TN=60,120,365 --mode=dry
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
@@ -207,48 +213,53 @@ sim_print_config <- function(cfg) {
 ## ===========================================================================
 
 ## ---------------------------------------------------------------------------
-## 1. THE MARGINS. The design is the full factorial of these lists. Remove a
-##    value to drop it, add one to cross it with everything else.
+## 1. THE DESIGN: the scenario-variants, the reference levels of the margins,
+##    and the blocks. Each block is the full factorial of the margins it lists,
+##    every other margin at its reference level, crossed with the
+##    scenario-variants; the design is the union of the blocks, and a cell that
+##    two blocks share is run once.
 ## ---------------------------------------------------------------------------
-SIM_MARGINS <- list(
 
-  ## The 19 scenario-variants (simulation-design.tex, Section 6.4). The name is
-  ## <scenario>-<variant>:
-  ##   S1w, S1s        complete heterogeneity, weak and strong separation
-  ##   S2              complete homogeneity: the pooled STEM model
-  ##   S3beta, S3G, S3Seta, S3theta, S3error
-  ##                   one block common to the regimes, the others as S1s
-  ##   ind  rho = 0, fields by regime: exactly the SC-STEM model
-  ##   shr  rho = 1, one field where theta is common, otherwise by regime
-  ##   lat  rho = 1, fields by regime  (only where theta is common)
-  ##   fld  rho = 0, one field         (only where theta is common)
-  ## The nine of the paper. The ten additional ones, to be added back when
-  ## wanted, are "S1w-ind", "S3beta-ind", "S3G-ind", "S3Seta-ind",
-  ## "S3theta-ind", "S3theta-lat", "S3theta-fld", "S3error-ind",
-  ## "S3error-lat", "S3error-fld".
-  scenario = c("S2", "S1s-ind", "S1s-shr", "S1w-shr",
-               "S3beta-shr", "S3G-shr", "S3Seta-shr", "S3theta-shr", "S3error-shr"),
+## The 19 scenario-variants (simulation-design.tex, Section 6.4). The name is
+## <scenario>-<variant>:
+##   S1w, S1s        complete heterogeneity, weak and strong separation
+##   S2              complete homogeneity: the pooled STEM model
+##   S3beta, S3G, S3Seta, S3theta, S3error
+##                   one block common to the regimes, the others as S1s
+##   ind  rho = 0, fields by regime: exactly the SC-STEM model
+##   shr  rho = 1, one field where theta is common, otherwise by regime
+##   lat  rho = 1, fields by regime  (only where theta is common)
+##   fld  rho = 0, one field         (only where theta is common)
+## The nine of the paper. The ten additional ones, to be added back when
+## wanted, are "S1w-ind", "S3beta-ind", "S3G-ind", "S3Seta-ind",
+## "S3theta-ind", "S3theta-lat", "S3theta-fld", "S3error-ind",
+## "S3error-lat", "S3error-fld".
+SIM_SCENARIOS <- c("S2", "S1s-ind", "S1s-shr", "S1w-shr",
+                   "S3beta-shr", "S3G-shr", "S3Seta-shr", "S3theta-shr", "S3error-shr")
 
-  ## number of locations; not below 40, since the grid reaches k = 4 regimes
-  ## of at least N_MIN = 6 locations each
-  n = c(40L, 100L, 200L, 400L),
+## The reference levels of the margins:
+##   n        number of locations; not below 40, since the grid reaches k = 4
+##            regimes of at least N_MIN = 6 locations each
+##   TN       length of the series
+##   omega    spatial overlap of the three regimes: the centres sit at the
+##            vertices of an equilateral triangle of side 2*omega, with the
+##            total variance of a coordinate held fixed. 0: the regimes
+##            coincide in space; 0.70: contiguous areas interpenetrating along
+##            their borders (1.63 within-regime standard deviations between
+##            centres); 1: well apart. Vacuous in S2
+##   balance  relative sizes of the regimes, "balanced" or "unbalanced"
+##            (1:2:3). Vacuous in S2
+##   knn      neighbours of the graph of the Potts penalty
+SIM_REFERENCE <- list(n = 100L, TN = 120L, omega = 0.70, balance = "balanced", knn = 5L)
 
-  ## length of the series
-  TN = c(60L, 120L, 365L),
-
-  ## Spatial overlap of the three regimes: the centres sit at the vertices of
-  ## an equilateral triangle of side 2*omega, with the total variance of a
-  ## coordinate held fixed. 0: the regimes coincide in space; 0.70: contiguous
-  ## areas interpenetrating along their borders (1.63 within-regime standard
-  ## deviations between centres); 1: well apart. Vacuous in S2.
-  omega = c(0, 0.70, 1),
-
-  ## relative sizes of the regimes: "balanced" or "unbalanced" (1:2:3).
-  ## Vacuous in S2.
-  balance = c("balanced", "unbalanced"),
-
-  ## neighbours of the graph of the Potts penalty
-  knn = c(3L, 5L, 10L)
+## The blocks (simulation-design.tex, Section 7). The core crosses the three
+## factors that govern recovery; the others vary one factor at a time around
+## the reference.
+SIM_BLOCKS <- list(
+  core    = list(n = c(40L, 100L, 200L), TN = c(60L, 120L, 365L), omega = c(0, 0.70, 1)),
+  balance = list(balance = "unbalanced"),
+  knn     = list(knn = c(3L, 10L)),
+  n400    = list(n = 400L)
 )
 
 ## ---------------------------------------------------------------------------
@@ -286,8 +297,12 @@ SIM_S3_LEVEL <- "strong"
 ## 3. THE RUN. What this invocation does.
 ## ---------------------------------------------------------------------------
 CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE), c(
-  SIM_MARGINS,
+  list(scenario = SIM_SCENARIOS),
+  SIM_REFERENCE,
   list(
+    ## the blocks this invocation runs, by name
+    blocks   = names(SIM_BLOCKS),
+
     ## "run": the Monte Carlo; "dry": print the cells and the cost, run nothing
     mode     = "run",
 
@@ -308,15 +323,21 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     phi_ref  = 0.05,
 
     ## How many replications per cell keep their full per-observation record.
-    ## One: across the full factorial every record is n x T rows, and five per
-    ## cell would take several gigabytes; any replication can be regenerated
-    ## from its seed.
+    ## One: every record is n x T rows, and five per cell would take gigabytes;
+    ## any replication can be regenerated from its seed.
     keep_obs = 1L,
 
     ## Bookkeeping. `out` defaults to a results/ folder beside this script.
     tag      = "main",
     out      = file.path(SIM_HERE, "results")
   )))
+
+## Margins given on the command line replace the blocks with one factorial
+## block of those margins around the reference, as in
+##   Rscript run-simulations.R --TN=60,365 --n=50
+SIM_CLI_MARGINS <- if (SIM_DEFINE_ONLY) character(0) else
+  intersect(names(SIM_REFERENCE),
+            sub("^--([^=]+)=.*$", "\\1", grep("^--[^=]+=.", commandArgs(TRUE), value = TRUE)))
 
 
 ## ===========================================================================
@@ -610,25 +631,44 @@ dgp_truth <- function(psi) {
 
 
 ## ===========================================================================
-## The cells: the full factorial of the margins. In S2 the overlap and the
-## balance are vacuous, so it enters once per (n, T, knn).
+## The cells: the union of the blocks, each the full factorial of its margins
+## around the reference. In S2 the overlap and the balance are vacuous, so it
+## enters once per (n, T, knn). A cell that two blocks share is kept once,
+## under the first of them.
 ## ===========================================================================
-sim_cells <- function(cfg = CFG) {
+
+## The blocks this invocation runs: those named in `blocks`, or, when margins
+## are given on the command line, one factorial block of those margins.
+sim_blocks <- function(cfg = CFG) {
+  if (length(SIM_CLI_MARGINS)) return(list(command_line = cfg[SIM_CLI_MARGINS]))
+  bad <- setdiff(cfg$blocks, names(SIM_BLOCKS))
+  if (length(bad)) stop("unknown block: ", paste(bad, collapse = ", "),
+                        "; the blocks are ", paste(names(SIM_BLOCKS), collapse = ", "),
+                        call. = FALSE)
+  SIM_BLOCKS[cfg$blocks]
+}
+
+sim_cells <- function(cfg = CFG, blocks = sim_blocks(cfg)) {
   bad <- setdiff(cfg$scenario, SIM_SCEN$id)
   if (length(bad)) stop("unknown scenario: ", paste(bad, collapse = ", "),
                         "; the scenarios are ", paste(SIM_SCEN$id, collapse = ", "),
                         call. = FALSE)
-  cells <- expand.grid(scenario = cfg$scenario, n = cfg$n, TN = cfg$TN,
-                       omega = cfg$omega, balance = cfg$balance, knn = cfg$knn,
-                       stringsAsFactors = FALSE, KEEP.OUT.ATTRS = FALSE)
+  cells <- do.call(rbind, lapply(names(blocks), function(b) {
+    m <- utils::modifyList(SIM_REFERENCE, blocks[[b]])
+    x <- expand.grid(scenario = cfg$scenario, n = m$n, TN = m$TN, omega = m$omega,
+                     balance = m$balance, knn = m$knn,
+                     stringsAsFactors = FALSE, KEEP.OUT.ATTRS = FALSE)
+    x$block <- b
+    x
+  }))
   s2 <- cells$scenario == "S2"
   cells$omega[s2] <- NA_real_
   cells$balance[s2] <- "-"
-  cells <- unique(cells)
+  cells$cell <- sim_cell_id(cells)
+  cells <- cells[!duplicated(cells$cell), , drop = FALSE]
   ok <- mapply(function(sc, n, bal) if (sc == "S2") TRUE else dgp_feasible(n, 3L, bal),
                cells$scenario, cells$n, cells$balance)
   cells <- cells[ok, , drop = FALSE]
-  cells$cell <- sim_cell_id(cells)
   rownames(cells) <- NULL
   cells
 }
@@ -904,11 +944,14 @@ sim_main <- function() {
 
   cells <- sim_cells()
   prev  <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
-  cat(sprintf("%d cells x %d replications, writing to\n  %s\n\n", nrow(cells),
+  per_block <- table(factor(cells$block, levels = unique(cells$block)))
+  cat(sprintf("%d cells (%s) x %d replications, writing to\n  %s\n\n", nrow(cells),
+              paste(names(per_block), per_block, sep = " ", collapse = ", "),
               CFG$nrep, OUT))
 
   if (identical(CFG$mode[1], "dry")) {
-    print(cells[, c("scenario", "n", "TN", "omega", "balance", "knn")], row.names = FALSE)
+    print(cells[, c("block", "scenario", "n", "TN", "omega", "balance", "knn")],
+          row.names = FALSE)
     cat("\n")
     sim_print_cost(cells, prev, CFG)
     return(invisible(cells))

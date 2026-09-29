@@ -16,6 +16,33 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-29 (second entry)
+
+**The simulation design is organized in blocks.** The full factorial of the
+previous entry was stopped after 83 of its 17,640 runs: at the measured mean of
+about 130 seconds a run it would have taken some 650 core-hours, over three
+days on the 7 cores of the machine that runs it. The SETUP now holds the
+scenario-variants (`SIM_SCENARIOS`), the reference level of every margin
+(`SIM_REFERENCE`) and the blocks (`SIM_BLOCKS`), each the full factorial of the
+margins it lists around the reference; the design is their union, a shared cell
+run once. The design adopted:
+
+| block | margins | cells |
+|---|---|---|
+| core | n {40, 100, 200} x T {60, 120, 365} x omega {0, 0.70, 1} | 225 |
+| balance | unbalanced | 8 |
+| knn | 3, 10 | 18 |
+| n400 | n = 400 | 9 |
+
+260 cells, 2600 runs at `nrep = 10`, about 58 core-hours on the costs measured
+one replication per (n, T), more where omega = 0, which cost about twice as
+much in the stopped runs. The core crosses the three factors that govern
+recovery; the balance, the graph and the national scale of n = 400 are
+robustness margins, varied one at a time. `--blocks=` runs a subset of the
+blocks; margins given on the command line replace the blocks with one
+factorial block around the reference. Of the 83 runs already recorded, 8 are
+cells of the new design.
+
 ### 2026-09-29
 
 **The SETUP of the simulation runner is the full experiment, first pass.** The
