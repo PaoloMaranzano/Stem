@@ -222,31 +222,33 @@ SIM_MARGINS <- list(
   ##   shr  rho = 1, one field where theta is common, otherwise by regime
   ##   lat  rho = 1, fields by regime  (only where theta is common)
   ##   fld  rho = 0, one field         (only where theta is common)
-  scenario = c("S1w-ind", "S1w-shr", "S1s-ind", "S1s-shr", "S2",
-               "S3beta-ind", "S3beta-shr", "S3G-ind", "S3G-shr",
-               "S3Seta-ind", "S3Seta-shr",
-               "S3theta-ind", "S3theta-shr", "S3theta-lat", "S3theta-fld",
-               "S3error-ind", "S3error-shr", "S3error-lat", "S3error-fld"),
+  ## The nine of the paper. The ten additional ones, to be added back when
+  ## wanted, are "S1w-ind", "S3beta-ind", "S3G-ind", "S3Seta-ind",
+  ## "S3theta-ind", "S3theta-lat", "S3theta-fld", "S3error-ind",
+  ## "S3error-lat", "S3error-fld".
+  scenario = c("S2", "S1s-ind", "S1s-shr", "S1w-shr",
+               "S3beta-shr", "S3G-shr", "S3Seta-shr", "S3theta-shr", "S3error-shr"),
 
-  ## number of locations. The cost of a fit is cubic in it
-  n = 100L,
+  ## number of locations; not below 40, since the grid reaches k = 4 regimes
+  ## of at least N_MIN = 6 locations each
+  n = c(40L, 100L, 200L, 400L),
 
   ## length of the series
-  TN = 120L,
+  TN = c(60L, 120L, 365L),
 
   ## Spatial overlap of the three regimes: the centres sit at the vertices of
   ## an equilateral triangle of side 2*omega, with the total variance of a
   ## coordinate held fixed. 0: the regimes coincide in space; 0.70: contiguous
   ## areas interpenetrating along their borders (1.63 within-regime standard
   ## deviations between centres); 1: well apart. Vacuous in S2.
-  omega = 0.70,
+  omega = c(0, 0.70, 1),
 
   ## relative sizes of the regimes: "balanced" or "unbalanced" (1:2:3).
   ## Vacuous in S2.
-  balance = "balanced",
+  balance = c("balanced", "unbalanced"),
 
   ## neighbours of the graph of the Potts penalty
-  knn = 5L
+  knn = c(3L, 5L, 10L)
 )
 
 ## ---------------------------------------------------------------------------
@@ -295,9 +297,9 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## replications per cell, and the slice this invocation covers. A long
     ## study is executed in slices on whatever machine is free: the files are
     ## appended, so the slices compose.
-    nrep     = 100L,
+    nrep     = 10L,
     rep_from = 1L,
-    rep_to   = 100L,
+    rep_to   = 10L,
 
     ## What the estimator searches over. phi_ref is the penalty at which the
     ## recovery at the true number of regimes is read, a point of phi_grid.
@@ -305,8 +307,11 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
     phi_ref  = 0.05,
 
-    ## How many replications per cell keep their full per-observation record
-    keep_obs = 5L,
+    ## How many replications per cell keep their full per-observation record.
+    ## One: across the full factorial every record is n x T rows, and five per
+    ## cell would take several gigabytes; any replication can be regenerated
+    ## from its seed.
+    keep_obs = 1L,
 
     ## Bookkeeping. `out` defaults to a results/ folder beside this script.
     tag      = "main",

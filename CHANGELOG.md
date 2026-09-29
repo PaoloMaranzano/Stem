@@ -16,6 +16,20 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-29
+
+**The SETUP of the simulation runner is the full experiment, first pass.** The
+nine scenario-variants of the paper (S2, S1s-ind, S1s-shr, S1w-shr and the five
+S3x-shr) crossed with n {40, 100, 200, 400}, T {60, 120, 365}, omega
+{0, 0.70, 1}, balanced and unbalanced regimes and knn {3, 5, 10}: 1728 cells
+with three regimes and 36 for S2, where overlap and balance are vacuous, 1764
+in all, with `nrep = 10`, 17,640 runs, about 51 hours on 13 cores on the costs
+measured one replication per (n, T). The ten additional scenario-variants stay
+listed in the SETUP comment, run at the reference levels only. No network below
+n = 40: the grid reaches k = 4 regimes of at least six locations. `keep_obs`
+drops from 5 to 1, since five full records per cell of the full factorial
+would take several gigabytes; any replication can be regenerated from its seed.
+
 ### 2026-09-28 (fifth entry)
 
 **The simulation runner is ready for the main run.** `run-simulations.R` pins
