@@ -16,6 +16,22 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-09-29 (third entry)
+
+**`dev/replication/analyse-simulations.R`, the analysis of the new design.** It
+reads the design from the runner beside it and the results of one or more tags
+(a (cell, replication) recorded under two counts once), and writes to
+`output/`: R1 the reference cell, every scenario-variant; R2 the core,
+selection and recovery against n, T and omega, as wide tables and as a figure
+with the scenario-variants by rows and T by columns; R3 how often S2 is split;
+R4 the robustness blocks against the reference cell; R5 bias and RMSE of the
+parameters at the reference, the reference case regime by regime; R6 the ARI at
+the true k against phi, from the grid, and the phi selected; R7 the seconds per
+replication by n and T. Each part is guarded, so it runs on partial results.
+Tested on the check run of 2026-09-28, on the 83 runs of the stopped factorial,
+and on a constructed set exercising R4. It replaces, on the Drive, the analysis
+of the previous design, which stays archived in `dev/archive/sim-design-generic`.
+
 ### 2026-09-29 (second entry)
 
 **The simulation design is organized in blocks.** The full factorial of the

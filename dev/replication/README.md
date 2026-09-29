@@ -8,13 +8,20 @@ disconnected from its sources.
 | script | what it does |
 |---|---|
 | `run-simulations.R` | runs the simulation study |
+| `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `run-application.R` | runs the application, staged and cached |
 
 The design of the simulation study is described in full in
-`simulation-design.tex`, in the Overleaf project of the paper. The script that
-turns the results into tables and figures is still to be written for this
-design; the one of the previous design is archived in
+`simulation-design.tex`, in the Overleaf project of the paper. The analysis
+takes the design from `run-simulations.R`, which must sit beside it, and can be
+run while the study is in progress: each part produces what the results
+support so far. The analysis of the previous design is archived in
 `dev/archive/sim-design-generic`.
+
+```
+Rscript analyse-simulations.R                  # the results of tag "main"
+Rscript analyse-simulations.R --tag=main,ref   # several tags, stacked
+```
 
 ## Requirements
 
