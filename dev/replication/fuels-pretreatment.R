@@ -20,7 +20,7 @@
 ## Outputs in <out>: the register (national, by province, by composition), the
 ## link diagnostics, the list of kept sites with their statistics, the national
 ## and metropolitan daily means of all reporting pumps (for centring), and the
-## daily series of the kept sites of the ten metropolitan cities.
+## daily series of the kept sites of the metropolitan cities of the application.
 ##
 ##     Rscript fuels-pretreatment.R
 ##     Rscript fuels-pretreatment.R --from=2021-01-04 --max_spell=120
@@ -52,7 +52,10 @@ CFG <- fu_config(list(
   data       = file.path(fu_here, "App_FuelsITA", "station_level.zip"),
   from       = "2022-01-03",     # a Monday: after the change of pricing behaviour of 2022
   to         = "2026-06-28",     # a Sunday
-  metros     = c("RM", "MI", "NA", "TO", "PA", "GE", "BO", "FI", "BA", "CT"),
+  ## the metropolitan cities of the application: those with at least 10 kept
+  ## independents (Naples, Rome, Catania, Bologna, Turin, Milan, Palermo, Messina,
+  ## Bari), plus Florence and Venice by choice
+  metros     = c("RM", "MI", "NA", "TO", "PA", "BA", "CT", "BO", "ME", "FI", "VE"),
   d_link     = 50,               # metres: successive codes closer than this are one site
   overlap    = 7L,               # days two successive codes may overlap
   link_gap   = 120L,             # days that may separate successive codes
@@ -248,7 +251,7 @@ fwrite(comp("group"), file.path(OUT, "composition_group.csv"))
 fwrite(comp("area"), file.path(OUT, "composition_area.csv"))
 mt <- reg[province %in% CFG$metros, .(pumps = sum(n)), by = .(province, step)]
 mt <- dcast(mt, province ~ step, value.var = "pumps")
-cat("\nREGISTER, the ten metropolitan cities\n"); print(mt)
+cat("\nREGISTER, the metropolitan cities of the application\n"); print(mt)
 fwrite(mt, file.path(OUT, "register_metros.csv"))
 cat("\nLINKING: successive codes within 200 m, distance quantiles (m):\n")
 print(round(stats::quantile(links$dist, c(.1, .25, .5, .75, .9)), 1))

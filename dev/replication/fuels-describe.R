@@ -22,8 +22,10 @@ pt <- readRDS(file.path(PRE, "pretreatment.rds")); ser <- readRDS(file.path(PRE,
 mn <- readRDS(file.path(PRE, "means.rds"))
 sites <- pt$sites[kept == TRUE]
 days <- ser[[1]]$days; ND <- length(days); sun <- which(format(days, "%u") == "7")
-METRO <- c(RM = "Roma", MI = "Milano", "NA" = "Napoli", TO = "Torino", PA = "Palermo", GE = "Genova",
-           BO = "Bologna", FI = "Firenze", BA = "Bari", CT = "Catania")
+METRO_ALL <- c(RM = "Roma", MI = "Milano", "NA" = "Napoli", TO = "Torino", PA = "Palermo", BA = "Bari",
+               CT = "Catania", BO = "Bologna", ME = "Messina", FI = "Firenze", VE = "Venezia", GE = "Genova",
+               RC = "Reggio Calabria", CA = "Cagliari")
+METRO <- METRO_ALL[names(METRO_ALL) %in% names(ser)]     # the cities of the pre-treatment run
 GCOL <- c("Agip Eni" = "#f2c500", "Api-Ip" = "#1f6f8b", "Esso" = "#c0392b", "Q8" = "#5b8c5a",
           "Tamoil" = "#e67e22", "independent" = "#7f8c8d", "other brands" = "#8e44ad")
 options(width = 160)
@@ -35,11 +37,13 @@ cat("KEPT SITES, Italy:", nrow(sites), "\n")
 print(sites[, .N, by = area][order(-N)])
 tabm <- dcast(sites[province %in% names(METRO), .N, by = .(province, group)], province ~ group, value.var = "N", fill = 0)
 tabm[, total := rowSums(.SD), .SDcols = -1]; tabm[, city := METRO[province]]
-cat("\nKEPT SITES in the ten metropolitan cities, by brand group\n"); print(tabm[order(-total)])
+cat("\nKEPT SITES in the metropolitan cities of the application, by brand group\n"); print(tabm[order(-total)])
 fwrite(tabm, file.path(OUT, "kept_metros_by_group.csv"))
 ita <- rnaturalearth::ne_countries(country = "Italy", scale = "medium", returnclass = "sf")
 draw_map <- function() {
-  graphics::layout(cbind(1, matrix(2:11, 5, byrow = TRUE)), widths = c(1.35, 0.6, 0.6))
+  nr <- ceiling(length(METRO) / 2)
+  graphics::layout(cbind(1, matrix(c(seq_along(METRO) + 1, rep(0, 2 * nr - length(METRO))), nr, byrow = TRUE)),
+                   widths = c(1.35, 0.6, 0.6))
   graphics::par(mar = c(0.5, 0.5, 2, 0.5))
   plot(sf::st_geometry(ita), col = "#f4f5f7", border = "#b8bec6", lwd = 0.6, xlim = c(6.6, 18.5), ylim = c(36.6, 47.1))
   graphics::points(sites$lon, sites$lat, pch = 16, cex = 0.2, col = GCOL[sites$group])
@@ -52,8 +56,8 @@ draw_map <- function() {
     graphics::title(sprintf("%s (%d)", METRO[p], nrow(z)), cex.main = 0.9, line = 0.3)
   }
 }
-grDevices::png(file.path(OUT, "map_kept.png"), width = 2200, height = 2000, res = 170); draw_map(); invisible(grDevices::dev.off())
-grDevices::cairo_pdf(file.path(OUT, "map_kept.pdf"), width = 13, height = 12); draw_map(); invisible(grDevices::dev.off())
+grDevices::png(file.path(OUT, "map_kept.png"), width = 2200, height = 2300, res = 170); draw_map(); invisible(grDevices::dev.off())
+grDevices::cairo_pdf(file.path(OUT, "map_kept.pdf"), width = 13, height = 14); draw_map(); invisible(grDevices::dev.off())
 
 ## ---- 2. do the kept sites still stay still? --------------------------------
 sites[, `:=`(chg_min = pmin(chg_g, chg_d), spell_max = pmax(spell_g, spell_d))]

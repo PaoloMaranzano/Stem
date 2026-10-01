@@ -11,8 +11,8 @@
 ## radius: the data-driven radius r* (half range of the correlogram of weekly
 ## relative prices, per city) and the fixed radii 1, 2 and 5 km.
 ## For each pair: Pearson and Spearman correlations (lag 0 and cross-
-## correlations) and Granger tests in both directions (Wald, heteroskedasticity-
-## consistent), gasoline and diesel, daily (first differences) and weekly
+## correlations) and Granger tests in both directions (the classical F test and
+## the heteroskedasticity-consistent HC1 Wald test), gasoline and diesel, daily (first differences) and weekly
 ## (levels), centred on the national or on the metropolitan mean. The tests are
 ## a SCREENING device, read against a reference pair (X drawn beyond 10 km):
 ## the formal inference of the application is the package bootstrap.
@@ -43,11 +43,13 @@ CFG <- list(
 )
 OUT <- CFG$out; dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 options(width = 170)
-METRO <- c(RM = "Roma", MI = "Milano", "NA" = "Napoli", TO = "Torino", PA = "Palermo", GE = "Genova",
-           BO = "Bologna", FI = "Firenze", BA = "Bari", CT = "Catania")
 GCOL <- c("Agip Eni" = "#f2c500", "Api-Ip" = "#1f6f8b", "Esso" = "#c0392b", "Q8" = "#5b8c5a",
           "Tamoil" = "#e67e22", "independent" = "#4d4d4d", "other brands" = "#c9b3d9")
 ser <- readRDS(file.path(CFG$pre, "metro_series.rds")); mn <- readRDS(file.path(CFG$pre, "means.rds"))
+METRO_ALL <- c(RM = "Roma", MI = "Milano", "NA" = "Napoli", TO = "Torino", PA = "Palermo", BA = "Bari",
+               CT = "Catania", BO = "Bologna", ME = "Messina", FI = "Firenze", VE = "Venezia", GE = "Genova",
+               RC = "Reggio Calabria", CA = "Cagliari")
+METRO <- METRO_ALL[names(METRO_ALL) %in% names(ser)]     # the cities of the pre-treatment run
 days <- ser[[1]]$days; ND <- length(days); sun <- which(format(days, "%u") == "7")
 locf <- function(v) { ok <- !is.na(v); if (!any(ok)) return(v)
   idx <- cummax(ifelse(ok, seq_along(v), 0L)); idx[idx == 0L] <- which(ok)[1]; v[idx] }
@@ -121,8 +123,8 @@ cat("\nRADIUS: correlogram of weekly metro-centred prices (fuels averaged); r* =
 print(rstar[, .(city, plateau = round(plateau, 3), excess_0 = round(excess_0, 3), r_star,
                 exp_half_range = round(exp_phi * log(2), 1), exp_practical_range = round(3 * exp_phi, 1))])
 fwrite(cg, file.path(OUT, "correlogram.csv")); fwrite(rstar, file.path(OUT, "radius.csv"))
-grDevices::cairo_pdf(file.path(OUT, "correlogram.pdf"), width = 12, height = 5.5)
-graphics::par(mfrow = c(2, 5), mar = c(3.4, 3.4, 2, 0.6), mgp = c(2.1, 0.6, 0))
+grDevices::cairo_pdf(file.path(OUT, "correlogram.pdf"), width = 12, height = 2.75 * ceiling(length(METRO) / 4))
+graphics::par(mfrow = c(ceiling(length(METRO) / 4), 4), mar = c(3.4, 3.4, 2, 0.6), mgp = c(2.1, 0.6, 0))
 for (p in names(METRO)) {
   z <- cg[province == p]; k <- rstar[province == p]
   graphics::plot(z$d, z$r, type = "n", log = "x", las = 1, bty = "n", ylim = c(-0.05, 0.55),
@@ -186,20 +188,24 @@ ccf_rows <- function(A, B, L) { T <- ncol(A)
   sapply(-L:L, function(l) if (l >= 0) rowcor(A[, (l + 1):T, drop = FALSE], B[, 1:(T - l), drop = FALSE]) else
     rowcor(A[, 1:(T + l), drop = FALSE], B[, (1 - l):T, drop = FALSE])) }
 lagm <- function(v, p, ix) vapply(seq_len(p), function(l) v[ix - l], numeric(length(ix)))
-## Wald test, heteroskedasticity-consistent (HC1), that the lags of the second
-## series add nothing, both directions. The plain F test assumes a constant
-## error variance, which the sticky daily changes violate: on Rome it rejected
-## for 77% of the pairs more than 10 km apart, the robust test for 13%.
+## Granger tests that the lags of the second series add nothing, both
+## directions, in two versions on the same regression: the classical F test,
+## which assumes a constant error variance, and the Wald test with a
+## heteroskedasticity-consistent covariance (HC1), which does not. With sticky
+## prices the variance is far from constant: on Rome the F test rejected for
+## 77% of the pairs more than 10 km apart, the HC1 test for 13%.
 granger2 <- function(y, x, p, P) {
   ix <- (p + 1):length(y); Ly <- lagm(y, p, ix); Lx <- lagm(x, p, ix); Pm <- P[ix, , drop = FALSE]
   Pm <- Pm[, colSums(Pm != 0) > 0, drop = FALSE]
   one <- function(resp, own, other) {
     Z <- cbind(1, own, Pm, other); q <- qr(Z); keep <- sort(q$pivot[seq_len(q$rank)])
-    j <- which(keep > ncol(Z) - ncol(other)); if (!length(j)) return(c(NA, NA))
-    Z <- Z[, keep, drop = FALSE]; A <- solve(crossprod(Z)); b <- A %*% crossprod(Z, resp); e <- drop(resp - Z %*% b)
-    V <- A %*% crossprod(Z * e) %*% A * nrow(Z) / (nrow(Z) - ncol(Z))
+    j <- which(keep > ncol(Z) - ncol(other)); if (!length(j)) return(rep(NA_real_, 4))
+    Z <- Z[, keep, drop = FALSE]; n <- nrow(Z); k <- ncol(Z)
+    A <- solve(crossprod(Z)); b <- A %*% crossprod(Z, resp); e <- drop(resp - Z %*% b)
+    Fs <- drop(crossprod(b[j], solve(A[j, j, drop = FALSE], b[j]))) / (sum(e^2) / (n - k) * length(j))
+    V <- A %*% crossprod(Z * e) %*% A * n / (n - k)
     W <- drop(crossprod(b[j], solve(V[j, j, drop = FALSE], b[j])))
-    c(W, stats::pchisq(W, length(j), lower.tail = FALSE))
+    c(Fs, stats::pf(Fs, length(j), n - k, lower.tail = FALSE), W, stats::pchisq(W, length(j), lower.tail = FALSE))
   }
   c(one(y[ix], Ly, Lx), one(x[ix], Lx, Ly))
 }
@@ -217,10 +223,11 @@ for (p in names(METRO)) {
     L <- if (startsWith(tr, "weekly")) CFG$l_weekly else CFG$l_daily
     pl <- if (startsWith(tr, "weekly")) CFG$p_weekly else CFG$p_daily
     cc <- ccf_rows(Y, X, L); colnames(cc) <- paste0("ccf_", -L:L)
-    gt <- t(vapply(seq_len(nrow(sp)), function(k) granger2(Y[k, ], X[k, ], pl, PUL[[tr]]), numeric(4)))
+    gt <- t(vapply(seq_len(nrow(sp)), function(k) granger2(Y[k, ], X[k, ], pl, PUL[[tr]]), numeric(8)))
     res[[length(res) + 1]] <- data.table(sp[, .(setting, province, row, kind, radius_km, n_x)], fuel = fu, trans = tr,
       pearson = rowcor(Y, X), spearman = rowcor(rowrank(Y), rowrank(X)),
-      W_xy = gt[, 1], p_xy = gt[, 2], W_yx = gt[, 3], p_yx = gt[, 4], cc)
+      F_xy = gt[, 1], pF_xy = gt[, 2], W_xy = gt[, 3], p_xy = gt[, 4],
+      F_yx = gt[, 5], pF_yx = gt[, 6], W_yx = gt[, 7], p_yx = gt[, 8], cc)
   }
   message("tests: ", p)
 }
@@ -238,9 +245,10 @@ SET <- c("1" = "1: Y major, X independent", "2" = "2: Y independent, X major", "
 FUEL <- c(g = "gasoline", d = "diesel")
 summ <- function(z) z[, .(pairs = .N, pearson = round(stats::median(pearson, na.rm = TRUE), 3),
   spearman = round(stats::median(spearman, na.rm = TRUE), 3),
-  `X->Y %` = round(100 * mean(p_xy < 0.05, na.rm = TRUE), 1), `Y->X %` = round(100 * mean(p_yx < 0.05, na.rm = TRUE), 1),
+  `X->Y % F` = round(100 * mean(pF_xy < 0.05, na.rm = TRUE), 1), `Y->X % F` = round(100 * mean(pF_yx < 0.05, na.rm = TRUE), 1),
+  `X->Y % HC` = round(100 * mean(p_xy < 0.05, na.rm = TRUE), 1), `Y->X % HC` = round(100 * mean(p_yx < 0.05, na.rm = TRUE), 1),
   `ccf X leads 1` = round(stats::median(ccf_1, na.rm = TRUE), 3), `ccf Y leads 1` = round(stats::median(`ccf_-1`, na.rm = TRUE), 3))]
-cat("\nSUMMARY (medians over pairs; Granger: share of pairs rejecting at 5%, both directions)\n")
+cat("\nSUMMARY (medians over pairs; Granger: share of pairs rejecting at 5%, both directions, F and HC1 Wald)\n")
 for (tr in TRANS) {
   cat(sprintf("\n== %s ==\n", tr))
   z <- res[trans == tr, summ(.SD), by = .(setting, kind, fuel)]

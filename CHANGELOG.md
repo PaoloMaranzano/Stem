@@ -16,6 +16,25 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-01 (second entry)
+
+**The cities of the fuel application.** The frame is the 14 metropolitan
+cities; a city enters if it keeps at least 10 independent sites after the
+pre-treatment, because the application also asks about independents and major
+brands, and with fewer independents the share of rejecting pairs in a city moves
+by ten points with one pump. Nine pass (Naples, Rome, Catania, Turin, Bologna,
+Milan, Palermo, Messina, Bari); the user added Florence and Venice by choice.
+Genoa (no independent) leaves, Messina enters. The list does not depend on the
+filters: allowing spells up to 180 days, or coverage down to 90%, the same nine
+cities pass, so the spell stays at 90 days. `fuels-describe.R` and
+`fuels-leader-follower.R` now take the cities from the pre-treatment output
+instead of a fixed list.
+
+**Both Granger tests in `fuels-leader-follower.R`.** The classical F test and
+the HC1 Wald test are computed on the same regression and reported side by
+side, at the user's request: the comparison shows the reader how much the
+non-constant variance of sticky prices inflates the F test.
+
 ### 2026-10-01
 
 **`dev/replication/fuels-pretreatment.R`, the data pre-treatment of the fuel
