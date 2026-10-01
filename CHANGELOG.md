@@ -16,6 +16,39 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-01 (third entry)
+
+**`dev/replication/run-fuels-application.R`, the full fuel application, written
+but not run: the user checks it and launches it.** 88 models on the eleven
+cities: part A, gasoline and diesel at the same pump in both directions (22);
+part B, leaders and followers, three settings by two fuels (66). Each model is
+the weekly relative price (Sunday price, national mean and pump mean removed,
+cents) on its own lags, the lags of x (the other fuel, or the nearest pump of
+the X set; the mean within r* as an option), the fiscal pulses, the latent
+process and the spatial error; the grid k = 1..K_max with the default phi grid,
+K_max = min(3, floor(n / m)) with m = 5 fixed by the user without validation,
+so that fewer than 10 pumps give the pooled STEM; the two-step rule; the
+refit-with-clustering bootstrap of the selected model and of the pooled one;
+the Granger test regime by regime as the Wald statistic on the bootstrap
+covariance of the lags of x; Ljung-Box diagnostics of the residuals and of
+their squares. `min_cluster_size` is set to m: the package default, the number
+of covariates plus two, would be 17 here and would forbid the small regimes the
+rule allows. Stages are cached, models can be split across processes
+(`--job=i/N`), `--dry-run` prints the plan and `--B=20` runs a pilot whose
+grids are reused by the full run; every stage records its minutes. It pins
+Stem at 4325536, the commit of the simulation study (the package code has not
+changed since).
+
+A smoke test on two tiny models (Messina and Florence, setting 2, B = 2) ran
+every stage. It also found that some bootstrap draws are pathological: one draw
+of eight on the 14 independents of Messina took about 13 minutes against 3 to 4
+seconds for the others. The profile puts all the time in the Newton-Raphson
+step of the spatial parameters inside the EM (`Q_function_addendo1` and its
+numerical Hessian, up to 50 iterations and 30 Hessian retries per EM
+iteration), which runs to its limits when the likelihood is flat in the range,
+as in a regime of five sparse pumps. The package is not touched: the cost and
+the remedies go to the user first. `run-fuels.R` is marked as superseded.
+
 ### 2026-10-01 (second entry)
 
 **The cities of the fuel application.** The frame is the 14 metropolitan

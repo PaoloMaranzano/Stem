@@ -1,6 +1,7 @@
 ## ===========================================================================
 ## SC-STEM application: Granger causality between gasoline and diesel at the
 ## pump, province by province, on weekly data. THE RUNNER (first version).
+## SUPERSEDED by run-fuels-application.R; kept as the record of the first test.
 ##
 ## The idea, the data and the choices behind this script are described in
 ## fuels-application-notes.tex, in the Overleaf project of the paper.
