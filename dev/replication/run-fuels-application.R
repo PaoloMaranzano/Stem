@@ -110,7 +110,7 @@ CFG <- fa_config(list(
   knn         = 5L,
   phi_grid    = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   band        = c(0.025, 0.2),
-  B           = 200L,            # bootstrap draws
+  B           = 100L,            # bootstrap draws (100, decided 2026-10-01)
   boot_pooled = TRUE,            # bootstrap the pooled model too, when k > 1 is selected
   level       = 0.95,
   seed        = 20261002L,
