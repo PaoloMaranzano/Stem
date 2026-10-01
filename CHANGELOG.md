@@ -16,6 +16,53 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-01
+
+**`dev/replication/fuels-pretreatment.R`, the data pre-treatment of the fuel
+application, with a register of every step.** Two passes over the station-level
+files. The first summarizes every code over its life, computes the national and
+metropolitan daily means of all reporting non-highway pumps (the centring
+references) and shards the window rows by province. The second, province by
+province, links successive codes at the same place into sites (within 50 m,
+starting no more than 7 days before and 120 days after the predecessor ends;
+the newer code wins on overlapping days), then filters: not on a highway, valid
+coordinates, coverage of both self prices >= 95%, no gap > 28 days, >= 12
+changes a year, no unchanged spell > 90 days, one site per point. Each step is
+counted by province, brand group, area and type, because the notes need a "Data
+pre-treatment" section that explains what every step removes and how it shifts
+the sample. The window, 2022-01-03 to 2026-06-28, avoids the 2018 and 2021 holes
+and starts with the 2022 change in stickiness; it is a parameter. A part of the
+files whose province column is missing altogether is labelled unknown rather
+than Naples: the "NA" fix applies only to the code read as a missing value.
+Step 4 also drops sites more than 150 km from the median location of their
+province: three kept sites were geocoded hundreds of kilometres away (one of
+Nuoro in Milan, one of Cosenza in Rome, one of Palermo near Messina), while the
+genuine edges of provinces stay within 95 km.
+
+**`dev/replication/fuels-describe.R`**: maps of the kept sites, residual
+stillness, and pump-by-pump ADF and KPSS tests and autocorrelations of the
+centred series (national and metropolitan centring) in the ten cities, with
+daily and weekly series of representative sites.
+
+**`dev/replication/fuels-leader-follower.R`**, an exploratory analysis asked for
+by the user: leader and follower between major brands and independents (major
+Y and independent X; independent Y and major X; major Y and other-major X), with
+X the nearest pump or the mean within a radius. The radius r* is read from the
+correlogram of weekly relative prices, per city, as the distance at which the
+excess correlation halves; the fixed radii 1, 2 and 5 km are the sensitivity.
+An exponential fit was tried for r* and kept only for reference, because one
+scale does not fit every city (Palermo decays on two, and the fit returns
+7.7 km). Pearson and Spearman correlations, cross-correlations and Granger
+tests in both directions are a screening device only; the formal inference of
+the application remains the package bootstrap. The tests are Wald tests with a
+heteroskedasticity-consistent (HC1) covariance: the plain F test of a first run
+rejected for 77-86% of the pairs whatever their distance, and a check on Rome
+showed the cause was the non-constant variance of the sticky daily changes, not
+the common factor (adding its lags changed little; the robust test brought the
+rejection rate of pairs more than 10 km apart to 13%). Because 13% is still
+above the nominal 5%, every Y also gets a reference X drawn at random beyond
+10 km, and the rates are read against it.
+
 ### 2026-09-30
 
 **`dev/replication/run-fuels.R`, a first runner for the fuel-price
