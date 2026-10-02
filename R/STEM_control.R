@@ -10,8 +10,10 @@
 #' instance to trade accuracy for speed in a simulation study.
 #'
 #' @details
-#' \strong{When the EM algorithm stops.} Two criteria, both required at the
-#' same iteration (or the iteration limit):
+#' \strong{When the EM algorithm stops.} Two criteria; with
+#' \code{em_stop = "any"} (the default) the algorithm stops as soon as either is
+#' met, with \code{em_stop = "all"} only when both are met at the same
+#' iteration, and in either case after \code{em_maxit} iterations:
 #' \deqn{\max_l \frac{|\psi_l^{(i)} - \psi_l^{(i-1)}|}{\max(|\psi_l^{(i-1)}|,
 #'   10^{-3})} < \texttt{tol\_par}, \qquad
 #'   |\ell(\psi^{(i)}) - \ell(\psi^{(i-1)})| < \texttt{tol\_loglik}.}{
@@ -29,8 +31,12 @@
 #' order of \eqn{10^4} a relative tolerance of \eqn{10^{-3}} stops the algorithm
 #' while several units can still be gained. On a regime with a persistent
 #' latent process the EM algorithm is slow along the ridge between the
-#' intercept and the level of the latent process; the defaults reach the
-#' maximum within a few thousandths of a log-likelihood unit.
+#' intercept and the level of the latent process. There, with the default
+#' tolerances, \code{"any"} stopped within a few hundredths of a
+#' log-likelihood unit of the maximum and \code{"all"} within a few
+#' thousandths, at 1.5 to 5 times the iterations; D-STEM's rule, the relative
+#' change of the parameters or of the log-likelihood, stopped several units
+#' short, because the relative change of the log-likelihood is met first.
 #'
 #' \strong{Session defaults.} Every estimation function takes
 #' \code{control = NULL} by default, which means the defaults of
@@ -54,6 +60,9 @@
 #'   \code{1e-3}.
 #' @param em_maxit maximum number of EM iterations of the pooled fit and of
 #'   every regime in the final refit. Default \code{500}.
+#' @param em_stop how the two criteria combine, for every EM run:
+#'   \code{"any"} (default), stop as soon as either is met; \code{"all"}, stop
+#'   only when both are met.
 #' @param alt_em_tol_par,alt_em_tol_loglik,alt_em_maxit the same three settings
 #'   for the EM algorithm run inside the alternation of SC-STEM. Defaults
 #'   \code{1e-2}, \code{1} and \code{50}.
@@ -85,6 +94,7 @@
 #'
 #' @export
 STEM_control <- function(em_tol_par = 1e-4, em_tol_loglik = 1e-3, em_maxit = 500L,
+                         em_stop = c("any", "all"),
                          alt_em_tol_par = 1e-2, alt_em_tol_loglik = 1, alt_em_maxit = 50L,
                          alt_maxit = 10L, alt_abs_tol = 1e-5, alt_rel_tol = 1e-6,
                          nr_maxit = 50L, nr_hess_maxit = 30L) {
@@ -101,9 +111,11 @@ STEM_control <- function(em_tol_par = 1e-4, em_tol_loglik = 1e-3, em_maxit = 500
     }
     as.integer(round(x))
   }
+  em_stop <- match.arg(em_stop)
   out <- list(em_tol_par = pos(em_tol_par, "em_tol_par"),
               em_tol_loglik = pos(em_tol_loglik, "em_tol_loglik"),
               em_maxit = int(em_maxit, "em_maxit"),
+              em_stop = em_stop,
               alt_em_tol_par = pos(alt_em_tol_par, "alt_em_tol_par"),
               alt_em_tol_loglik = pos(alt_em_tol_loglik, "alt_em_tol_loglik"),
               alt_em_maxit = int(alt_em_maxit, "alt_em_maxit"),
@@ -149,6 +161,9 @@ stem_control_em <- function(control, stage = c("final", "alternation")) {
 #' @export
 print.STEM_control <- function(x, ...) {
   cat("STEM estimation settings\n")
+  cat("  the EM algorithm stops when     : ",
+      if (x$em_stop == "any") "either criterion is met" else "both criteria are met",
+      " (em_stop = \"", x$em_stop, "\")\n", sep = "")
   cat("  final fits (pooled, final refit): tol_par = ", x$em_tol_par,
       ", tol_loglik = ", x$em_tol_loglik, ", maxit = ", x$em_maxit, "\n", sep = "")
   cat("  EM inside the alternation       : tol_par = ", x$alt_em_tol_par,

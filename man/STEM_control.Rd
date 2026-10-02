@@ -8,6 +8,7 @@ STEM_control(
   em_tol_par = 1e-04,
   em_tol_loglik = 0.001,
   em_maxit = 500L,
+  em_stop = c("any", "all"),
   alt_em_tol_par = 0.01,
   alt_em_tol_loglik = 1,
   alt_em_maxit = 50L,
@@ -28,6 +29,10 @@ log-likelihood, for the pooled fit and the final refit. Default
 
 \item{em_maxit}{maximum number of EM iterations of the pooled fit and of
 every regime in the final refit. Default \code{500}.}
+
+\item{em_stop}{how the two criteria combine, for every EM run:
+\code{"any"} (default), stop as soon as either is met; \code{"all"}, stop
+only when both are met.}
 
 \item{alt_em_tol_par, alt_em_tol_loglik, alt_em_maxit}{the same three settings
 for the EM algorithm run inside the alternation of SC-STEM. Defaults
@@ -61,8 +66,10 @@ defaults are meant for an analysis; an expert user may change them, for
 instance to trade accuracy for speed in a simulation study.
 }
 \details{
-\strong{When the EM algorithm stops.} Two criteria, both required at the
-same iteration (or the iteration limit):
+\strong{When the EM algorithm stops.} Two criteria; with
+\code{em_stop = "any"} (the default) the algorithm stops as soon as either is
+met, with \code{em_stop = "all"} only when both are met at the same
+iteration, and in either case after \code{em_maxit} iterations:
 \deqn{\max_l \frac{|\psi_l^{(i)} - \psi_l^{(i-1)}|}{\max(|\psi_l^{(i-1)}|,
   10^{-3})} < \texttt{tol\_par}, \qquad
   |\ell(\psi^{(i)}) - \ell(\psi^{(i-1)})| < \texttt{tol\_loglik}.}{
@@ -80,8 +87,12 @@ the log-likelihood depends on its scale, and with log-likelihoods of the
 order of \eqn{10^4} a relative tolerance of \eqn{10^{-3}} stops the algorithm
 while several units can still be gained. On a regime with a persistent
 latent process the EM algorithm is slow along the ridge between the
-intercept and the level of the latent process; the defaults reach the
-maximum within a few thousandths of a log-likelihood unit.
+intercept and the level of the latent process. There, with the default
+tolerances, \code{"any"} stopped within a few hundredths of a
+log-likelihood unit of the maximum and \code{"all"} within a few
+thousandths, at 1.5 to 5 times the iterations; D-STEM's rule, the relative
+change of the parameters or of the log-likelihood, stopped several units
+short, because the relative change of the log-likelihood is met first.
 
 \strong{Session defaults.} Every estimation function takes
 \code{control = NULL} by default, which means the defaults of

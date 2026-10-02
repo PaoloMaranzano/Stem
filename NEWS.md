@@ -178,10 +178,12 @@ information criteria all come from the exact cluster-wise likelihoods.
   function in one object, in the spirit of `optim(control = )`. All the
   estimation functions take `control`; `options(Stem.control = list(...))` sets
   them for a whole session.
-* New stopping rule of the EM algorithm: the largest relative change of a free
-  parameter, taken one at a time (as in D-STEM v2), **and** the absolute change
-  of the log-likelihood must both fall below their tolerances (defaults `1e-4`
-  and `1e-3`), or `em_maxit` iterations (default 500) are reached. The previous
+* New stopping rule of the EM algorithm, on two criteria: the largest relative
+  change of a free parameter, taken one at a time (as in D-STEM v2), and the
+  absolute change of the log-likelihood, with tolerances `1e-4` and `1e-3` by
+  default. With `em_stop = "any"` (the default, as in D-STEM v2) the algorithm
+  stops when either criterion is met, with `em_stop = "all"` only when both are;
+  in either case after `em_maxit` iterations (default 500). The previous
   rule stopped when the relative change of the whole parameter vector and the
   relative change of the log-likelihood fell below `precision`. That vector
   contained the fixed loadings, so the rule loosened with the number of

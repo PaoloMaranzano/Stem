@@ -72,7 +72,8 @@ The function returns an object of class \dQuote{STEM_Model} which is a list give
 \code{phi.hat} is a list with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}).
 \code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) which is the output of the Kalman filtering procedure. \code{loglik} is the log-likehood value.
 \code{convergence.par} is a list with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
-for the two convergence criteria described below, and \code{converged} is their conjunction; \code{max.rel.par} and \code{delta.loglik} are the values
+for the two convergence criteria described below, and \code{converged} says whether the stopping rule was met (either criterion with
+\code{em_stop = "any"}, both with \code{em_stop = "all"}) rather than the limit on the iterations reached; \code{max.rel.par} and \code{delta.loglik} are the values
 of the two criteria at the last iteration; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
 Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds the settings used.
 }
@@ -145,7 +146,7 @@ The algorithm details and formulas are given in Fasso' and Cameletti (2007, 2009
   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
 
   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
-  The algorithm converges when the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) are jointly met
+  The algorithm stops when either of the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) is met, or, with \code{em_stop = "all"} in \code{control}, when both are
 
   \deqn{\max_l \frac{|\psi_l^{(i)} - \psi_l^{(i-1)}|}{\max(|\psi_l^{(i-1)}|, 10^{-3})} < \texttt{em\_tol\_par}}{max_l |psi_l(i) - psi_l(i-1)| / max(|psi_l(i-1)|, 1e-3) < em_tol_par}
 

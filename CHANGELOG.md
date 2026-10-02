@@ -16,6 +16,39 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02 (second entry)
+
+**`em_stop`: the two criteria of the EM algorithm combined by "any"
+(default) or "all".** The first version of the rule required both criteria at
+the same iteration. The user disagreed: D-STEM stops at either, and requiring
+both costs several times the iterations for a gain in the log-likelihood of
+hundredths of a unit. `STEM_control(em_stop = "any")` is now the default,
+`"all"` the option. Checked on the slow ridge (regime 1 of the reference cell,
+G = 0.8, traced to 3000 iterations): "any" stopped at 86-110 iterations within
+0.03 log-likelihood units of the maximum, "all" at 129-507 within 0.002. On the
+fit at k = 3, phi = 0.05 of five replications of the reference cell, the
+relative bias and RMSE of the regime parameters against the truth are the same
+under the two rules (G: bias -15.5% against -17.0%, RMSE 32% against 35%; the
+other parameters within about three points, "any" never the worse), with 85/35/79 EM iterations per regime
+against 193/182/363, and 18 s per fit against 63 s. The grid of the simulation
+study on one replication of the reference cell takes 185 s under "any", 669 s
+under "all", against about 40 s with the old, unconverged rule.
+
+Two things learned on the way, recorded for whoever repeats these checks:
+
+- `pkgload::load_all()` sources the test helpers by default, and
+  `tests/testthat/helper-models.R` sets the loose session option
+  `Stem.control` that makes the test suite fast. A scratch run with
+  `control = NULL` then runs with the test settings. Use
+  `load_all(helpers = FALSE)`, or pass `control` explicitly.
+- A grid with loose final refits followed by refitting only the reported fits
+  at the defaults is NOT the same estimator: the departures that initialize the
+  unpenalized fits are computed from the pooled fit of the grid, which then
+  runs loose too. On replication 1 of the reference cell the initial
+  partitions of S1-weak-shr changed (ARI 0.31 between the two grids) and
+  S3-beta-shr selected k = 3 instead of 2. The simulation study runs at the
+  package defaults.
+
 ### 2026-10-02
 
 **The EM algorithm stopped too early, and the regime fits of SC-STEM started

@@ -43,7 +43,8 @@
 #' \code{phi.hat} is a list with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}).
 #' \code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) which is the output of the Kalman filtering procedure. \code{loglik} is the log-likehood value.
 #' \code{convergence.par} is a list with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
-#' for the two convergence criteria described below, and \code{converged} is their conjunction; \code{max.rel.par} and \code{delta.loglik} are the values
+#' for the two convergence criteria described below, and \code{converged} says whether the stopping rule was met (either criterion with
+#' \code{em_stop = "any"}, both with \code{em_stop = "all"}) rather than the limit on the iterations reached; \code{max.rel.par} and \code{delta.loglik} are the values
 #' of the two criteria at the last iteration; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
 #' Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds the settings used.
 #' }
@@ -103,7 +104,7 @@
 #'   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
 #'
 #'   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
-#'   The algorithm converges when the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) are jointly met
+#'   The algorithm stops when either of the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) is met, or, with \code{em_stop = "all"} in \code{control}, when both are
 #'
 #'   \deqn{\max_l \frac{|\psi_l^{(i)} - \psi_l^{(i-1)}|}{\max(|\psi_l^{(i-1)}|, 10^{-3})} < \texttt{em\_tol\_par}}{max_l |psi_l(i) - psi_l(i-1)| / max(|psi_l(i-1)|, 1e-3) < em_tol_par}
 #'
@@ -213,6 +214,9 @@ if (!is.null(max.iter)) control$em_maxit <- stem_control_resolve(list(em_maxit =
 tol_par    <- control$em_tol_par
 tol_loglik <- control$em_tol_loglik
 max.iter   <- control$em_maxit
+### when the algorithm stops: as soon as either criterion is met ("any", the
+### default), or only when both are ("all")
+em_done    <- if (identical(control$em_stop, "all")) function(a, b) a && b else function(a, b) a || b
 
 ### With no spatial correlation the exponential function is replaced by the
 ### identity, so that Sigma_e is a single variance and the Newton-Raphson step,
@@ -260,7 +264,7 @@ step_last     	= NULL
 max_rel_par  = Inf
 delta_loglik = Inf
 free_par     = NULL
-while ((!converged_EM_1 | !converged_EM_2) && n_iter_EM <= max.iter){
+while (!em_done(converged_EM_1, converged_EM_2) && n_iter_EM <= max.iter){
 	step = kalman(	z            		= z,
 			coordinates  	= coordinates,
          		p           		= p,
@@ -358,7 +362,7 @@ StemModel$estimates$y.smoothed = step_last$m.smoother
 StemModel$estimates$loglik = (parameters_mat[(n_iter_EM-1),2])*(-2)
 convergence.par 			= list(conv.log = converged_EM_1,
 						conv.par = converged_EM_2,
-						converged = converged_EM_1 && converged_EM_2,
+						converged = em_done(converged_EM_1, converged_EM_2),
 						max.rel.par = max_rel_par,
 						delta.loglik = delta_loglik,
 						iterEM   = n_iter_EM-1,
