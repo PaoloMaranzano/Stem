@@ -14,12 +14,13 @@
 ## says what is missing, so it can be run while the study is in progress.
 ##
 ##   R1  the reference cell: every scenario-variant at the reference levels
-##   R2  the core: selection and recovery against n, T and omega
+##   R2  the core: selection and recovery against n, T and the geometry
 ##   R3  S2: how often a homogeneous network is split
 ##   R4  robustness: balance, graph and n = 400 against the reference
 ##   R5  the parameters: bias and RMSE at the reference
 ##   R6  the penalty: recovery against phi, and the phi selected
-##   R7  the cost of a replication
+##   R7  the cost of a replication, by n and T and by geometry
+##   R8  the replications stopped by the time limit and drawn again
 ##
 ## Inputs  : <here>/results/<tag>.csv, -params.csv, -grid.csv  (--results=)
 ## Outputs : <here>/output/  tables (.tex, .csv) and figures (.pdf)  (--out=)
@@ -60,7 +61,7 @@ source(runner, local = globalenv())
 ## Options
 ## ---------------------------------------------------------------------------
 AN <- sim_config(list(
-  tag     = "main",
+  tag     = "main2",
   results = file.path(ana_here, "results"),
   out     = file.path(ana_here, "output")
 ))
@@ -75,6 +76,7 @@ cat("analysis\n  results from ", RES, " (tag ", paste(AN$tag, collapse = ", "),
 ## Style and small helpers
 ## ---------------------------------------------------------------------------
 PAL3 <- c("#1f6f8b", "#e0a458", "#a8516e")
+PAL4 <- c("#1b2430", "#1f6f8b", "#e0a458", "#a8516e")
 PAL5 <- c("#1b2430", "#1f6f8b", "#e0a458", "#5b8c5a", "#a8516e")
 GREY <- "#8a939f"
 INK  <- "#1b2430"
@@ -82,6 +84,23 @@ INK  <- "#1b2430"
 CORE_N  <- SIM_BLOCKS$core$n
 CORE_T  <- SIM_BLOCKS$core$TN
 CORE_OM <- SIM_BLOCKS$core$omega
+
+## The four geometries of the core, from the most to the least overlapping: the
+## overlap omega and what is held fixed as it grows (spread = "total": the
+## variance of the whole network; "regime": the variance within a regime).
+## Share of the locations nearer the centre of another regime: 67, 32, 20, 10%.
+GEO_LEV <- c("0", "0.7", "1b", "1")
+GEO_LAB <- c("0" = "total overlap", "0.7" = "medium-high overlap",
+             "1b" = "medium-low overlap", "1" = "strong separation")
+geo_code <- function(omega, spread) {
+  out <- rep(NA_character_, length(omega))
+  ok <- !is.na(omega)
+  out[ok & abs(omega) < 1e-8] <- "0"
+  out[ok & abs(omega - 0.7) < 1e-8] <- "0.7"
+  one <- ok & abs(omega - 1) < 1e-8
+  out[one] <- ifelse(spread[one] %in% "regime", "1b", "1")
+  out
+}
 
 pdf_open <- function(name, width, height)
   grDevices::cairo_pdf(file.path(OUT, name), width = width, height = height)
@@ -134,7 +153,7 @@ at_ref <- function(d, ...) {
   m <- utils::modifyList(SIM_REFERENCE, list(...))
   s2 <- d$scenario == "S2"
   d$n == m$n & d$TN == m$TN & d$knn == m$knn &
-    (s2 | (abs(d$omega - m$omega) < 1e-8 & d$balance == m$balance))
+    (s2 | (abs(d$omega - m$omega) < 1e-8 & d$spread %in% m$spread & d$balance == m$balance))
 }
 
 ## the metrics of a group of replications. With three regimes: how often k is
@@ -177,6 +196,11 @@ if (is.null(S)) stop("no results for tag ", paste(AN$tag, collapse = ", "), " in
                      call. = FALSE)
 
 S$error[is.na(S$error)] <- ""
+## results written before the fourth geometry and the time limit existed
+if (is.null(S$spread)) S$spread <- ifelse(is.na(S$omega), "-", "total")
+if (is.null(S$attempt)) S$attempt <- 1L
+S$geo <- geo_code(S$omega, S$spread)
+if (!is.null(P) && is.null(P$spread)) P$spread <- ifelse(is.na(P$omega), "-", "total")
 bad <- S[nzchar(S$error), , drop = FALSE]
 if (nrow(bad)) {
   cat("FAILED replications:", nrow(bad), "\n")
@@ -189,7 +213,7 @@ S <- S[!nzchar(S$error), , drop = FALSE]
 ## design puts it there
 blk <- lapply(names(SIM_BLOCKS), function(b) sim_cells(blocks = SIM_BLOCKS[b])$cell)
 names(blk) <- names(SIM_BLOCKS)
-S$in_core <- S$cell %in% blk$core
+S$in_core <- S$cell %in% unlist(blk[intersect(c("core", "spread"), names(blk))])
 cat("replications:", nrow(S), "in", length(unique(S$cell)), "cells;",
     sum(S$in_core), "in the core\n\n")
 
@@ -220,33 +244,33 @@ if (nrow(ref)) {
 
 
 ## ===========================================================================
-## R2. The core: selection and recovery against n, T and omega
+## R2. The core: selection and recovery against n, T and the geometry
 ## ===========================================================================
 core <- S[S$in_core & S$K_true > 1, , drop = FALSE]
 if (nrow(core)) {
-  tc <- agg(core, c("scenario", "omega", "TN", "n"), metrics)
-  tc <- tc[order(match(tc$scenario, scen_order(tc$scenario)), tc$omega, tc$TN, tc$n), ]
+  tc <- agg(core, c("scenario", "geo", "TN", "n"), metrics)
+  tc <- tc[order(match(tc$scenario, scen_order(tc$scenario)), match(tc$geo, GEO_LEV), tc$TN, tc$n), ]
   csv_write(tc, "tab_sim_core.csv")
   cat("R2. THE CORE:", nrow(tc), "cells with three regimes\n")
-  print(utils::head(tc[, c("scenario", "omega", "TN", "n", "M", "k_ok", "ari", "ari_sel")], 12),
+  print(utils::head(tc[, c("scenario", "geo", "TN", "n", "M", "k_ok", "ari", "ari_sel")], 12),
         row.names = FALSE, digits = 3)
   if (nrow(tc) > 12) cat("  ... (", nrow(tc) - 12, " more rows in tab_sim_core.csv)\n", sep = "")
 
-  ## a wide table: scenario and omega by rows, T and n by columns
+  ## a wide table: scenario and geometry by rows, T and n by columns
   wide_tex <- function(v, name, caption_head) {
     ids <- scen_order(tc$scenario)
     head1 <- paste0(" & & ", paste(sprintf("\\multicolumn{%d}{c}{$T = %d$}", length(CORE_N), CORE_T),
                                    collapse = " & "), " \\\\")
     rules <- paste(sprintf("\\cmidrule(lr){%d-%d}", 3 + (seq_along(CORE_T) - 1) * length(CORE_N),
                            2 + seq_along(CORE_T) * length(CORE_N)), collapse = " ")
-    head2 <- paste0("scenario-variant & $\\omega$ & ",
+    head2 <- paste0("scenario-variant & geometry & ",
                     paste(rep(CORE_N, length(CORE_T)), collapse = " & "), " \\\\")
-    body <- unlist(lapply(ids, function(i) vapply(CORE_OM, function(w) {
+    body <- unlist(lapply(ids, function(i) vapply(GEO_LEV, function(w) {
       vals <- unlist(lapply(CORE_T, function(Tn) vapply(CORE_N, function(nn) {
-        q <- tc[tc$scenario == i & abs(tc$omega - w) < 1e-8 & tc$TN == Tn & tc$n == nn, v]
+        q <- tc[tc$scenario == i & tc$geo %in% w & tc$TN == Tn & tc$n == nn, v]
         if (length(q)) fmt(q) else "---"
       }, character(1))))
-      paste0(if (abs(w - CORE_OM[1]) < 1e-8) tt(i) else "", " & ", format(w), " & ",
+      paste0(if (w == GEO_LEV[1]) tt(i) else "", " & ", GEO_LAB[[w]], " & ",
              paste(vals, collapse = " & "), " \\\\")
     }, character(1))))
     tex_write(c(sprintf("%% %s", caption_head),
@@ -271,15 +295,15 @@ if (nrow(core)) {
       graphics::plot(NA, xlim = range(CORE_N), ylim = c(0, 1), log = "x", xaxt = "n",
                      xlab = "", ylab = "", bty = "n", las = 1, cex.axis = 0.8)
       graphics::axis(1, at = CORE_N, labels = CORE_N, cex.axis = 0.8)
-      for (wi in seq_along(CORE_OM)) {
-        q <- s[abs(s$omega - CORE_OM[wi]) < 1e-8, ]
+      for (wi in seq_along(GEO_LEV)) {
+        q <- s[s$geo %in% GEO_LEV[wi], ]
         q <- q[order(q$n), ]
         if (!nrow(q)) next
         se <- q[[se_v]]; se[!is.finite(se)] <- 0
         graphics::polygon(c(q$n, rev(q$n)), pmin(1, pmax(0, c(q[[v]] - 2 * se, rev(q[[v]] + 2 * se)))),
-                          col = grDevices::adjustcolor(PAL3[wi], 0.15), border = NA)
-        graphics::lines(q$n, q[[v]], col = PAL3[wi], lwd = 1.6)
-        graphics::points(q$n, q[[v]], col = PAL3[wi], pch = 19, cex = 0.6)
+                          col = grDevices::adjustcolor(PAL4[wi], 0.15), border = NA)
+        graphics::lines(q$n, q[[v]], col = PAL4[wi], lwd = 1.6)
+        graphics::points(q$n, q[[v]], col = PAL4[wi], pch = 19, cex = 0.6)
       }
       if (i == ids[1]) graphics::mtext(sprintf("T = %d", Tn), side = 3, line = 0.4,
                                        cex = 0.8, font = 2, col = INK)
@@ -287,8 +311,8 @@ if (nrow(core)) {
                                            cex = 0.72, font = 2, col = INK)
     }
     graphics::par(mar = c(2.6, 0.2, 1.2, 0.2)); graphics::plot.new()
-    graphics::legend("center", bty = "n", cex = 0.8, legend = paste0("omega = ", CORE_OM),
-                     col = PAL3, lwd = 1.6, pch = 19)
+    graphics::legend("center", bty = "n", cex = 0.75, legend = GEO_LAB[GEO_LEV],
+                     col = PAL4, lwd = 1.6, pch = 19)
     graphics::mtext("number of locations", side = 1, outer = TRUE, line = 0.2, cex = 0.8)
     graphics::mtext(paste(title, "-", ylab), side = 3, outer = TRUE, line = 1.0, cex = 0.95,
                     font = 2, col = INK)
@@ -515,4 +539,47 @@ tex_write(c("\\begin{tabular}{rrrrrr}", "\\toprule",
                     as.integer(tcost$runs), fmt(tcost$median, 0), fmt(tcost$mean, 0),
                     fmt(tcost$max, 0)),
             "\\bottomrule", "\\end{tabular}"), "tab_sim_cost.tex")
+
+## by geometry, in the core only: the overlap of the regimes changes the
+## number of iterations of the alternation and of the EM algorithm
+core_c <- S[S$in_core, , drop = FALSE]
+if (nrow(core_c)) {
+  tgeo <- agg(core_c, c("geo", "n", "TN"), function(s)
+    data.frame(runs = nrow(s), median = stats::median(s$secs_total, na.rm = TRUE),
+               max = max(s$secs_total, na.rm = TRUE)))
+  tgeo <- tgeo[order(match(tgeo$geo, GEO_LEV), tgeo$n, tgeo$TN), ]
+  cat("\nR7. SECONDS per replication in the core, by geometry, n and T\n")
+  print(tgeo, row.names = FALSE, digits = 3)
+  csv_write(tgeo, "tab_sim_cost_geometry.csv")
+}
+cat("\n")
+
+
+## ===========================================================================
+## R8. The replications stopped by the time limit and drawn again
+## ===========================================================================
+## Every timeout is logged by the runner in <tag>-timeouts.csv; the replication
+## is then drawn again with another seed (attempt 2, 3, ...). A cell with many
+## timeouts is one where the estimator is systematically slow, not a few bad
+## draws.
+TO <- rd("-timeouts", c("cell", "rep", "attempt"))
+if (!is.null(TO) && nrow(TO)) {
+  if (is.null(TO$spread)) TO$spread <- ifelse(is.na(TO$omega), "-", "total")
+  TO$geo <- geo_code(TO$omega, TO$spread)
+  done_key <- paste(S$cell, S$rep)          # S holds the completed replications only
+  tto <- agg(TO, c("scenario", "geo", "n", "TN"), function(s) {
+    reps <- unique(paste(s$cell, s$rep))
+    data.frame(timeouts = nrow(s), reps = length(reps), recovered = sum(reps %in% done_key),
+               cap_median = stats::median(s$cap, na.rm = TRUE))
+  })
+  redrawn <- S[S$attempt > 1, , drop = FALSE]
+  tto <- tto[order(match(tto$scenario, scen_order(tto$scenario)), match(tto$geo, GEO_LEV),
+                   tto$n, tto$TN), ]
+  cat("R8. TIMEOUTS by scenario-variant, geometry, n and T (recovered = replications\n",
+      "    that succeeded at a later attempt)\n", sep = "")
+  print(tto, row.names = FALSE, digits = 3)
+  cat(sprintf("\n  %d timeouts in total; %d replications drawn again and completed\n",
+              nrow(TO), nrow(redrawn)))
+  csv_write(tto, "tab_sim_timeouts.csv")
+} else cat("R8: no timeouts logged\n")
 cat("\ndone\n")

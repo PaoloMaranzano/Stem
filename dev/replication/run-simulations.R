@@ -37,6 +37,15 @@
 ## files. To share the work between machines give each its own `tag` and its own
 ## range of replications.
 ##
+## THE TIME LIMIT. Every replication runs in a separate R process (package
+## callr) under a time limit set from the times already recorded: cap_mult times
+## the median of the cell once cap_after replications of it are done, before
+## that cap_first_mult times the median of the cells with the same (n, T), and
+## cap_first_min seconds when nothing is known yet. A replication over its limit
+## is stopped, written to <tag>-timeouts.csv, and drawn again with the seed of
+## the next attempt (1000 rep + 1 + 100000 (attempt - 1)), up to cap_attempts;
+## the last one is recorded as failed. cap_mult = 0 removes the limit.
+##
 ## Every setting of the SETUP can also be given from a terminal, which overrides
 ## it; lists are separated by commas:
 ##
@@ -51,7 +60,7 @@
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package, and nothing here is shipped with it.
 ##
-## FIVE OUTPUTS, keyed on (cell, rep) and joining on it and on nothing else:
+## SIX OUTPUTS, keyed on (cell, rep) and joining on it and on nothing else:
 ##
 ##   <tag>.csv           one row per replication: the selected (k, phi), the
 ##                       recovery of the partition, the error of the fitted
@@ -66,6 +75,7 @@
 ##                       ARI of its partition with the truth
 ##   <tag>-obs/*.rds     the full observations of the first keep_obs
 ##                       replications of every cell
+##   <tag>-timeouts.csv  one row per replication stopped by the time limit
 ## ===========================================================================
 
 
@@ -118,9 +128,10 @@ sim_require <- function(pkgs) {
   }
 }
 
-## Pinned to the commit of 2026-09-28 (departures initialization, warm start,
-## two-step rule with phi by the smallest BIC at the selected k)
-SIM_STEM_REF <- "PaoloMaranzano/Stem@4325536872218e27a39f9fd21ba533196c9ace50"
+## Pinned to the commit of 2026-10-02 (STEM_control, the stopping rule of the
+## EM algorithm with em_stop = "any", the regimes started from their own least
+## squares and then warm, the final refit at the settings of the pooled fit)
+SIM_STEM_REF <- "PaoloMaranzano/Stem@9f9c81edd05661233f1cdd76fbdeb886587465bd"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
@@ -148,7 +159,7 @@ sim_stem_ok <- function(latest = NA_character_) {
   }
   if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
   ns <- asNamespace("Stem")
-  have <- c("STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
+  have <- c("STEM_control", "STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "scstem_neighbors", "scstem_align_labels", "scstem_ari")
   all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
@@ -169,6 +180,7 @@ if (!sim_stem_ok(SIM_STEM_SHA)) {
          "\")", call. = FALSE)
 }
 sim_require("spdep")
+if (!SIM_DEFINE_ONLY) sim_require("callr")   # runs a replication under its time limit
 suppressPackageStartupMessages(library("Stem"))
 
 
@@ -247,16 +259,28 @@ SIM_SCENARIOS <- c("S2", "S1s-ind", "S1s-shr", "S1w-shr",
 ##            coincide in space; 0.70: contiguous areas interpenetrating along
 ##            their borders (1.63 within-regime standard deviations between
 ##            centres); 1: well apart. Vacuous in S2
+##   spread   what is held fixed as omega moves the centres apart. "total": the
+##            variance of a coordinate over the whole network, so the regimes
+##            shrink as they separate (omega = 1: 3.2 standard deviations
+##            between centres, 10% of the locations nearer another centre);
+##            "regime": the variance within a regime, at its value at omega =
+##            0.70, so the network widens instead (omega = 1: 2.3 standard
+##            deviations, 20% nearer another centre). The two coincide at
+##            omega = 0.70. Vacuous in S2
 ##   balance  relative sizes of the regimes, "balanced" or "unbalanced"
 ##            (1:2:3). Vacuous in S2
 ##   knn      neighbours of the graph of the Potts penalty
-SIM_REFERENCE <- list(n = 100L, TN = 120L, omega = 0.70, balance = "balanced", knn = 5L)
+SIM_REFERENCE <- list(n = 100L, TN = 120L, omega = 0.70, spread = "total", balance = "balanced",
+                      knn = 5L)
 
 ## The blocks (simulation-design.tex, Section 7). The core crosses the three
 ## factors that govern recovery; the others vary one factor at a time around
 ## the reference.
 SIM_BLOCKS <- list(
   core    = list(n = c(40L, 100L, 200L), TN = c(60L, 120L, 365L), omega = c(0, 0.70, 1)),
+  ## the fourth geometry of the core: regimes 2 omega apart with the spread
+  ## they have at omega = 0.70 (medium-low overlap)
+  spread  = list(n = c(40L, 100L, 200L), TN = c(60L, 120L, 365L), omega = 1, spread = "regime"),
   balance = list(balance = "unbalanced"),
   knn     = list(knn = c(3L, 10L)),
   n400    = list(n = 400L)
@@ -284,10 +308,17 @@ SIM_S1 <- list(
               G  = c(0.80, 0.70, 0.60), v  = c(0.30, 0.35, 0.40),
               se = c(0.20, 0.25, 0.30), so = c(0.20, 0.175, 0.15),
               R  = c(2, 1.5, 1)),
+  ## regime 3 has nugget 0.40, sill 0.20 and range 1 (it had 0.50, 0.10, 0.5):
+  ## with a sill one sixth of the error variance and a range of three
+  ## nearest-neighbour spacings its spatial parameters were not identified, and
+  ## a long-range field absorbed part of its almost white latent process. The
+  ## total error variance and the range, all the assignment score sees, are
+  ## unchanged or invisible to it, so the separation of the scenarios is the same.
+  ## Regime 2 has range 1.5 (it had 1), so that the ranges still decrease.
   strong = list(b0 = c(2.00, 2.30, 2.60), b1 = c(0.55, 0.85, 1.15),
                 G  = c(0.80, 0.50, 0.20), v  = c(0.30, 0.40, 0.50),
-                se = c(0.20, 0.35, 0.50), so = c(0.20, 0.15, 0.10),
-                R  = c(2, 1, 0.5))
+                se = c(0.20, 0.35, 0.40), so = c(0.20, 0.15, 0.20),
+                R  = c(2, 1.5, 1))
 )
 
 ## S3 keeps the values of S1 at this level for the blocks that differ
@@ -327,8 +358,28 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## any replication can be regenerated from its seed.
     keep_obs = 1L,
 
+    ## The time limit of a replication, adaptive cell by cell. Once a cell has
+    ## cap_after replications that ended normally, the limit is cap_mult times
+    ## their median (at least cap_min seconds); before that, cap_first_mult
+    ## times the median of the replications with the same (n, T) in any cell
+    ## (at least cap_first_min seconds), or cap_first_min when there are none.
+    ## A replication over its limit is stopped, written to <tag>-timeouts.csv
+    ## and drawn again with the seed of its next attempt, up to cap_attempts
+    ## attempts; after the last it is recorded as failed. Each replication then
+    ## runs in a process of its own (package callr), which is what lets it be
+    ## stopped. cap_mult = 0 switches the limit off.
+    cap_mult       = 10,
+    cap_min        = 600,
+    cap_after      = 3L,
+    cap_first_mult = 20,
+    cap_first_min  = 3600,
+    cap_attempts   = 3L,
+
     ## Bookkeeping. `out` defaults to a results/ folder beside this script.
-    tag      = "main",
+    ## "main2": the design of October 2026 (new values of the strong level,
+    ## the fourth geometry, the new stopping rule of the EM algorithm); the
+    ## first pass of September, under "main", is not comparable with it.
+    tag      = "main2",
     out      = file.path(SIM_HERE, "results")
   )))
 
@@ -447,11 +498,13 @@ dgp_feasible <- function(n, K, balance = "balanced") {
   ok
 }
 
-dgp_locations <- function(n, K, omega, balance = "balanced", seed = 1) {
+## spread = "total": the within-regime variance is what NU_TOT leaves to the
+## centres; spread = "regime": it is fixed at its value at the reference omega.
+dgp_locations <- function(n, K, omega, balance = "balanced", seed = 1, spread = "total") {
   set.seed(seed)
   g  <- rep(seq_len(K), times = dgp_sizes(n, K, balance))
   mu <- dgp_centres(K, omega)
-  nu_sp <- NU_TOT - dgp_centre_var(K, omega)
+  nu_sp <- NU_TOT - dgp_centre_var(K, if (identical(spread, "regime")) SIM_REFERENCE$omega else omega)
   if (nu_sp <= 0) stop("omega = ", omega, " spreads the centres beyond NU_TOT", call. = FALSE)
   xy <- cbind(sx = mu[g, 1] + stats::rnorm(n, sd = sqrt(nu_sp)),
               sy = mu[g, 2] + stats::rnorm(n, sd = sqrt(nu_sp)))
@@ -598,15 +651,17 @@ dgp_error <- function(labels, psi, coords, TN, field) {
 ## replication r uses the same locations and covariate in every
 ## scenario-variant (S2, with its single cloud, apart), and the same random
 ## numbers for the latent and the error, so that two variants differ by their
-## definition and not by their draw.
+## definition and not by their draw. A replication that exceeds its time limit
+## is drawn again with the seed of the next attempt, 100000 further on.
 ## ---------------------------------------------------------------------------
-dgp_draw <- function(cell, rep) {
+dgp_draw <- function(cell, rep, attempt = 1L) {
   row  <- SIM_SCEN[SIM_SCEN$id == cell$scenario, , drop = FALSE]
   K    <- if (row$family == "S2") 1L else 3L
-  seed <- 1000L * rep + 1L
+  seed <- 1000L * rep + 1L + 100000L * (as.integer(attempt) - 1L)
+  spread <- if (is.null(cell$spread) || K == 1L) "total" else cell$spread
   loc  <- dgp_locations(cell$n, K, if (K == 1L) 0 else cell$omega,
                         balance = if (K == 1L) "balanced" else cell$balance,
-                        seed = seed)
+                        seed = seed, spread = spread)
   x    <- dgp_covariate(loc$coords, cell$TN, seed = seed + 1L)
   psi  <- dgp_psi(row)
   set.seed(seed + 2L)
@@ -656,13 +711,14 @@ sim_cells <- function(cfg = CFG, blocks = sim_blocks(cfg)) {
   cells <- do.call(rbind, lapply(names(blocks), function(b) {
     m <- utils::modifyList(SIM_REFERENCE, blocks[[b]])
     x <- expand.grid(scenario = cfg$scenario, n = m$n, TN = m$TN, omega = m$omega,
-                     balance = m$balance, knn = m$knn,
+                     spread = m$spread, balance = m$balance, knn = m$knn,
                      stringsAsFactors = FALSE, KEEP.OUT.ATTRS = FALSE)
     x$block <- b
     x
   }))
   s2 <- cells$scenario == "S2"
   cells$omega[s2] <- NA_real_
+  cells$spread[s2] <- "-"
   cells$balance[s2] <- "-"
   cells$cell <- sim_cell_id(cells)
   cells <- cells[!duplicated(cells$cell), , drop = FALSE]
@@ -676,9 +732,11 @@ sim_cells <- function(cfg = CFG, blocks = sim_blocks(cfg)) {
 ## The primary key of a cell: a string, because omega is a double and a join on
 ## a floating-point column is a defect waiting to happen.
 sim_cell_id <- function(cells) {
+  ## omega carries a "b" when the regimes keep their spread (spread = "regime")
   sprintf("%s_n%d_T%d_w%s_%s_knn%d", cells$scenario, as.integer(cells$n),
           as.integer(cells$TN),
-          ifelse(is.na(cells$omega), "NA", sprintf("%.2f", cells$omega)),
+          ifelse(is.na(cells$omega), "NA", paste0(sprintf("%.2f", cells$omega),
+                 ifelse(cells$spread %in% "regime", "b", ""))),
           substr(cells$balance, 1, 3), as.integer(cells$knn))
 }
 
@@ -702,16 +760,21 @@ sim_cost <- function(cells, measured, nrep, cores) {
 ## ===========================================================================
 ## THE MONTE CARLO: one replication is the whole procedure a user would run
 ## ===========================================================================
-sim_one <- function(cell, rep) {
+sim_one <- function(cell, rep, attempt = 1L) {
 
   t_all <- proc.time()[["elapsed"]]
-  dat <- dgp_draw(cell, rep)
+  dat <- dgp_draw(cell, rep, attempt)
   mod <- sim_model(dat)
 
+  ## The computational settings are the defaults of the package, passed
+  ## explicitly so that a session option Stem.control cannot change them. A
+  ## grid with looser final refits would be another estimator: the departures
+  ## that start the unpenalized fits come from the pooled fit of the grid.
   t0 <- proc.time()[["elapsed"]]
   ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
                               distance = "euclidean", verbose = FALSE,
-                              knn = cell$knn, min_cluster_size = N_MIN)
+                              knn = cell$knn, min_cluster_size = N_MIN,
+                              control = Stem::STEM_control())
   sel <- Stem::SCSTEM_Select(ic)
   secs <- proc.time()[["elapsed"]] - t0
 
@@ -749,10 +812,11 @@ sim_one <- function(cell, rep) {
     sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
 
   row <- dat$row
-  key <- data.frame(cell = cell$cell, rep = rep, scenario = cell$scenario,
+  key <- data.frame(cell = cell$cell, rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
                     family = row$family, level = row$level, common = row$common,
                     variant = row$variant, rho = row$rho, field = row$field,
                     n = cell$n, TN = cell$TN, omega = cell$omega,
+                    spread = if (is.null(cell$spread)) "total" else cell$spread,
                     balance = cell$balance, knn = cell$knn, K_true = K,
                     stringsAsFactors = FALSE)
 
@@ -827,32 +891,60 @@ sim_one <- function(cell, rep) {
 
 ## The row a replication leaves when it fails: the key, NA for every measure,
 ## and the reason.
-sim_failed <- function(cell, rep, msg) {
+sim_failed <- function(cell, rep, msg, attempt = 1L, secs = NA_real_) {
   row <- SIM_SCEN[SIM_SCEN$id == cell$scenario, , drop = FALSE]
   list(summary = data.frame(
-    cell = cell$cell, rep = rep, scenario = cell$scenario,
+    cell = cell$cell, rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
     family = row$family, level = row$level, common = row$common,
     variant = row$variant, rho = row$rho, field = row$field,
-    n = cell$n, TN = cell$TN, omega = cell$omega, balance = cell$balance,
+    n = cell$n, TN = cell$TN, omega = cell$omega,
+    spread = if (is.null(cell$spread)) "total" else cell$spread, balance = cell$balance,
     knn = cell$knn, K_true = if (row$family == "S2") 1L else 3L,
     k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
     ari_sel = NA_real_, share_sel = NA_real_, ari_true = NA_real_, share_true = NA_real_,
     rmse_sel = NA_real_, rmse_true = NA_real_, rmse_pooled = NA_real_,
-    nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_, secs_total = NA_real_,
+    nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_, secs_total = secs,
     error = msg, stringsAsFactors = FALSE),
     params = NULL, grid = NULL, station = NULL, obs = NULL)
 }
 
-sim_one_safe <- function(cell, rep) {
-  tryCatch(sim_one(cell, rep),
-           error = function(e) sim_failed(cell, rep, conditionMessage(e)))
+sim_one_safe <- function(cell, rep, attempt = 1L) {
+  tryCatch(sim_one(cell, rep, attempt),
+           error = function(e) sim_failed(cell, rep, conditionMessage(e), attempt))
+}
+
+## One replication under its time limit, in a process of its own that is killed
+## when the limit is reached. Within one R process a limit cannot be enforced:
+## setTimeLimit() raises an error once, which the estimation code catches as the
+## failure of one configuration and goes on. The process loads this file in
+## definitions-only mode and takes the settings of the session.
+sim_one_capped <- function(task) {
+  t0 <- proc.time()[["elapsed"]]
+  res <- tryCatch(
+    callr::r(function(path, cfg, cell, rep, attempt) {
+      assign("SIM_DEFINE_ONLY", TRUE, envir = globalenv())
+      source(path, local = globalenv())
+      assign("CFG", cfg, envir = globalenv())
+      sim_one_safe(cell, rep, attempt)
+    }, args = list(task$path, CFG, task$cell, task$rep, task$attempt),
+    timeout = task$cap),
+    error = function(e) e)
+  secs <- proc.time()[["elapsed"]] - t0
+  if (inherits(res, "callr_timeout_error"))
+    return(sim_failed(task$cell, task$rep, sprintf("timeout after %.0f s", secs), task$attempt, secs))
+  if (inherits(res, "error"))
+    return(sim_failed(task$cell, task$rep, conditionMessage(res), task$attempt, secs))
+  res
 }
 
 
 ## ===========================================================================
 ## Running the tasks on several cores
 ## ===========================================================================
-sim_task_fun <- function(task) sim_one_safe(task$cell, task$rep)
+sim_task_fun <- function(task) {
+  if (is.finite(task$cap) && !is.null(task$path) && requireNamespace("callr", quietly = TRUE))
+    sim_one_capped(task) else sim_one_safe(task$cell, task$rep, task$attempt)
+}
 
 ## What a core does once, when it starts: load this very file in
 ## definitions-only mode and take the settings of the session that launched it.
@@ -865,7 +957,10 @@ sim_worker_init <- function(path, cfg) {
 
 ## Runs `fun` on every task and hands each result to `on_result` as soon as it
 ## arrives; the tasks are handed out one at a time as the processes free up.
-sim_run_tasks <- function(tasks, fun, on_result, cores) {
+## `prepare` completes a task just before it is handed out (its time limit,
+## computed on what has been recorded so far), and `on_result` may return a task
+## to be appended to the queue (a replication drawn again after a timeout).
+sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task) task) {
   n <- length(tasks)
   if (!n) return(invisible(0L))
   cores <- max(1L, min(as.integer(cores), n))
@@ -875,8 +970,14 @@ sim_run_tasks <- function(tasks, fun, on_result, cores) {
     cores <- 1L
   }
   if (cores == 1L) {
-    for (k in seq_len(n)) on_result(fun(tasks[[k]]), tasks[[k]], k, n)
-    return(invisible(n))
+    k <- 0L
+    while (k < length(tasks)) {
+      k <- k + 1L
+      tasks[[k]] <- prepare(tasks[[k]])
+      again <- on_result(fun(tasks[[k]]), tasks[[k]], k, length(tasks))
+      if (!is.null(again)) tasks[[length(tasks) + 1L]] <- again
+    }
+    return(invisible(length(tasks)))
   }
   cat(sprintf("starting %d R processes ...\n", cores)); utils::flush.console()
   cl <- parallel::makePSOCKcluster(cores)
@@ -884,17 +985,22 @@ sim_run_tasks <- function(tasks, fun, on_result, cores) {
   parallel::clusterCall(cl, sim_worker_init, SIM_FILE, CFG)
   send <- utils::getFromNamespace("sendCall", "parallel")
   recv <- utils::getFromNamespace("recvOneResult", "parallel")
-  for (i in seq_len(cores)) send(cl[[i]], fun, list(tasks[[i]]), tag = i)
-  nxt <- cores + 1L
-  for (k in seq_len(n)) {
-    d <- recv(cl)
-    if (nxt <= n) {
-      send(cl[[d$node]], fun, list(tasks[[nxt]]), tag = nxt)
-      nxt <- nxt + 1L
-    }
-    on_result(d$value, tasks[[d$tag]], k, n)
+  for (i in seq_len(cores)) {
+    tasks[[i]] <- prepare(tasks[[i]])
+    send(cl[[i]], fun, list(tasks[[i]]), tag = i)
   }
-  invisible(n)
+  nxt <- cores + 1L; inflight <- cores; k <- 0L
+  while (inflight > 0L) {
+    d <- recv(cl); inflight <- inflight - 1L; k <- k + 1L
+    again <- on_result(d$value, tasks[[d$tag]], k, length(tasks))
+    if (!is.null(again)) tasks[[length(tasks) + 1L]] <- again
+    if (nxt <= length(tasks)) {
+      tasks[[nxt]] <- prepare(tasks[[nxt]])
+      send(cl[[d$node]], fun, list(tasks[[nxt]]), tag = nxt)
+      nxt <- nxt + 1L; inflight <- inflight + 1L
+    }
+  }
+  invisible(length(tasks))
 }
 
 ## Replication by replication, so an interrupted run leaves whole replications
@@ -940,6 +1046,7 @@ sim_main <- function() {
   CSV_PAR <- file.path(OUT, sprintf("%s-params.csv", CFG$tag))
   CSV_GRD <- file.path(OUT, sprintf("%s-grid.csv", CFG$tag))
   CSV_STA <- file.path(OUT, sprintf("%s-stations.csv", CFG$tag))
+  CSV_TO  <- file.path(OUT, sprintf("%s-timeouts.csv", CFG$tag))
   DIR_OBS <- file.path(OUT, sprintf("%s-obs", CFG$tag))
 
   cells <- sim_cells()
@@ -950,7 +1057,7 @@ sim_main <- function() {
               CFG$nrep, OUT))
 
   if (identical(CFG$mode[1], "dry")) {
-    print(cells[, c("block", "scenario", "n", "TN", "omega", "balance", "knn")],
+    print(cells[, c("block", "scenario", "n", "TN", "omega", "spread", "balance", "knn")],
           row.names = FALSE)
     cat("\n")
     sim_print_cost(cells, prev, CFG)
@@ -960,6 +1067,35 @@ sim_main <- function() {
   dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
   dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
   done <- if (is.null(prev)) character(0) else paste(prev$cell, prev$rep, sep = "|")
+
+  ## The durations of the replications that ended normally, by cell and by
+  ## (n, T), from which the time limits are computed; they start from what is
+  ## already recorded.
+  T_CELL <- new.env(); T_NT <- new.env()
+  remember <- function(cell, n, TN, secs) {
+    if (!is.finite(secs)) return(invisible(NULL))
+    assign(cell, c(get0(cell, T_CELL, inherits = FALSE), secs), envir = T_CELL)
+    key <- paste(n, TN); assign(key, c(get0(key, T_NT, inherits = FALSE), secs), envir = T_NT)
+  }
+  if (!is.null(prev)) {
+    ok <- is.na(prev$error) | !nzchar(prev$error)
+    for (i in which(ok)) remember(prev$cell[i], prev$n[i], prev$TN[i], prev$secs_total[i])
+  }
+  cap_of <- function(cell) {
+    if (!(CFG$cap_mult[1] > 0)) return(Inf)
+    own <- get0(cell$cell, T_CELL, inherits = FALSE)
+    if (length(own) >= CFG$cap_after[1])
+      return(max(CFG$cap_min[1], CFG$cap_mult[1] * stats::median(own)))
+    ref <- get0(paste(cell$n, cell$TN), T_NT, inherits = FALSE)
+    if (length(ref)) return(max(CFG$cap_first_min[1], CFG$cap_first_mult[1] * stats::median(ref)))
+    CFG$cap_first_min[1]
+  }
+  prepare <- function(task) {
+    if (is.null(task$attempt)) task$attempt <- 1L
+    task$cap <- cap_of(task$cell)
+    task$path <- SIM_FILE
+    task
+  }
 
   save_obs <- function(df, cell, rep) {
     if (is.null(df)) return(invisible(NULL))
@@ -979,22 +1115,41 @@ sim_main <- function() {
   t_start <- proc.time()[["elapsed"]]
   on_result <- function(out, task, k, n) {
     if (!is.list(out) || is.null(out$summary))
-      out <- sim_failed(task$cell, task$rep, paste(as.character(out), collapse = " "))
+      out <- sim_failed(task$cell, task$rep, paste(as.character(out), collapse = " "), task$attempt)
+    s  <- out$summary
+    el <- (proc.time()[["elapsed"]] - t_start) / 3600
+    ## a replication over its time limit: recorded apart and, while attempts
+    ## are left, drawn again with the seed of the next attempt (the last
+    ## attempt is also written to the results, as a failed replication)
+    if (grepl("^timeout", s$error))
+      sim_append(data.frame(cell = task$cell$cell, rep = task$rep, attempt = task$attempt,
+                            scenario = task$cell$scenario, n = task$cell$n, TN = task$cell$TN,
+                            omega = task$cell$omega, spread = task$cell$spread,
+                            cap = round(task$cap), secs = round(s$secs_total),
+                            seed = 1000L * task$rep + 1L + 100000L * (task$attempt - 1L)), CSV_TO)
+    if (grepl("^timeout", s$error) && task$attempt < CFG$cap_attempts[1]) {
+      cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | TIMEOUT after %.0f s (limit %.0f s), attempt %d of %d: drawn again\n",
+                  k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, task$cap,
+                  task$attempt, CFG$cap_attempts[1]))
+      utils::flush.console()
+      task$attempt <- task$attempt + 1L
+      return(task)
+    }
     sim_append(out$summary, CSV)
     sim_append(out$params,  CSV_PAR)
     sim_append(out$grid,    CSV_GRD)
     sim_append(out$station, CSV_STA)
     save_obs(out$obs, task$cell, task$rep)
-    s  <- out$summary
-    el <- (proc.time()[["elapsed"]] - t_start) / 3600
+    if (!nzchar(s$error)) remember(task$cell$cell, task$cell$n, task$cell$TN, s$secs_total)
     cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | %6.1f s %5s %6s | %s, ~%s left\n",
                 k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, format(s$k_hat),
                 format(round(s$ari_true, 3)), sim_hours(el), sim_hours(el / k * (n - k))))
     if (nzchar(s$error)) cat("              FAILED: ", s$error, "\n", sep = "")
     utils::flush.console()
+    NULL
   }
 
-  sim_run_tasks(tasks, sim_task_fun, on_result, CFG$cores[1])
+  sim_run_tasks(tasks, sim_task_fun, on_result, CFG$cores[1], prepare = prepare)
   cat(sprintf("\ndone in %s\n\n", sim_hours((proc.time()[["elapsed"]] - t_start) / 3600)))
   sim_print_cost(cells, utils::read.csv(CSV, stringsAsFactors = FALSE), CFG)
   invisible(NULL)

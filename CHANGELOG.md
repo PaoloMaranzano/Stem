@@ -16,6 +16,44 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02 (third entry)
+
+**The simulation study, second design (`tag = "main2"`): new values, a fourth
+geometry, a time limit per replication, and the figures of the design.**
+Replication material only (`dev/replication`), nothing in the package.
+
+- `run-simulations.R`. Regime 3 of S1-strong has nugget 0.40, partial sill
+  0.20 and range 1 (it had 0.50, 0.10 and 0.5), regime 2 range 1.5: with a sill
+  one sixth of the error variance and a range of three nearest-neighbour
+  spacings the spatial parameters of regime 3 were not identified, and a
+  long-range field absorbed part of its almost white latent process. The total
+  error variances, all the assignment score sees, are unchanged, so the
+  separation of the scenarios is the same. A fourth geometry, block `spread`:
+  omega = 1 with the spread of a regime fixed at its value at omega = 0.7
+  (medium-low overlap, 20% of the locations nearer another centre), beside
+  omega = 1 with the spread of the network fixed (strong separation, 10%); 72
+  cells more, 332 in all. Every replication runs in its own process (callr)
+  under an adaptive time limit (10 times the median of its cell after three
+  replications, 20 times the median of its (n, T) before, 3600 s with nothing
+  recorded); a replication over the limit is written to
+  `<tag>-timeouts.csv` and drawn again with seed 1000 rep + 1 + 100000
+  (attempt - 1), up to three attempts. `setTimeLimit()` could not do this: it
+  fires once and the `tryCatch()` blocks inside the estimator swallow it. The
+  grid runs with `control = STEM_control()` passed explicitly; pinned to
+  9f9c81e. Checked: the dry run, a replication stopped at a 5 s limit, drawn
+  again and recorded as failed, and a replication completed inside the
+  process.
+- `analyse-simulations.R`: the core read by the four geometries (labels
+  total overlap, medium-high overlap, medium-low overlap, strong separation);
+  the cost also by geometry; new part R8, the timeouts and the replications
+  drawn again, by scenario-variant, geometry, n and T.
+- `design-figures.R`, new: the figures and tables that describe the design
+  (the four geometries, one data set in time and space at each level of
+  separation, the decay of the correlations, the variance of every regime by
+  source, the parameter values, the separation measure, the blocks), computed
+  from the definitions of the runner so that the description cannot drift
+  from the design. They go into the new Supplementary Material B of the paper.
+
 ### 2026-10-02 (second entry)
 
 **`em_stop`: the two criteria of the EM algorithm combined by "any"
