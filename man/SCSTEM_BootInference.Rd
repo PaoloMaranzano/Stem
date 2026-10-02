@@ -27,7 +27,7 @@ An object of class \dQuote{SCSTEM_BootInference}, a list with
   \item \code{tests}: data frame of the pairwise percentile tests between
     clusters.
   \item \code{aligned}: the aligned bootstrap draws, as a
-    \eqn{B_{valid}} by \eqn{k} by \eqn{npar} array, so that any further
+    \eqn{B_{valid}} by \eqn{K} by \eqn{npar} array, so that any further
     statistic can be computed by the user.
   \item \code{coclustering}: \eqn{d} by \eqn{d} matrix of the bootstrap
     co-clustering frequencies, that is the share of usable draws in which
@@ -50,7 +50,7 @@ percentile tests for the differences between clusters.
 before any statistic is computed each refit cluster is mapped to the cluster
 of the original fit with which it shares the largest number of locations,
 resolving conflicts greedily by decreasing overlap (majority rule). Draws
-whose refit did not recover all \eqn{k} clusters are discarded.
+whose refit did not recover all \eqn{K} clusters are discarded.
 
 \strong{Confidence intervals.} From the same set of aligned draws the
 function computes, for every cluster-wise parameter, the intervals of
@@ -105,10 +105,10 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
-fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 inf <- SCSTEM_BootInference(boot)
 inf

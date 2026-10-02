@@ -25,7 +25,7 @@ library(Stem)
 `Stem` estimates hierarchical spatio-temporal models of the form
 
 $$
-z_t = X_t \beta + K y_t + e_t, \qquad e_t \sim N(0, \Sigma_e),
+z_t = X_t \beta + A y_t + e_t, \qquad e_t \sim N(0, \Sigma_e),
 $$
 $$
 y_t = G y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta), \qquad
@@ -34,7 +34,7 @@ $$
 
 for $t = 1, \dots, T$. The observation vector $z_t$ collects the measurements at
 $d$ spatial locations; $y_t$ is a $p$-dimensional latent temporal process shared
-by the network and loaded on the locations through the $d \times p$ matrix $K$;
+by the network and loaded on the locations through the $d \times p$ matrix $A$;
 $X_t$ holds $r$ known covariates. The spatial covariance is
 
 $$
@@ -91,14 +91,14 @@ phi <- list(
   C0          = as.matrix(1)
 )
 
-K <- matrix(1, ncol(z), 1)   # a single latent process, loaded on every station
+A <- matrix(1, ncol(z), 1)   # a single latent process, loaded on every station
 
 mod <- STEM_Model(
   z = z,
   covariates = covariates,
   coordinates = coordinates,
   phi = phi,
-  K = K
+  A = A
 )
 
 class(mod)

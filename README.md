@@ -27,7 +27,7 @@ spatial noise. In matrix form, with $Z_t$ the $d$-vector of observations at
 time $t$:
 
 ```math
-Z_t = X_t \beta + K y_t + e_t
+Z_t = X_t \beta + A y_t + e_t
 ```
 
 ```math
@@ -46,7 +46,7 @@ white over time.
 |---|---|---|
 | $\beta$ | Regression coefficients on the covariates $X_t$ | The part of the concentration explained by observable drivers: altitude, emissions, a co-pollutant. Constant over space and time. |
 | $y_t$ | Latent temporal process, dimension $p$ | The unobserved "regional level" that moves the whole network together day by day - weather, seasonality, anything not in $X_t$. |
-| $K$ | $d \times p$ loading matrix | How strongly each location feels the shared process. Usually $K = 1$, meaning one common level; it can also carry EOF loadings. |
+| $A$ | $d \times p$ loading matrix | How strongly each location feels the shared process. Usually $A = 1$, meaning one common level; it can also carry EOF loadings. |
 | $G$ | Transition matrix of the state equation | The **persistence** of the latent process. With $p = 1$ it is a scalar autoregressive coefficient: near 1 means long memory, near 0 means the level is renewed each day. |
 | $\Sigma_\eta$ | Innovation variance of the state equation | How much genuinely new information enters the latent process at each step. |
 | $\sigma^2_\varepsilon$ | Measurement error variance | Instrumental noise, independent across locations. Geostatistically it is the **nugget**: the discontinuity of the covariance at distance zero. |
@@ -72,11 +72,11 @@ response of PM2.5 to altitude in the middle of an alluvial plain need not be the
 response near the Alpine foothills.
 
 SC-STEM addresses this by introducing **spatial regimes**. Each location $i$ is
-assigned to one of $k$ latent regimes, and conditionally on belonging to regime
+assigned to one of $K$ latent regimes, and conditionally on belonging to regime
 $k$ it follows its own STEM model:
 
 ```math
-z_{it} = x_{it}^{\top} \beta_k + K_i y_t^{(k)} + e_{it}
+z_{it} = x_{it}^{\top} \beta_k + A_i y_t^{(k)} + e_{it}
 ```
 
 ```math
@@ -93,7 +93,7 @@ So **every regime carries a full parameter set of its own**,
 \Psi_k = ( \beta_k, \sigma^2_{\varepsilon k}, \sigma^2_{\omega k}, \theta_k, G_k, \Sigma_{\eta k}, m_{0k} )
 ```
 
-and the model estimates $k$ such sets together with the partition itself. Not
+and the model estimates $K$ such sets together with the partition itself. Not
 only the regression coefficients vary: so do the nugget, the spatial range and
 the persistence of the latent dynamics, so a regime can differ from another in
 *how* it behaves in time and space, not merely in level.
@@ -115,7 +115,7 @@ The penalty is what makes the regimes *spatial*. The first term rewards fit and
 would happily scatter the labels; the second rewards neighboring locations
 sharing a label. The hyperparameter $\phi \ge 0$ arbitrates between them:
 $\phi = 0$ gives ordinary clusterwise regression with no spatial structure,
-large $\phi$ gives contiguous and rigid regimes. Setting $k = 1$ returns the
+large $\phi$ gives contiguous and rigid regimes. Setting $K = 1$ returns the
 pooled model, which stays available as the reference against which any clustered
 fit must justify itself.
 
@@ -205,14 +205,14 @@ $\lambda$.
 `STEM_Fit()` is the single entry point for all four estimators, and which one
 runs is decided by two arguments and nothing else:
 
-| `k` | `lambda` | what is fitted |
+| `K` | `lambda` | what is fitted |
 |---|---|---|
 | `1` | `0` | the pooled STEM model |
 | `> 1` | `0` | the spatially-clustered model |
 | `1` | `> 0` | the pooled model with an elastic net on $\beta$ |
 | `> 1` | `> 0` | the clustered model, penalized within each regime |
 
-The defaults `k = 1`, `alpha = 0`, `lambda = 0` reproduce `STEM_Estimation()`
+The defaults `K = 1`, `alpha = 0`, `lambda = 0` reproduce `STEM_Estimation()`
 bit for bit, which the test suite asserts on the whole parameter vector and on
 the log-likelihood.
 
@@ -221,7 +221,7 @@ fit0 <- STEM_Fit(mod)                                  # classical STEM
 fitr <- STEM_Fit(mod, alpha = 0,   lambda = 0.3)       # ridge
 fitl <- STEM_Fit(mod, alpha = 1,   lambda = 0.3)       # lasso
 fite <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3)       # elastic net
-fitc <- STEM_Fit(mod, k = 3, phi_penalty = 0.05,       # SC-STEM, ridge per regime
+fitc <- STEM_Fit(mod, K = 3, phi_penalty = 0.05,       # SC-STEM, ridge per regime
                  alpha = 0, lambda = 0.3)
 ```
 
@@ -243,18 +243,18 @@ conditioning is otherwise the only thing separating the two, and on a collinear
 design it is not negligible. With that, the agreement with an elastic net
 computed directly on $X'X$ and $X'y$ is between $10^{-14}$ and $10^{-11}$ for
 the ridge, the lasso, the elastic net and the unpenalized case alike. With
-`k > 1` the same switches give clusterwise penalized regression, the partition
+`K > 1` the same switches give clusterwise penalized regression, the partition
 still estimated.
 
-$\lambda$ and $\alpha$ are hyperparameters like $k$ and $\phi$ and are chosen
+$\lambda$ and $\alpha$ are hyperparameters like $K$ and $\phi$ and are chosen
 the same way: by an information criterion computed with the effective degrees of
 freedom, or -- the honest route -- by spatio-temporal cross-validation with
 blocking that respects both dependencies (Otto, Fasso and Maranzano 2024).
 `SCSTEM_Infocrit()` accepts `alpha` and `lambda` and returns criteria already
 corrected for the effective degrees of freedom, so a grid over all four
-hyperparameters is a loop over $(\alpha, \lambda)$ around the $(k, \phi)$ grid
+hyperparameters is a loop over $(\alpha, \lambda)$ around the $(K, \phi)$ grid
 it already traverses; the two-step rule of `SCSTEM_Select()` still arbitrates
-$(k, \phi)$ only. One caveat: if $\lambda$ is selected from the data, the parametric
+$(K, \phi)$ only. One caveat: if $\lambda$ is selected from the data, the parametric
 bootstrap must repeat the selection on every draw, exactly as
 `SCSTEM_Bootstrap()` repeats the clustering; and with $\alpha > 0$ the estimator
 is not smooth, so intervals for a coefficient at the boundary do not have their
@@ -275,7 +275,7 @@ the current implementation, not the model on paper.
 | Distribution of the response | Gaussian only | The EM closed forms and the Kalman recursions both rely on normality. Non-Gaussian responses have to be transformed first. |
 | Response dimension | univariate | `z` is a $T \times d$ matrix of **one** variable measured at $d$ sites. Several pollutants modeled jointly is a different specification. |
 | Latent state | multivariate | $p \ge 1$ latent processes, default $p = 1$. This is what is multivariate in the model. |
-| Loading matrix `K` | known, user-supplied | $d \times p$, not estimated, and common across regimes in SC-STEM. |
+| Loading matrix `A` | known, user-supplied | $d \times p$, not estimated, and common across regimes in SC-STEM. |
 | Latent dynamics | VAR(1) | `G` and `Sigmaeta` are diagonal by default; both can be made full via `flag.Gdiag` and `flag.Sigmaetadiag`. |
 | Initial condition | `m0` estimated, `C0` fixed | |
 | Spatial covariance | exponential only | $\sigma^2_\epsilon I + \sigma^2_\omega \exp(-\theta h)$: isotropic and stationary *within* a regime. Only this function has the analytical derivatives the Newton-Raphson step needs. |
@@ -332,14 +332,14 @@ uncertainty, prediction) or an engine below.
 | Function | Purpose |
 |---|---|
 | `STEM_Model()` | build the model object from data, coordinates and starting values |
-| `STEM_Fit()` | **the entry point.** Data and hyperparameters in, one fitted model out. `k` chooses pooled or clustered, `(alpha, lambda)` unpenalized or penalized |
+| `STEM_Fit()` | **the entry point.** Data and hyperparameters in, one fitted model out. `K` chooses pooled or clustered, `(alpha, lambda)` unpenalized or penalized |
 
 **Choosing the hyperparameters**
 
 | Function | Purpose |
 |---|---|
-| `SCSTEM_Infocrit()` | fit a grid of `(k, phi)` and return the criteria, with the effective degrees of freedom when a penalty is in force |
-| `SCSTEM_Select()` | the two-step rule: `k` by the modal criterion in a band, `phi` by the smallest criterion at that `k` |
+| `SCSTEM_Infocrit()` | fit a grid of `(K, phi)` and return the criteria, with the effective degrees of freedom when a penalty is in force |
+| `SCSTEM_Select()` | the two-step rule: `K` by the modal criterion in a band, `phi` by the smallest criterion at that `K` |
 
 **After the fit**
 
@@ -385,19 +385,19 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley[["z"]][seq_len(Tn), ],
                   covariates = povalley[["covariates"]][keep, ],
                   coordinates = povalley[["coords"]],
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
-# one entry point for every estimator: k chooses pooled or clustered,
+# one entry point for every estimator: K chooses pooled or clustered,
 # lambda chooses penalized or not
 fit <- STEM_Fit(mod, distance = "geo")                 # classical STEM
 
-# explore the grid and let the two-step rule choose k and phi
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, distance = "geo")
+# explore the grid and let the two-step rule choose K and phi
+ic  <- SCSTEM_Infocrit(mod, K_grid = 1:4, distance = "geo")
 sel <- SCSTEM_Select(ic)
 sel
 
 # the same clustered model with a ridge on the coefficients of every regime
-fitr <- STEM_Fit(mod, k = sel[["k_selected"]], phi_penalty = sel[["phi_selected"]],
+fitr <- STEM_Fit(mod, K = sel[["K_selected"]], phi_penalty = sel[["phi_selected"]],
                  alpha = 0, lambda = 2, distance = "geo")
 
 # uncertainty, with the partition re-estimated at every draw
@@ -420,7 +420,7 @@ and still an option, say nothing about the regimes when the covariates are
 exogenous to them.
 
 **A penalized fit starts from the unpenalized one.** A fit with $\phi > 0$
-starts from the partition of the fit with $\phi = 0$ at the same $k$, and the
+starts from the partition of the fit with $\phi = 0$ at the same $K$, and the
 automatic scale of the penalty is measured there, on regimes that are already
 fitted. A penalty that is strong from the first sweep would freeze whatever
 partition it is given, and a scale measured on the starting partition would
@@ -429,9 +429,9 @@ grid the rule costs nothing: `SCSTEM_Infocrit()` passes the partition of its
 $\phi = 0$ fit on. Measured on fitted regimes the scale is of the order of the
 whole gain of the right regime over the wrong ones, so the useful values of
 $\phi$ are small: the default grid is
-$\phi \in \{0, 0.025, 0.05, 0.1, 0.2, 0.5, 1\}$. `SCSTEM_Select()` chooses $k$
+$\phi \in \{0, 0.025, 0.05, 0.1, 0.2, 0.5, 1\}$. `SCSTEM_Select()` chooses $K$
 by the modal BIC over the moderate values $[0.025, 0.2]$, the pooled model
-competing, and then $\phi$ by the smallest BIC at that $k$ over the whole grid:
+competing, and then $\phi$ by the smallest BIC at that $K$ over the whole grid:
 since every penalized fit starts from the unpenalized one, a penalty is chosen
 only when it leads to a partition with a higher likelihood, and the strong
 values $0.5$ and $1$ are kept on the grid for data on which they do.
@@ -452,7 +452,7 @@ procedure, clustering included, on every draw, so the reported intervals are not
 conditional on a partition that is itself estimated.
 
 **The filter never inverts a $d \times d$ matrix.** The predictive covariance
-$Q_t = K P_t K' + \Sigma_\varepsilon$ has $\Sigma_\varepsilon$ constant in $t$
+$Q_t = A P_t A' + \Sigma_\varepsilon$ has $\Sigma_\varepsilon$ constant in $t$
 and a rank-$p$ update on top of it, so the Woodbury identity and the matrix
 determinant lemma reduce each step to $p \times p$ algebra against a Cholesky
 factor of $\Sigma_\varepsilon$ that is computed once per pass. The cost of a

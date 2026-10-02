@@ -81,10 +81,10 @@ A removed cell of a retained location is predicted by
 of its regime. A removed location is predicted by the same conditional mean,
 computed with the parameters of the regime it inherits and given the
 retained locations of that regime observed at the same time point:
-\deqn{\hat{z}_{0t} = x_{0t}'\hat\beta_k + K_0 \hat{y}_{k,t}
-  + \Sigma_{0O}\Sigma_{OO}^{-1}(z_{Ot} - x_{Ot}'\hat\beta_k - K_O\hat{y}_{k,t}),}
+\deqn{\hat{z}_{0t} = x_{0t}'\hat\beta_k + A_0 \hat{y}_{k,t}
+  + \Sigma_{0O}\Sigma_{OO}^{-1}(z_{Ot} - x_{Ot}'\hat\beta_k - A_O\hat{y}_{k,t}),}
 which is kriging within the regime. For the pooled model, fitted by
-\code{SCSTEM_Estimation(..., k = 1)}, this is ordinary kriging.
+\code{SCSTEM_Estimation(..., K = 1)}, this is ordinary kriging.
 
 The refits reproduce the estimation of each model, with the settings stored
 in its \code{input_args} (number of regimes, penalty, graph, initialization,
@@ -110,11 +110,11 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
-pooled <- SCSTEM_Estimation(mod, k = 1, distance = 'geo')
-fit2 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+pooled <- SCSTEM_Estimation(mod, K = 1, distance = 'geo')
+fit2 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 cv <- SCSTEM_CV(list(pooled = pooled, k2 = fit2), scheme = "LKLO",
                 folds = 4, seed = 1)
 cv

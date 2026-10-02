@@ -8,14 +8,14 @@ test_that("missing values are accepted in z but not in covariates or coordinates
   z_na[3, 2] <- NA
   expect_silent(
     STEM_Model(z = z_na, covariates = s$covariates, coordinates = s$coordinates,
-               phi = po_phi(), K = matrix(1, s$d, 1))
+               phi = po_phi(), A = matrix(1, s$d, 1))
   )
 
   cov_na <- s$covariates
   cov_na[5, 2] <- NA
   expect_error(
     STEM_Model(z = s$z, covariates = cov_na, coordinates = s$coordinates,
-               phi = po_phi(), K = matrix(1, s$d, 1)),
+               phi = po_phi(), A = matrix(1, s$d, 1)),
     "coordinates, covariates"
   )
 
@@ -23,7 +23,7 @@ test_that("missing values are accepted in z but not in covariates or coordinates
   coord_na[1, 1] <- NA
   expect_error(
     STEM_Model(z = s$z, covariates = s$covariates, coordinates = coord_na,
-               phi = po_phi(), K = matrix(1, s$d, 1)),
+               phi = po_phi(), A = matrix(1, s$d, 1)),
     "coordinates, covariates"
   )
 })
@@ -34,7 +34,7 @@ test_that("a location with no observation at all is rejected", {
   z_na[, 4] <- NA
   expect_error(
     STEM_Model(z = z_na, covariates = s$covariates, coordinates = s$coordinates,
-               phi = po_phi(), K = matrix(1, s$d, 1)),
+               phi = po_phi(), A = matrix(1, s$d, 1)),
     "no observed value"
   )
 })
@@ -123,7 +123,7 @@ test_that("estimation runs with scattered gaps and with an empty time point", {
 
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+                    phi = po_phi(), A = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
 
   p <- fit$estimates$phi.hat
@@ -165,9 +165,9 @@ test_that("SC-STEM estimation tolerates gaps in the response", {
 
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+                    phi = po_phi(), A = matrix(1, s$d, 1))
 
-  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, knn = 3,
+  fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.5, knn = 3,
                       precision = 0.5, precision_full_dataset = 0.5,
                       max_iter = 2, seed = 1)
 
@@ -186,7 +186,7 @@ test_that("STEM_Complete reproduces the observations and predicts the blanks", {
 
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+                    phi = po_phi(), A = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
   zhat <- STEM_Complete(fit)
 
@@ -210,12 +210,12 @@ test_that("a fully missing time point falls back on the signal", {
 
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+                    phi = po_phi(), A = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
   zhat <- STEM_Complete(fit)
 
   ### with nothing observed there is no spatial correction, so the prediction
-  ### is exactly the signal x'beta + K yhat
+  ### is exactly the signal x'beta + A yhat
   XX <- Stem:::changedimension_covariates(s$covariates, s$d, ncol(s$covariates),
                                           nrow(z_na))
   b <- matrix(as.numeric(fit$estimates$phi.hat$beta), ncol = 1)
@@ -279,7 +279,7 @@ test_that("the filter handles gaps and an empty time point", {
 
   mod <- STEM_Model(z = z_na, covariates = s$covariates,
                     coordinates = s$coordinates,
-                    phi = po_phi(), K = matrix(1, s$d, 1))
+                    phi = po_phi(), A = matrix(1, s$d, 1))
   fit <- STEM_Estimation(mod, precision = 0.5, max.iter = 3)
 
   expect_true(is.finite(fit$estimates$loglik))

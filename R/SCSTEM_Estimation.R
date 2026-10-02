@@ -3,26 +3,26 @@
 #' @description
 #' \code{SCSTEM_Estimation} fits a spatially-clustered spatio-temporal
 #' expectation-maximization (SC-STEM) model. The \eqn{d} monitoring locations
-#' are partitioned into \eqn{k} latent spatial regimes, and a separate
+#' are partitioned into \eqn{K} latent spatial regimes, and a separate
 #' \dQuote{STEM_Model} is estimated within each regime, so that regression
 #' coefficients, variance components and latent temporal dynamics are all
 #' cluster-specific. The partition and the parameters are estimated jointly by
 #' alternating optimization of a Potts-penalized log-likelihood.
 #'
 #' This is one of the two estimation engines of the package. The entry point is
-#' \code{\link{STEM_Fit}}, which calls this function when \code{k > 1} and
-#' \code{\link{STEM_Estimation}} when \code{k = 1}, and which takes the same
+#' \code{\link{STEM_Fit}}, which calls this function when \code{K > 1} and
+#' \code{\link{STEM_Estimation}} when \code{K = 1}, and which takes the same
 #' arguments and returns the same object. Call \code{SCSTEM_Estimation} directly only
 #' to bypass the dispatch.
 #'
 #' @details
 #' \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
-#' \eqn{k}, the SC-STEM model is the cluster-specific STEM model
-#' \deqn{z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+#' \eqn{k \in \{1, \ldots, K\}}, the SC-STEM model is the cluster-specific STEM model
+#' \deqn{z_{it} = x_{it}' \beta_k + A_i y^{(k)}_t + e_{it}, \qquad
 #'       y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,}
 #' with \eqn{e_t \sim N(0, \Sigma_{e,k})},
 #' \eqn{\Sigma_{e,k} = \sigma^2_{\epsilon k} I + \sigma^2_{\omega k} C(h;\theta_k)}
-#' and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{k = 1}
+#' and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{K = 1}
 #' recovers the pooled \code{\link{STEM_Estimation}} fit.
 #'
 #' \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
@@ -74,12 +74,12 @@
 #'
 #' \strong{Penalized fits start from the unpenalized one.} With
 #' \code{phi_penalty > 0} the fit with \code{phi_penalty = 0} at the same
-#' \eqn{k} is run first, and its solution is the starting partition. A penalty
+#' \eqn{K} is run first, and its solution is the starting partition. A penalty
 #' that is strong from the first sweep freezes whatever partition it is given,
 #' so a start unrelated to the regimes would stay where it is; from the
 #' unpenalized solution the penalty only has to decide how much spatial
 #' smoothing that solution can afford. \code{\link{SCSTEM_Infocrit}} fits
-#' \eqn{\phi = 0} once per \eqn{k} and passes its partition on, so a single fit
+#' \eqn{\phi = 0} once per \eqn{K} and passes its partition on, so a single fit
 #' and the corresponding member of a grid coincide.
 #'
 #' \strong{Algorithm.} The two steps are iterated until convergence:
@@ -129,7 +129,7 @@
 #' or above \code{min_cluster_size}, which keeps every visited configuration
 #' admissible while preserving the monotonicity of the ICM sweep within the
 #' feasible set. The constraint matters most when the number of locations is
-#' small relative to \eqn{k}; it can be lifted with
+#' small relative to \eqn{K}; it can be lifted with
 #' \code{enforce_min_size = FALSE}.
 #'
 #' The constraint has a cost of its own: a location sitting in a cluster that is
@@ -155,7 +155,7 @@
 #' \strong{Final refit and information criteria.} On convergence the
 #' cluster-wise STEM models are re-estimated once on the final partition, with
 #' the \code{em_*} settings of \code{control}, the same as the pooled fit at
-#' \eqn{k = 1}, so that the log-likelihoods compared across \eqn{k} are
+#' \eqn{K = 1}, so that the log-likelihoods compared across \eqn{K} are
 #' computed to the same accuracy. All
 #' reported coefficients, variance components and information criteria come
 #' from this refit and are based on the \emph{exact} cluster-wise
@@ -176,7 +176,7 @@
 #' the EM algorithm, occasionally further apart when a small regime starts near
 #' the boundary of its parameter space; either way the difference is not a
 #' property of the penalty. Sharing the refit makes the fits of one partition
-#' identical, so that a comparison across penalties at one \eqn{k} compares
+#' identical, so that a comparison across penalties at one \eqn{K} compares
 #' partitions only. \code{refit_reused} reports whether the refit was shared.
 #'
 #' \strong{Statistical features and scope.} The assumptions are inherited from
@@ -185,7 +185,7 @@
 #' \eqn{d} matrix of one variable measured at \eqn{d} sites, so several
 #' pollutants modeled jointly is a different specification. What is multivariate
 #' is the \emph{latent state}, of dimension \eqn{p \ge 1}, loaded onto the
-#' locations by the known matrix \eqn{K}, which is not estimated and is common
+#' locations by the known matrix \eqn{A}, which is not estimated and is common
 #' across regimes. The latent dynamics is a VAR(1), with \eqn{G} and
 #' \eqn{\Sigma_\eta} diagonal by default; \eqn{m_0} is estimated and \eqn{C_0}
 #' is held fixed. The spatial correlation function is exponential, hence
@@ -217,7 +217,7 @@
 #'
 #' @param StemModel an object of class \dQuote{STEM_Model} given as output by
 #'   the \code{\link{STEM_Model}} function.
-#' @param k integer, the number of spatial clusters. \code{k = 1} returns the
+#' @param K integer, the number of spatial clusters. \code{K = 1} returns the
 #'   pooled STEM fit. Default is 3.
 #' @param phi_penalty non-negative number, the weight of the Potts spatial
 #'   penalty. \code{phi_penalty = 0} gives non-spatial clusterwise STEM.
@@ -253,7 +253,7 @@
 #'   \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
 #'   violates \code{min_cluster_size}. With \code{phi_penalty > 0} and no
 #'   \code{init_partition}, the fit starts from the solution of the
-#'   unpenalized fit at the same \eqn{k}, itself started from
+#'   unpenalized fit at the same \eqn{K}, itself started from
 #'   \code{init_method}; a given \code{init_partition} is taken as that start,
 #'   which is how \code{\link{SCSTEM_Infocrit}} passes the partition of its
 #'   unpenalized fit.
@@ -309,7 +309,7 @@
 #'   which under the relative scale already means the same proportional
 #'   shrinkage, since the reference is computed inside each regime.
 #'   \dQuote{size} sets \eqn{\lambda_g = \lambda \bar n / n_g} with
-#'   \eqn{\bar n = d/k}, shrinking a regime of half the average size twice as
+#'   \eqn{\bar n = d/K}, shrinking a regime of half the average size twice as
 #'   hard. Either way \code{lambda} stays ONE hyperparameter: genuinely
 #'   cluster-specific \eqn{(\alpha_g, \lambda_g)} is a different model and is
 #'   not offered here.
@@ -327,7 +327,7 @@
 #'
 #' @return An object of class \dQuote{SCSTEM_Estimation}, a list with components:
 #' \itemize{
-#'   \item \code{phi_hat}: \eqn{k} by \eqn{npar} matrix of cluster-wise
+#'   \item \code{phi_hat}: \eqn{K} by \eqn{npar} matrix of cluster-wise
 #'     parameter estimates from the final refit.
 #'   \item \code{group}: integer vector of length \eqn{d} with the estimated
 #'     cluster label of each location.
@@ -400,11 +400,11 @@
 #' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 #'                   covariates = povalley$covariates[keep, ],
 #'                   coordinates = povalley$coords,
-#'                   phi = phi, K = matrix(1, d, 1))
+#'                   phi = phi, A = matrix(1, d, 1))
 #'
 #' \donttest{
 #' # three spatial regimes with a moderate spatial penalty
-#' fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.05, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0.05, distance = 'geo')
 #' fit
 #'
 #' # the estimated regimes on the map
@@ -420,7 +420,7 @@
 #'
 #' @export
 SCSTEM_Estimation <- function(StemModel,
-                         k = 3,
+                         K = 3,
                          phi_penalty = 0.05,
                          phi_scale = c("auto", "per-observation", "raw"),
                          knn = 5,
@@ -452,6 +452,8 @@ SCSTEM_Estimation <- function(StemModel,
 
   ### the arguments as given, for the unpenalized fit that starts a penalized one
   call_args <- as.list(environment())
+  ### `k` would have been matched to `knn` by partial matching: stop instead
+  stem_renamed_args(names(as.list(sys.call()))[-1], c(k = "K"))
   if (!is.null(refit_cache) && !is.environment(refit_cache)) {
     stop("'refit_cache' must be NULL or an environment.", call. = FALSE)
   }
@@ -475,27 +477,27 @@ SCSTEM_Estimation <- function(StemModel,
   ### each regime and therefore carries its own information: a regime with half
   ### the locations has a proportionally smaller reference, so the same lambda
   ### buys the same fraction of the path. This is the pooled hyperparameter of
-  ### the manuscript, and one number to select rather than k.
+  ### the manuscript, and one number to select rather than K.
   ###
   ### "size" departs from that on purpose, giving lambda_g = lambda * nbar / n_g
-  ### with nbar = d/k: a regime with half the average number of locations is
+  ### with nbar = d/K: a regime with half the average number of locations is
   ### shrunk twice as hard. The argument for it is that small regimes carry
   ### noisier coefficients than the proportional rule alone accounts for. It
   ### remains ONE hyperparameter; genuinely cluster-specific (alpha_g, lambda_g)
   ### is a different model and is not offered here.
   lambda_of <- function(n_g) {
     if (lambda <= 0 || lambda_by == "common") return(lambda)
-    nbar <- length(StemModel$data$z[1, ]) / k
+    nbar <- length(StemModel$data$z[1, ]) / K
     lambda * nbar / max(n_g, 1)
   }
   distance <- match.arg(distance)
   init_method <- match.arg(init_method)
   label_update <- match.arg(label_update)
 
-  if (length(k) != 1L || is.na(k) || k < 1 || k != round(k)) {
-    stop("'k' must be a single positive integer.", call. = FALSE)
+  if (length(K) != 1L || is.na(K) || K < 1 || K != round(K)) {
+    stop("'K' must be a single positive integer.", call. = FALSE)
   }
-  k <- as.integer(k)
+  K <- as.integer(K)
   if (length(phi_penalty) != 1L || is.na(phi_penalty) || phi_penalty < 0) {
     stop("'phi_penalty' must be a single non-negative number.", call. = FALSE)
   }
@@ -528,7 +530,7 @@ SCSTEM_Estimation <- function(StemModel,
   coordinates <- StemModel$data$coordinates
   covariates <- StemModel$data$covariates
   phi0 <- StemModel$skeleton$phi
-  Kmat <- StemModel$skeleton$K
+  Amat <- StemModel$skeleton$A
   pdim <- StemModel$skeleton$p
 
   d <- ncol(z)
@@ -539,8 +541,8 @@ SCSTEM_Estimation <- function(StemModel,
   if (is.null(min_cluster_size)) min_cluster_size <- ncov + 2L
   min_cluster_size <- max(2L, as.integer(min_cluster_size))
 
-  if (k > 1 && d < k * min_cluster_size) {
-    stop("Too few locations (", d, ") for k = ", k,
+  if (K > 1 && d < K * min_cluster_size) {
+    stop("Too few locations (", d, ") for K = ", K,
          " clusters of at least ", min_cluster_size, " locations each.", call. = FALSE)
   }
 
@@ -556,9 +558,9 @@ SCSTEM_Estimation <- function(StemModel,
 
   npar_g <- scstem_npar(ncov = ncov, pdim = pdim)
 
-  if (k == 1L) {
+  if (K == 1L) {
     ### Pooled model: a single STEM fit on the whole network
-    if (isTRUE(verbose)) message("Pooled STEM fit (k = 1) ...")
+    if (isTRUE(verbose)) message("Pooled STEM fit (K = 1) ...")
     pooled <- STEM_Estimation(StemModel, control = ctl_final,
                               distance = distance, regularization = regularization,
                               verbose = FALSE, alpha = alpha, lambda = lambda_of(d),
@@ -566,11 +568,11 @@ SCSTEM_Estimation <- function(StemModel,
                               latent = latent, spatial = spatial)
     par_names <- names(unlist(pooled$estimates$phi.hat))
     loglik <- as.numeric(pooled$estimates$loglik)
-    ### effective parameter count under a penalty; see the k > 1 branch
+    ### effective parameter count under a penalty; see the K > 1 branch
     df_p <- pooled$estimates$penalty$beta.df
     npar_1 <- if (lambda > 0 && !is.null(df_p) && is.finite(df_p))
       npar_g - ncov + df_p else npar_g
-    info <- c(loglik = loglik, k = npar_1,
+    info <- c(loglik = loglik, df = npar_1,
               AIC = -2 * loglik + 2 * npar_1,
               BIC = -2 * loglik + log(Nobs) * npar_1,
               KIC = -2 * loglik + 3 * npar_1)
@@ -588,9 +590,9 @@ SCSTEM_Estimation <- function(StemModel,
       refit_reused = FALSE,
       obj_trace = data.frame(iter = integer(0), objective = numeric(0),
                              label_changes = integer(0)),
-      convergence = "Pooled model (k = 1): no clustering performed",
+      convergence = "Pooled model (K = 1): no clustering performed",
       penalized_obj = NA_real_,
-      input_args = list(StemModel = StemModel, k = 1L, phi_penalty = phi_penalty,
+      input_args = list(StemModel = StemModel, K = 1L, phi_penalty = phi_penalty,
                         phi_scale = phi_scale, knn = knn, distance = distance,
                         init_method = init_method, label_update = label_update,
                         precision = control$alt_em_tol_par,
@@ -617,7 +619,7 @@ SCSTEM_Estimation <- function(StemModel,
   W <- nbinfo$W
 
   ### A penalized fit starts from the solution of the unpenalized fit at the
-  ### same k. A penalty that is strong from the first sweep freezes whatever
+  ### same K. A penalty that is strong from the first sweep freezes whatever
   ### partition it is given, so a start unrelated to the regimes would stay
   ### where it is; from the unpenalized solution the penalty only has to decide
   ### how much spatial smoothing that solution can afford. The same start also
@@ -637,10 +639,10 @@ SCSTEM_Estimation <- function(StemModel,
     args0$refit_cache <- refit_cache
     fit0 <- tryCatch(suppressWarnings(do.call(SCSTEM_Estimation, args0)),
                      error = function(e) NULL)
-    if (!is.null(fit0) && length(unique(fit0$group)) == k) {
+    if (!is.null(fit0) && length(unique(fit0$group)) == K) {
       init_partition <- fit0$group
     } else {
-      warning("SCSTEM_Estimation: the unpenalized fit at k = ", k, " failed or ",
+      warning("SCSTEM_Estimation: the unpenalized fit at K = ", K, " failed or ",
               "lost a cluster; the penalized fit starts from init_method.",
               call. = FALSE)
     }
@@ -659,13 +661,13 @@ SCSTEM_Estimation <- function(StemModel,
       stop("'init_partition' must have one label per location (length ", d, ").",
            call. = FALSE)
     }
-    if (length(unique(labels)) != k) {
+    if (length(unique(labels)) != K) {
       stop("'init_partition' defines ", length(unique(labels)),
-           " groups, but k = ", k, " was requested.", call. = FALSE)
+           " groups, but K = ", K, " was requested.", call. = FALSE)
     }
     if (isTRUE(enforce_min_size) &&
-        any(tabulate(labels, nbins = k) < min_cluster_size)) {
-      labels <- scstem_repair_partition(labels, feat = Xmeans, k = k,
+        any(tabulate(labels, nbins = K) < min_cluster_size)) {
+      labels <- scstem_repair_partition(labels, feat = Xmeans, K = K,
                                         min_size = min_cluster_size)
     }
   } else {
@@ -694,13 +696,13 @@ SCSTEM_Estimation <- function(StemModel,
     }
     labels <- scstem_with_seed(
       seed,
-      scstem_init(Xmeans = feat, coords = coordinates, k = k,
+      scstem_init(Xmeans = feat, coords = coordinates, K = K,
                   method = method0, min_size = min_cluster_size)
     )
   }
-  if (length(unique(labels)) < k) {
-    stop("The initialization returned fewer than k = ", k,
-         " non-empty clusters. Try a smaller k or a different init_method.",
+  if (length(unique(labels)) < K) {
+    stop("The initialization returned fewer than K = ", K,
+         " non-empty clusters. Try a smaller K or a different init_method.",
          call. = FALSE)
   }
 
@@ -708,11 +710,11 @@ SCSTEM_Estimation <- function(StemModel,
   ########## Alternating algorithm #########
   ##########################################
 
-  beta_g <- matrix(NA_real_, nrow = k, ncol = ncov)
-  s2eps_g <- s2omega_g <- rep(NA_real_, k)
-  ysm_g <- vector("list", k)
-  fit <- vector("list", k)
-  has_valid <- rep(FALSE, k)
+  beta_g <- matrix(NA_real_, nrow = K, ncol = ncov)
+  s2eps_g <- s2omega_g <- rep(NA_real_, K)
+  ysm_g <- vector("list", K)
+  fit <- vector("list", K)
+  has_valid <- rep(FALSE, K)
   stale_warned <- FALSE
 
   obj_prev <- -Inf
@@ -730,7 +732,7 @@ SCSTEM_Estimation <- function(StemModel,
     ### ---------------------------------------------------------------
     ### Step 1: cluster-wise parameter update, given the labels
     ### ---------------------------------------------------------------
-    for (g in seq_len(k)) {
+    for (g in seq_len(K)) {
       idx <- which(labels == g)
       if (length(idx) >= min_cluster_size) {
         ### start: the regime's estimates of the previous iteration, or, the
@@ -743,7 +745,7 @@ SCSTEM_Estimation <- function(StemModel,
                      covariates = X_g,
                      coordinates = coordinates[idx, , drop = FALSE],
                      phi = start_g,
-                     K = Kmat[idx, , drop = FALSE]),
+                     A = Amat[idx, , drop = FALSE]),
           silent = TRUE)
         fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
           STEM_Estimation(mod_g, control = ctl_alt, distance = distance,
@@ -772,15 +774,15 @@ SCSTEM_Estimation <- function(StemModel,
     }
 
     if (!any(has_valid)) {
-      stop("No cluster could be estimated: try a smaller k, a larger ",
+      stop("No cluster could be estimated: try a smaller K, a larger ",
            "min_cluster_size or looser convergence settings.", call. = FALSE)
     }
 
     ### ---------------------------------------------------------------
     ### Step 2: label update, given the parameters
     ### ---------------------------------------------------------------
-    LL <- matrix(-Inf, nrow = d, ncol = k)
-    for (g in seq_len(k)) {
+    LL <- matrix(-Inf, nrow = d, ncol = K)
+    for (g in seq_len(K)) {
       if (!has_valid[g]) next
       for (i in seq_len(d)) {
         LL[i, g] <- scstem_loglike_i(
@@ -788,7 +790,7 @@ SCSTEM_Estimation <- function(StemModel,
           X_i = covariates[scstem_rows(i, Tobs), , drop = FALSE],
           beta = beta_g[g, ],
           ysm = ysm_g[[g]],
-          K_i = Kmat[i, , drop = FALSE],
+          A_i = Amat[i, , drop = FALSE],
           sigma2eps = s2eps_g[g],
           sigma2omega = s2omega_g[g]
         )
@@ -834,10 +836,10 @@ SCSTEM_Estimation <- function(StemModel,
       ### and the partition
       ### collapses. Restricting the moves keeps every configuration admissible
       ### and preserves the monotonicity of the sweep within the feasible set.
-      sizes <- tabulate(labels, nbins = k)
+      sizes <- tabulate(labels, nbins = K)
       for (i in seq_len(d)) {
         nbi <- nb[[i]]
-        penvec <- if (length(nbi)) tabulate(labels[nbi], nbins = k) else rep(0, k)
+        penvec <- if (length(nbi)) tabulate(labels[nbi], nbins = K) else rep(0, K)
         qd <- LL[i, ] + phi_eff * penvec
         gi <- labels[i]
         if (isTRUE(enforce_min_size) && sizes[gi] <= min_cluster_size) {
@@ -856,12 +858,12 @@ SCSTEM_Estimation <- function(StemModel,
       ### of the previous iteration (pre-2.0.0 behavior). The joint update
       ### offers no way to impose the size constraint move by move, so an
       ### inadmissible configuration is repaired afterwards.
-      Ind <- matrix(0, nrow = d, ncol = k)
+      Ind <- matrix(0, nrow = d, ncol = K)
       Ind[cbind(seq_len(d), labels_prev)] <- 1
       Pen <- W %*% Ind
       labels <- apply(LL + phi_eff * as.matrix(Pen), 1, which.max)
-      if (isTRUE(enforce_min_size) && any(tabulate(labels, nbins = k) < min_cluster_size)) {
-        labels <- scstem_repair_partition(labels, feat = Xmeans, k = k,
+      if (isTRUE(enforce_min_size) && any(tabulate(labels, nbins = K) < min_cluster_size)) {
+        labels <- scstem_repair_partition(labels, feat = Xmeans, K = K,
                                           min_size = min_cluster_size)
       }
     }
@@ -892,7 +894,7 @@ SCSTEM_Estimation <- function(StemModel,
                        data.frame(iter = it, objective = obj,
                                   label_changes = n_changes,
                                   swaps = n_swap,
-                                  min_cluster = min(tabulate(labels, nbins = k))))
+                                  min_cluster = min(tabulate(labels, nbins = K))))
     if (is.finite(obj) && obj > best_obj) {
       best_obj <- obj
       best_labels <- labels
@@ -901,7 +903,7 @@ SCSTEM_Estimation <- function(StemModel,
     if (isTRUE(verbose)) {
       message("* Iteration ", it, ": penalized objective = ", round(obj, 4),
               " ; label changes = ", n_changes,
-              " ; smallest cluster = ", min(tabulate(labels, nbins = k)))
+              " ; smallest cluster = ", min(tabulate(labels, nbins = K)))
     }
 
     ### ---------------------------------------------------------------
@@ -957,19 +959,19 @@ SCSTEM_Estimation <- function(StemModel,
   ########## Final refit ###################
   ##########################################
 
-  loglik_g <- rep(NA_real_, k)
-  final_refit <- rep(FALSE, k)
-  idx_g <- vector("list", k)
-  fit_final <- vector("list", k)
-  par_list <- vector("list", k)
-  em_converged <- rep(NA, k)
+  loglik_g <- rep(NA_real_, K)
+  final_refit <- rep(FALSE, K)
+  idx_g <- vector("list", K)
+  fit_final <- vector("list", K)
+  par_list <- vector("list", K)
+  em_converged <- rep(NA, K)
 
   ### A partition already refitted on these data, by another fit of the same
   ### grid or by the unpenalized fit that started this one, is not refitted
   ### again: the refit depends on the partition and the settings, not on the
   ### penalty, and where two refits of one partition from different starts
   ### stop is not a property of the penalty either.
-  refit_key <- paste0(k, ":", paste(as.integer(labels), collapse = ","))
+  refit_key <- paste0(K, ":", paste(as.integer(labels), collapse = ","))
   refit_reused <- !is.null(refit_cache) &&
     exists(refit_key, envir = refit_cache, inherits = FALSE)
   if (refit_reused) {
@@ -979,7 +981,7 @@ SCSTEM_Estimation <- function(StemModel,
     em_converged <- hit$em_converged
   }
 
-  for (g in seq_len(k)) {
+  for (g in seq_len(K)) {
     if (refit_reused) break
     idx_g[[g]] <- which(labels == g)
     if (length(idx_g[[g]]) < min_cluster_size) next
@@ -993,7 +995,7 @@ SCSTEM_Estimation <- function(StemModel,
                  covariates = X_g,
                  coordinates = coordinates[idx_g[[g]], , drop = FALSE],
                  phi = start_g,
-                 K = Kmat[idx_g[[g]], , drop = FALSE]),
+                 A = Amat[idx_g[[g]], , drop = FALSE]),
       silent = TRUE)
     fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
       STEM_Estimation(mod_g, control = ctl_final, distance = distance,
@@ -1019,13 +1021,13 @@ SCSTEM_Estimation <- function(StemModel,
 
   if (!any(final_refit)) {
     stop("No cluster could be re-estimated on the final partition. ",
-         "Try a smaller k, a larger min_cluster_size, or a stronger phi_penalty.",
+         "Try a smaller K, a larger min_cluster_size, or a stronger phi_penalty.",
          call. = FALSE)
   }
 
   par_names <- names(par_list[[which(final_refit)[1]]])
-  phi_hat <- matrix(NA_real_, nrow = k, ncol = length(par_names),
-                    dimnames = list(paste("cluster", seq_len(k)), par_names))
+  phi_hat <- matrix(NA_real_, nrow = K, ncol = length(par_names),
+                    dimnames = list(paste("cluster", seq_len(K)), par_names))
   for (g in which(final_refit)) phi_hat[g, ] <- par_list[[g]][par_names]
 
   if (any(!final_refit)) {
@@ -1045,24 +1047,24 @@ SCSTEM_Estimation <- function(StemModel,
   ### tr(M (M + lambda D)^{-1}), for the lasso the number of active
   ### coefficients, and for the elastic net the corresponding trace on the
   ### active set. With lambda = 0 every regime returns r and this reduces to
-  ### k_eff * npar_g, the count the package has always used.
-  k_eff <- sum(final_refit)
+  ### K_eff * npar_g, the count the package has always used.
+  K_eff <- sum(final_refit)
   loglik_tot <- sum(loglik_g[final_refit])
-  k_par <- if (lambda > 0) {
+  df_par <- if (lambda > 0) {
     sum(vapply(which(final_refit), function(g) {
       df_g <- fit_final[[g]]$estimates$penalty$beta.df
       if (is.null(df_g) || !is.finite(df_g)) ncov else df_g
-    }, numeric(1))) + k_eff * (npar_g - ncov)
+    }, numeric(1))) + K_eff * (npar_g - ncov)
   } else {
-    k_eff * npar_g
+    K_eff * npar_g
   }
-  info <- c(loglik = loglik_tot, k = k_par,
-            AIC = -2 * loglik_tot + 2 * k_par,
-            BIC = -2 * loglik_tot + log(Nobs) * k_par,
-            KIC = -2 * loglik_tot + 3 * k_par)
+  info <- c(loglik = loglik_tot, df = df_par,
+            AIC = -2 * loglik_tot + 2 * df_par,
+            BIC = -2 * loglik_tot + log(Nobs) * df_par,
+            KIC = -2 * loglik_tot + 3 * df_par)
 
   if (isTRUE(verbose)) {
-    message("SC-STEM estimation ended (", convergence, "); k_eff = ", k_eff,
+    message("SC-STEM estimation ended (", convergence, "); K_eff = ", K_eff,
             " ; BIC = ", round(info[["BIC"]], 3))
   }
 
@@ -1084,7 +1086,7 @@ SCSTEM_Estimation <- function(StemModel,
     last_objective = if (nrow(obj_trace)) obj_trace$objective[nrow(obj_trace)] else NA_real_,
     phi_effective = phi_eff,
     phi_multiplier = pen_mult,
-    input_args = list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
+    input_args = list(StemModel = StemModel, K = K, phi_penalty = phi_penalty,
                       phi_scale = phi_scale, knn = knn, distance = distance,
                       init_method = init_method, label_update = label_update,
                       precision = control$alt_em_tol_par,
@@ -1118,14 +1120,14 @@ SCSTEM_Estimation <- function(StemModel,
 #' @export
 print.SCSTEM_Estimation <- function(x, digits = 4, ...) {
   cat("Spatially-clustered STEM model\n")
-  cat("  clusters requested : ", x$input_args$k, "\n", sep = "")
-  cat("  clusters estimated : ", sum(x$final_refit), "\n", sep = "")
+  cat("  regimes requested  : K = ", x$input_args$K, "\n", sep = "")
+  cat("  regimes estimated  : K_eff = ", sum(x$final_refit), "\n", sep = "")
   cat("  spatial penalty    : phi = ", x$input_args$phi_penalty,
       " (", x$input_args$phi_scale, ", knn = ", x$input_args$knn, ")\n", sep = "")
   cat("  label update       : ", x$input_args$label_update, "\n", sep = "")
   cat("  convergence        : ", x$convergence, "\n", sep = "")
   cat("  cluster sizes      : ",
-      paste(as.integer(table(factor(x$group, levels = seq_len(x$input_args$k)))),
+      paste(as.integer(table(factor(x$group, levels = seq_len(x$input_args$K)))),
             collapse = ", "), "\n", sep = "")
   cat("\nInformation criteria\n")
   print(round(x$info_crit, digits))

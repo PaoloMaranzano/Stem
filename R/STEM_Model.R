@@ -3,18 +3,18 @@
 #' @description
 #' The function \code{STEM_Model} is used to create an object of class \dQuote{STEM_Model}.
 #'
-#' @param ... A list with named elements: \code{phi}, \code{K}, \code{z}, \code{coordinates}, \code{covariates}, and optionally, \code{p} (default is 1). See model details below.
+#' @param ... A list with named elements: \code{phi}, \code{A}, \code{z}, \code{coordinates}, \code{covariates}, and optionally, \code{p} (default is 1). See model details below.
 #'
 #' @return
 #' The function returns a list containing:
 #' \itemize{
-#'   \item{\code{skeleton}} A list with components \code{phi}, \code{p}, and \code{K} as provided in the input.
+#'   \item{\code{skeleton}} A list with components \code{phi}, \code{p}, and \code{A} as provided in the input.
 #'   \item{\code{data}} A list with components \code{z}, \code{coordinates}, \code{covariates} from the input, as well as \code{r}, \code{n}, and \code{d}.
 #' }
 #'
 #' @details
 #' The hierarchical spatio-temporal model is defined as:
-#' \deqn{z_t = X_t \beta  + K y_t + e_t , e_t \sim N(0, \Sigma_e )}
+#' \deqn{z_t = X_t \beta  + A y_t + e_t , e_t \sim N(0, \Sigma_e )}
 #' \deqn{y_t = G y_{t-1} + \eta_t , \eta_t \sim N(0,\Sigma_{\eta})}
 #' for \eqn{t=1,...,n}. The initialization follows:
 #' \eqn{ y_0 \sim N(m0,C0).}
@@ -42,7 +42,7 @@
 #'       \item{\code{C0}}{ (\eqn{p \times p}) }
 #'     }
 #'   }
-#'   \item{\code{K}}{Loading matrix (\eqn{d \times p}).}
+#'   \item{\code{A}}{Loading matrix (\eqn{d \times p}).}
 #'   \item{\code{z}}{Observation matrix (\eqn{n \times d}).}
 #'   \item{\code{coordinates}}{Matrix (\eqn{d \times 2}) with spatial coordinates.}
 #'   \item{\code{covariates}}{Matrix (\eqn{(n \times d) \times r}) stacking data by station.}
@@ -91,11 +91,11 @@
 #'             m0 = as.matrix(0),
 #'             C0 = as.matrix(1))
 #'
-#' K <- matrix(1, ncol(z), 1)
+#' A <- matrix(1, ncol(z), 1)
 #'
 #' # Create model
 #' mod1 <- STEM_Model(z = z, covariates = covariates,
-#'                    coordinates = coordinates, phi = phi, K = K)
+#'                    coordinates = coordinates, phi = phi, A = A)
 #'
 #' class(mod1)
 #'
@@ -116,12 +116,12 @@ STEM_Model <-
       x <- list(...)
 
     #STEM_Model components : skeleton and data
-    skeleton <- STEM_Skeleton(x) #(phi=phi, p=p, K=K)
+    skeleton <- STEM_Skeleton(x) #(phi=phi, p=p, A=A)
 
     data <- STEM_Data(x) #(z=z, coordinates=coordinates, covariates=covariates)
 
     if(length(skeleton$phi$beta) != ncol(data$covariates)) stop("The length of Beta must be equal to the number of columns of covariates")
-    if(!(nrow(skeleton$K) == data$d && ncol(skeleton$K) == skeleton$p)) stop("The dimension of matrix K must be d*p")
+    if(!(nrow(skeleton$A) == data$d && ncol(skeleton$A) == skeleton$p)) stop("The dimension of the loading matrix A must be d*p")
 
 
     x=list(skeleton=skeleton,data=data)

@@ -1,7 +1,7 @@
 test_that("the pooled SC-STEM fit reproduces STEM_Estimation", {
   mod <- po_model(Tn = 60L)
   pooled <- STEM_Estimation(mod, precision = 0.05, distance = "geo")
-  sc <- SCSTEM_Estimation(mod, k = 1, phi_penalty = 0, distance = "geo",
+  sc <- SCSTEM_Estimation(mod, K = 1, phi_penalty = 0, distance = "geo",
                      precision_full_dataset = 0.05)
 
   expect_s3_class(sc, "SCSTEM_Estimation")
@@ -13,7 +13,7 @@ test_that("the pooled SC-STEM fit reproduces STEM_Estimation", {
 
 test_that("SCSTEM_Estimation returns an admissible partition and a monotone objective", {
   mod <- po_model(Tn = 90L)
-  fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   sizes <- tabulate(fit$group, nbins = 3)
@@ -34,7 +34,7 @@ test_that("SCSTEM_Estimation returns an admissible partition and a monotone obje
 
 test_that("the returned partition attains the best visited objective", {
   mod <- po_model(Tn = 90L)
-  fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   ### the reported objective must be the maximum seen along the trace, and the
@@ -49,18 +49,18 @@ test_that("the ICM sweep is monotone at fixed parameters", {
   ### The property that does hold: with the log-likelihood matrix held fixed,
   ### a sequential sweep followed by the swap pass cannot lower the objective.
   set.seed(11)
-  d <- 24L; k <- 3L
-  LL <- matrix(rnorm(d * k, sd = 2), d, k)
+  d <- 24L; K <- 3L
+  LL <- matrix(rnorm(d * K, sd = 2), d, K)
   nb <- lapply(seq_len(d), function(i) setdiff(max(1, i - 3):min(d, i + 3), i))
   phi_eff <- 0.4
-  lab <- rep(seq_len(k), length.out = d)
+  lab <- rep(seq_len(K), length.out = d)
 
   obj <- function(l) sum(LL[cbind(seq_len(d), l)]) +
     phi_eff * Stem:::scstem_potts_pairs(l, nb)
 
   before <- obj(lab)
   for (i in seq_len(d)) {
-    penvec <- tabulate(lab[nb[[i]]], nbins = k)
+    penvec <- tabulate(lab[nb[[i]]], nbins = K)
     lab[i] <- which.max(LL[i, ] + phi_eff * penvec)
   }
   expect_gte(obj(lab), before - 1e-8)
@@ -69,7 +69,7 @@ test_that("the ICM sweep is monotone at fixed parameters", {
 
 test_that("the information criteria use the exact parameter count", {
   mod <- po_model(Tn = 60L)
-  fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.5, distance = "geo",
                       precision = 0.05)
 
   ncov <- ncol(mod$data$covariates)
@@ -77,7 +77,7 @@ test_that("the information criteria use the exact parameter count", {
   npar_expected <- sum(fit$final_refit) * (ncov + 3 + 3 * pdim)
   nobs <- nrow(mod$data$z) * ncol(mod$data$z)
 
-  expect_equal(unname(fit$info_crit[["k"]]), npar_expected)
+  expect_equal(unname(fit$info_crit[["df"]]), npar_expected)
   expect_equal(unname(fit$info_crit[["AIC"]]),
                -2 * unname(fit$info_crit[["loglik"]]) + 2 * npar_expected)
   expect_equal(unname(fit$info_crit[["BIC"]]),
@@ -89,9 +89,9 @@ test_that("a stronger spatial penalty does not reduce spatial cohesion", {
   mod <- po_model(Tn = 90L)
   nb <- Stem:::scstem_neighbors(mod$data$coordinates, knn = 5)
 
-  f0 <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0, distance = "geo",
+  f0 <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0, distance = "geo",
                      precision = 0.05)
-  f1 <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 2, distance = "geo",
+  f1 <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 2, distance = "geo",
                      precision = 0.05)
 
   expect_gte(Stem:::scstem_potts_pairs(f1$group, nb$nb),
@@ -109,10 +109,10 @@ test_that("the neighbor graph is symmetric", {
 
 test_that("the swap pass never decreases the objective", {
   set.seed(1)
-  d <- 12L; k <- 3L
-  LL <- matrix(rnorm(d * k), d, k)
+  d <- 12L; K <- 3L
+  LL <- matrix(rnorm(d * K), d, K)
   nb <- lapply(seq_len(d), function(i) setdiff(max(1, i - 2):min(d, i + 2), i))
-  lab <- rep(seq_len(k), length.out = d)
+  lab <- rep(seq_len(K), length.out = d)
   phi_eff <- 0.7
 
   obj <- function(l) sum(LL[cbind(seq_len(d), l)]) +
@@ -121,7 +121,7 @@ test_that("the swap pass never decreases the objective", {
   out <- Stem:::scstem_swap_pass(lab, LL, phi_eff, nb)
   expect_gte(obj(out$labels), obj(lab) - 1e-8)
   ### swaps preserve the cluster sizes exactly
-  expect_equal(tabulate(out$labels, nbins = k), tabulate(lab, nbins = k))
+  expect_equal(tabulate(out$labels, nbins = K), tabulate(lab, nbins = K))
 })
 
 
@@ -129,7 +129,7 @@ test_that("the estimation does not modify the RNG state of the caller", {
   mod <- po_model(Tn = 45L)
   set.seed(99)
   before <- .Random.seed
-  invisible(SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.5, distance = "geo",
+  invisible(SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.5, distance = "geo",
                          precision = 0.05, seed = 12345))
   expect_identical(.Random.seed, before)
 })
@@ -145,20 +145,20 @@ test_that("the Adjusted Rand Index behaves at its boundaries", {
 
 test_that("a penalized fit starts from the unpenalized solution", {
   mod <- po_model(Tn = 60L)
-  f0 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0, distance = "geo",
+  f0 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0, distance = "geo",
                           precision = 0.05)
-  f1 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+  f1 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = "geo",
                           precision = 0.05)
   ## the same as starting it explicitly from the unpenalized partition
-  f1b <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+  f1b <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = "geo",
                            precision = 0.05, init_partition = f0$group)
   expect_equal(f1$group, f1b$group)
   expect_equal(f1$phi_multiplier, f1b$phi_multiplier)
   ## and the same as the member of a grid, which passes that partition on
-  ic <- SCSTEM_Infocrit(mod, k_grid = 2, phi_grid = c(0, 0.05), distance = "geo",
+  ic <- SCSTEM_Infocrit(mod, K_grid = 2, phi_grid = c(0, 0.05), distance = "geo",
                         precision = 0.05)
-  expect_equal(ic$fits[["k=2, phi=0.05"]]$group, f1$group)
-  expect_equal(ic$fits[["k=2, phi=0.05"]]$phi_effective, f1$phi_effective)
+  expect_equal(ic$fits[["K=2, phi=0.05"]]$group, f1$group)
+  expect_equal(ic$fits[["K=2, phi=0.05"]]$phi_effective, f1$phi_effective)
 })
 
 
@@ -174,12 +174,12 @@ test_that("the default initialization starts from the departures from the pooled
 
   ## the grid computes the departures once, from its pooled fit, and its fits
   ## coincide with the single ones, which fit the pooled model themselves
-  f0 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0, distance = "geo",
+  f0 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0, distance = "geo",
                           precision = 0.05)
-  f1 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = "geo",
+  f1 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = "geo",
                           precision = 0.05)
-  ic <- SCSTEM_Infocrit(mod, k_grid = 1:2, phi_grid = c(0, 0.05), distance = "geo",
+  ic <- SCSTEM_Infocrit(mod, K_grid = 1:2, phi_grid = c(0, 0.05), distance = "geo",
                         precision = 0.05)
-  expect_equal(ic$fits[["k=2, phi=0"]]$group, f0$group)
-  expect_equal(ic$fits[["k=2, phi=0.05"]]$group, f1$group)
+  expect_equal(ic$fits[["K=2, phi=0"]]$group, f0$group)
+  expect_equal(ic$fits[["K=2, phi=0.05"]]$group, f1$group)
 })

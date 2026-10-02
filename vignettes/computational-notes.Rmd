@@ -48,12 +48,12 @@ $O(d^3)$ again.
 
 **Where the factor $T$ comes from.** The measurement equation of the model is
 
-$$z_t = X_t\beta + K y_t + e_t, \qquad e_t \sim N_d(0, \Sigma_\varepsilon),$$
+$$z_t = X_t\beta + A y_t + e_t, \qquad e_t \sim N_d(0, \Sigma_\varepsilon),$$
 
 and the filter needs, at every time point, the covariance of the one-step-ahead
 predictive distribution of $z_t$,
 
-$$Q_t = K P_t K' + \Sigma_\varepsilon,$$
+$$Q_t = A P_t A' + \Sigma_\varepsilon,$$
 
 together with its inverse and its determinant. $P_t$, the predicted variance of
 the state, changes with $t$, so $Q_t$ changes with $t$, so a direct
@@ -64,7 +64,7 @@ operations per factorisation, roughly $0.04$ seconds with the reference BLAS
 that ships with R. That looks small. Multiplied by $T = 730$ it is 29 seconds
 for **one forward pass**, that is one E-step; an EM run does thirty to fifty of
 them; and `SCSTEM_Estimation()` runs an EM per regime, for every point of the
-$(k,\varphi)$ grid, for every bootstrap draw. The cubic term is paid thousands
+$(K,\varphi)$ grid, for every bootstrap draw. The cubic term is paid thousands
 of times.
 
 Doubling $d$ multiplies a quadratic cost by four and a cubic cost by eight.
@@ -78,39 +78,39 @@ $Q_t$ is not an arbitrary $d\times d$ matrix. Two facts about it are structural.
 1. $\Sigma_\varepsilon = \sigma^2_\varepsilon I_d + \sigma^2_\omega C(h;\theta)$
    **does not depend on $t$**: it is a function of the parameters only, and is
    rebuilt once per EM iteration.
-2. $K P_t K'$ **has rank $p$**, the dimension of the latent state, which is one
+2. $A P_t A'$ **has rank $p$**, the dimension of the latent state, which is one
    in the default specification. Between one time point and the next, $d^2$
    numbers change, but with only $p(p+1)/2$ degrees of freedom.
 
 The Woodbury identity says that the inverse of an invertible matrix plus a
 low-rank update is the inverse of the first plus a low-rank correction:
 
-$$(A + UCV)^{-1} = A^{-1} - A^{-1}U\,(C^{-1} + VA^{-1}U)^{-1}\,VA^{-1}.$$
+$$(M + UCV)^{-1} = M^{-1} - M^{-1}U\,(C^{-1} + VM^{-1}U)^{-1}\,VM^{-1}.$$
 
-With $A = \Sigma_\varepsilon$, $U = K$, $C = P_t$ and $V = K'$,
+With $M = \Sigma_\varepsilon$, $U = A$, $C = P_t$ and $V = A'$,
 
-$$Q_t^{-1} = \Sigma_\varepsilon^{-1} - \Sigma_\varepsilon^{-1}K\,
-             (P_t^{-1} + K'\Sigma_\varepsilon^{-1}K)^{-1}\,
-             K'\Sigma_\varepsilon^{-1}.$$
+$$Q_t^{-1} = \Sigma_\varepsilon^{-1} - \Sigma_\varepsilon^{-1}A\,
+             (P_t^{-1} + A'\Sigma_\varepsilon^{-1}A)^{-1}\,
+             A'\Sigma_\varepsilon^{-1}.$$
 
 The only inverse that depends on $t$ is that of
-$P_t^{-1} + K'\Sigma_\varepsilon^{-1}K$, which is $p\times p$: with $p = 1$ it
+$P_t^{-1} + A'\Sigma_\varepsilon^{-1}A$, which is $p\times p$: with $p = 1$ it
 is a division. Everything else -- the Cholesky factor of $\Sigma_\varepsilon$,
-the product $K'\Sigma_\varepsilon^{-1}K$, the matrix
-$\Sigma_\varepsilon^{-1}K$ -- is constant over the pass and computed once.
+the product $A'\Sigma_\varepsilon^{-1}A$, the matrix
+$\Sigma_\varepsilon^{-1}A$ -- is constant over the pass and computed once.
 
 The determinant, needed for the log-likelihood, comes from the matrix
 determinant lemma, which is the same statement about $\det$:
 
 $$\log|Q_t| = \log|\Sigma_\varepsilon| + \log|P_t| +
-              \log|P_t^{-1} + K'\Sigma_\varepsilon^{-1}K|,$$
+              \log|P_t^{-1} + A'\Sigma_\varepsilon^{-1}A|,$$
 
 again with only a $p\times p$ piece depending on $t$.
 
 **And $Q_t$ itself is never needed.** The recursion uses only
 
-- $K'Q_t^{-1}K$, which is $p\times p$,
-- $K'Q_t^{-1}e_t$, which is $p\times 1$,
+- $A'Q_t^{-1}A$, which is $p\times p$,
+- $A'Q_t^{-1}e_t$, which is $p\times 1$,
 - the quadratic form $e_t'Q_t^{-1}e_t$, a scalar, obtained from one triangular
   solve against the cached Cholesky factor of $\Sigma_\varepsilon$ at $O(d^2)$,
   corrected by a $p\times p$ term.
@@ -153,7 +153,7 @@ The sums the M-step accumulates over time are cross-products, not loops. Because
 the loading matrix does not depend on time, the second moment of the measurement
 error collapses to
 
-$$\sum_t \left\{ K C^s_t K' + r_t r_t' \right\} = K\Big(\sum_t C^s_t\Big)K' + R'R,$$
+$$\sum_t \left\{ A C^s_t A' + r_t r_t' \right\} = A\Big(\sum_t C^s_t\Big)A' + R'R,$$
 
 with $R$ the $T\times d$ matrix of residuals: one cross-product in place of $T$
 outer products, and no need to hold $T$ matrices of size $d\times d$ at once.

@@ -302,7 +302,7 @@ fa_model <- function(des, coords) {
                    phi = list(beta = matrix(b, ncol = 1), sigma2eps = 0.6 * s2, sigma2omega = 0.4 * s2,
                               theta = 3 / dm, G = matrix(0.3, 1, 1), Sigmaeta = matrix(0.2 * s2, 1, 1),
                               m0 = as.matrix(0), C0 = as.matrix(1)),
-                   K = matrix(1, des$d, 1))
+                   A = matrix(1, des$d, 1))
 }
 
 ## the Granger test regime by regime: the Wald statistic of the lags of x on
@@ -364,26 +364,26 @@ fa_run <- function(M, seed) {
   ## 1-2. the grid and the selection
   ic <- cached(paste0(tag, "_grid"), {
     mod <- fa_model(des, coords)
-    Stem::SCSTEM_Infocrit(mod, k_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid,
+    Stem::SCSTEM_Infocrit(mod, K_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid,
                           knn = min(CFG$knn[1], M$n - 1L), distance = "geo",
                           min_cluster_size = CFG$m[1], seed = seed, verbose = TRUE)
   })
   sel <- Stem::SCSTEM_Select(ic, band = CFG$band, criterion = "BIC")
-  pooled <- ic$fits[[which(ic$table$k == 1)[1]]]
+  pooled <- ic$fits[[which(ic$table$K == 1)[1]]]
   ## 3. the bootstrap of the selected model, and of the pooled one
   boot_tag <- sprintf("%s_B%d", tag, CFG$B[1])
-  inf_sel <- cached(paste0(boot_tag, "_k", sel$k_selected, "_boot"), {
+  inf_sel <- cached(paste0(boot_tag, "_k", sel$K_selected, "_boot"), {
     bt <- Stem::SCSTEM_Bootstrap(sel$fit, B = CFG$B[1], seed = seed, verbose = TRUE)
     list(info = bt$info, B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = CFG$level[1]))
   })
-  inf_pool <- if (sel$k_selected == 1L) inf_sel else if (isTRUE(CFG$boot_pooled[1]))
+  inf_pool <- if (sel$K_selected == 1L) inf_sel else if (isTRUE(CFG$boot_pooled[1]))
     cached(paste0(boot_tag, "_k1_boot"), {
       bt <- Stem::SCSTEM_Bootstrap(pooled, B = CFG$B[1], seed = seed, verbose = TRUE)
       list(info = bt$info, B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = CFG$level[1]))
     }) else NULL
   ## 4. the Granger tests
-  gr <- rbind(fa_granger(sel$fit, inf_sel$inf, des$names, sprintf("selected, k = %d", sel$k_selected)),
-              if (sel$k_selected > 1L && !is.null(inf_pool)) fa_granger(pooled, inf_pool$inf, des$names, "pooled"))
+  gr <- rbind(fa_granger(sel$fit, inf_sel$inf, des$names, sprintf("selected, K = %d", sel$K_selected)),
+              if (sel$K_selected > 1L && !is.null(inf_pool)) fa_granger(pooled, inf_pool$inf, des$names, "pooled"))
   ## 5. the residuals
   dg <- fa_diagnostics(sel$fit, des)
   ## outputs
@@ -398,21 +398,21 @@ fa_run <- function(M, seed) {
   fwrite(data.table(site = b$sites, brand = meta$brand_end, group = meta$group, lon = meta$lon, lat = meta$lat,
                     regime = sel$fit$group), file.path(od, "regimes.csv"))
   fa_map(meta, sel$fit, file.path(od, "map.pdf"),
-         sprintf("%s: k = %d, phi = %s", M$id, sel$k_selected, format(sel$phi_selected)))
+         sprintf("%s: K = %d, phi = %s", M$id, sel$K_selected, format(sel$phi_selected)))
   bic <- function(f) unname(f$info_crit[["BIC"]])
   row <- data.table(model = M$id, part = M$part, city = FA_CITY[M$city],
                     setting = if (is.na(M$setting)) "" else FA_SETTING[as.character(M$setting)],
-                    fuel = M$fuel, pumps = M$n, K_max = M$kmax, k = sel$k_selected, phi = sel$phi_selected,
+                    fuel = M$fuel, pumps = M$n, K_max = M$kmax, K = sel$K_selected, phi = sel$phi_selected,
                     BIC_pooled = bic(pooled), BIC_selected = bic(sel$fit),
                     p_regimes = paste(format.pval(gr[model != "pooled"]$p_value, digits = 2), collapse = "; "),
-                    p_pooled = if (sel$k_selected == 1L) gr$p_value[1] else
+                    p_pooled = if (sel$K_selected == 1L) gr$p_value[1] else
                       if (nrow(gr[model == "pooled"])) gr[model == "pooled"]$p_value[1] else NA_real_,
                     B_valid = inf_sel$B_valid,
                     ARI_boot_median = if (!is.null(stab) && nrow(stab)) stats::median(stab$ARI, na.rm = TRUE) else NA_real_,
                     min_grid = fa_minutes(ic), min_boot = fa_minutes(inf_sel),
-                    min_boot_pooled = if (sel$k_selected > 1L) fa_minutes(inf_pool) else NA_real_)
+                    min_boot_pooled = if (sel$K_selected > 1L) fa_minutes(inf_pool) else NA_real_)
   saveRDS(row, file.path(od, "summary_row.rds"))
-  message(sprintf("   k = %d, phi = %s | Granger p by regime: %s", sel$k_selected,
+  message(sprintf("   K = %d, phi = %s | Granger p by regime: %s", sel$K_selected,
                   format(sel$phi_selected), row$p_regimes))
   invisible(row)
 }

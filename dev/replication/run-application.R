@@ -118,7 +118,7 @@ app_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
 
 CFG <- app_config(list(
   data     = "",                                  # empty: Stem's povalley
-  k_grid   = 1:4,
+  K_grid   = 1:4,
   phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   band     = c(0.025, 0.2),  # the band in which the tuning rule chooses k
   knn      = 5L,
@@ -179,7 +179,7 @@ phi0 <- list(beta = matrix(ols$coefficients, ncol = 1),
              G = matrix(0.7, 1, 1), Sigmaeta = matrix(0.1 * s2, 1, 1),
              m0 = as.matrix(0), C0 = as.matrix(1))
 mod <- Stem::STEM_Model(z = z, covariates = X, coordinates = coords,
-                        phi = phi0, K = matrix(1, d, 1))
+                        phi = phi0, A = matrix(1, d, 1))
 
 ## ---- B: pooled reference ----------------------------------------------------
 message("B. pooled STEM fit")
@@ -191,7 +191,7 @@ pooled <- cached("pooled", {
 ## ---- C: the grid ------------------------------------------------------------
 message("C. grid over k and phi")
 grid <- cached("grid", {
-  Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
+  Stem::SCSTEM_Infocrit(mod, K_grid = CFG$K_grid, phi_grid = CFG$phi_grid,
                         knn = CFG$knn[1], distance = "geo",
                         precision = 0.1, precision_full_dataset = 0.01,
                         max_iter = 8, seed = CFG$seed[1], verbose = TRUE,
@@ -208,7 +208,7 @@ stopifnot(inherits(best, "SCSTEM_Estimation"))
 
 if ("--no-bootstrap" %in% commandArgs(trailingOnly = TRUE)) {
   message("\nStopping before the bootstrap, as requested.")
-  message("Selected configuration: k = ", sel$k_selected,
+  message("Selected configuration: K = ", sel$K_selected,
           ", phi = ", sel$phi_selected)
   print(table(best$group))
   print(grid$table)
@@ -219,8 +219,8 @@ if ("--no-bootstrap" %in% commandArgs(trailingOnly = TRUE)) {
 ## With k = 1 the rule finds no partition that improves on the pooled model,
 ## and there is no clustering to bootstrap.
 boot <- inf <- NULL
-if (sel$k_selected == 1L) {
-  message("E. skipped: the selection rule chooses k = 1, no partition ",
+if (sel$K_selected == 1L) {
+  message("E. skipped: the selection rule chooses K = 1, no partition ",
           "improves on the pooled model")
 } else {
   message("E. refit-with-clustering bootstrap")
@@ -244,7 +244,7 @@ utils::write.csv(data.frame(location = seq_len(d), lon = coords[, 1],
 if (!is.null(inf))
   utils::write.csv(inf$summary, file.path(OUT, "estimates.csv"), row.names = FALSE)
 
-message("\nSelected configuration: k = ", sel$k_selected, ", phi = ", sel$phi_selected)
+message("\nSelected configuration: K = ", sel$K_selected, ", phi = ", sel$phi_selected)
 print(table(best$group))
 message("\nGrid:")
 print(grid$table)

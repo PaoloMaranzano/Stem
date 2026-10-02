@@ -4,8 +4,8 @@
 #' @description The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
 #'
 #' This is one of the two estimation engines of the package. The entry point is
-#' \code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
-#' \code{\link{SCSTEM_Estimation}} when \code{k > 1}, and which takes the same
+#' \code{\link{STEM_Fit}}, which calls this function when \code{K = 1} and
+#' \code{\link{SCSTEM_Estimation}} when \code{K > 1}, and which takes the same
 #' arguments and returns the same object. Call \code{STEM_Estimation} directly
 #' only to bypass the dispatch; it is the historical interface of the package
 #' and is kept unchanged.
@@ -181,10 +181,10 @@
 #'             m0=as.matrix(0),
 #'             C0=as.matrix(1))
 #'
-#' K <-matrix(1,ncol(z),1)
+#' A <-matrix(1,ncol(z),1)
 #'
 #' mod1 <- STEM_Model(z=z,covariates=covariates,
-#'                    coordinates=coordinates,phi=phi,K=K)
+#'                    coordinates=coordinates,phi=phi,A=A)
 #' class(mod1)
 #'
 #' #mod1 is given as output by the STEM_Model function
@@ -237,7 +237,7 @@ covariates  = changedimension_covariates(covariates,d=d,r=r,n=n)
 coordinates = StemModel$data$coordinates
 
 phi_start 	= StemModel$skeleton$phi
-phi_start$K = t(StemModel$skeleton$K)
+phi_start$A = t(StemModel$skeleton$A)
 n_par     	= length(unlist(phi_start))
 
 phi_start$logb 		= log(phi_start$sigma2eps/phi_start$sigma2omega)
@@ -317,7 +317,7 @@ while (!em_done(converged_EM_1, converged_EM_2) && n_iter_EM <= max.iter){
 	### The free parameters: everything the EM step returns but the loading
 	### matrix and C0, which it does not estimate (with the loadings among them,
 	### a relative criterion would loosen with the number of locations).
-	if (is.null(free_par)) free_par = !grepl("^(K|C0)[0-9]*$", names(unlist(step$phi))[-1])
+	if (is.null(free_par)) free_par = !grepl("^(A|C0)[0-9]*$", names(unlist(step$phi))[-1])
 
 	###Check the convergence! Both criteria are undefined at the first
 	### iteration, which has no predecessor.
@@ -351,7 +351,7 @@ while (!em_done(converged_EM_1, converged_EM_2) && n_iter_EM <= max.iter){
 phi_start$theta = exp(phi_start$logtheta)
 phi_start$sigma2eps = exp(phi_start$logb) * phi_start$sigma2omega
 phi_start = phi_start[-which(names(phi_start) == "logtheta")]
-phi_start = phi_start[-which(names(phi_start) == "K")]
+phi_start = phi_start[-which(names(phi_start) == "A")]
 phi_start = phi_start[-which(names(phi_start) == "logb")]
 phi.estimated= phi_start
 

@@ -38,7 +38,7 @@ function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',p
 	#~ output.estimation		= MLE,
 	#~ coord.newlocations 	= data.newlocations$coord.newlocations,
 	#~ covariates.newlocations= data.newlocations$covariates.newlocations,
-	#~ K.newlocations 		= data.newlocations$K.newlocations,
+	#~ A.newlocations 		= data.newlocations$A.newlocations,
 	#~ time.point 			= time.point,
 	#~ regular.grid 		= output.kriging$regular.grid)
 

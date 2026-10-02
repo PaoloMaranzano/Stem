@@ -5,14 +5,14 @@
 #' is decided by two arguments and nothing else:
 #'
 #' \tabular{lll}{
-#'   \strong{k} \tab \strong{lambda} \tab \strong{what is fitted} \cr
+#'   \strong{K} \tab \strong{lambda} \tab \strong{what is fitted} \cr
 #'   \code{1}   \tab \code{0}        \tab the pooled STEM model, \code{\link{STEM_Estimation}} \cr
 #'   \code{> 1} \tab \code{0}        \tab the spatially-clustered model, \code{\link{SCSTEM_Estimation}} \cr
 #'   \code{1}   \tab \code{> 0}      \tab the pooled model with an elastic net on \eqn{\beta} \cr
 #'   \code{> 1} \tab \code{> 0}      \tab the clustered model with an elastic net on \eqn{\beta} within each regime
 #' }
 #'
-#' The defaults \code{k = 1}, \code{alpha = 0}, \code{lambda = 0} therefore
+#' The defaults \code{K = 1}, \code{alpha = 0}, \code{lambda = 0} therefore
 #' reproduce the classical estimator exactly, to floating point.
 #'
 #' @details
@@ -47,7 +47,7 @@
 #' \code{lambda} mean the same thing for every covariate and, in the clustered
 #' model, for every regime. Coefficients are returned on the original scale.
 #'
-#' \strong{Choosing lambda and alpha.} They are hyperparameters like \code{k}
+#' \strong{Choosing lambda and alpha.} They are hyperparameters like \code{K}
 #' and \code{phi_penalty} and are chosen the same way: over a grid, by an
 #' information criterion computed with the \emph{effective} number of
 #' coefficients the penalty leaves, or by spatio-temporal cross-validation.
@@ -85,11 +85,11 @@
 #' On a design with a deliberately collinear pair this agrees with the
 #' elastic net computed directly on \eqn{X'X} and \eqn{X'y} to between
 #' \eqn{10^{-14}} and \eqn{10^{-11}}, for the ridge, the lasso, the elastic net
-#' and the unpenalized case alike. With \code{k > 1} the same switches give
+#' and the unpenalized case alike. With \code{K > 1} the same switches give
 #' clusterwise penalized regression, the partition still estimated.
 #'
 #' @section How the penalty and the clustering interact:
-#' With \code{k > 1} the objective carries two penalties doing different things:
+#' With \code{K > 1} the objective carries two penalties doing different things:
 #' \code{phi_penalty} penalizes disagreement between the labels of neighboring
 #' locations, \code{lambda} penalizes the size of the coefficients within a
 #' regime. They are not applied one after the other. The algorithm alternates
@@ -112,11 +112,11 @@
 #' hyperparameters.
 #'
 #' \strong{They are not separable.} The \code{lambda} minimizing predictive risk
-#' grows with \code{k}, because a regime of \eqn{d/k} locations carries less
-#' information than the pooled network; and the \code{k} a criterion selects
+#' grows with \code{K}, because a regime of \eqn{d/K} locations carries less
+#' information than the pooled network; and the \code{K} a criterion selects
 #' grows with \code{lambda}, because shrinkage lowers the effective number of
 #' coefficients and so makes an extra regime cheaper. Fixing \code{lambda} once
-#' on the pooled fit and only then selecting \code{k} under-shrinks precisely
+#' on the pooled fit and only then selecting \code{K} under-shrinks precisely
 #' where shrinkage is needed.
 #'
 #' \strong{The automatic scale of the Potts penalty moves with lambda.} With
@@ -135,8 +135,8 @@
 #'
 #' @param StemModel an object of class \dQuote{STEM_Model}, from
 #'   \code{\link{STEM_Model}}.
-#' @param k number of spatial regimes. \code{1}, the default, fits the pooled
-#'   model; \code{k > 1} fits the spatially-clustered model.
+#' @param K number of spatial regimes. \code{1}, the default, fits the pooled
+#'   model; \code{K > 1} fits the spatially-clustered model.
 #' @param alpha the elastic-net mixing parameter, in \eqn{[0,1]}. \code{0} is
 #'   ridge, \code{1} is the lasso, in between is the elastic net. Ignored when
 #'   \code{lambda} is zero. Default is 0.
@@ -154,7 +154,7 @@
 #'   whose diagonal the internal scaling has already set to one, so a ridge is
 #'   scale free by construction and rescaling it would only break that.
 #' @param lambda_by how the penalty is spread over the regimes when
-#'   \code{k > 1}: \dQuote{common} (the default) or \dQuote{size}. See
+#'   \code{K > 1}: \dQuote{common} (the default) or \dQuote{size}. See
 #'   \code{\link{SCSTEM_Estimation}}. Both keep \code{lambda} a single
 #'   hyperparameter.
 #' @param latent logical. \code{FALSE} switches the latent process off.
@@ -163,17 +163,17 @@
 #'   \code{regularization = 0} this reduces the model exactly to penalized
 #'   linear regression -- see the section below.
 #' @param phi_penalty the strength of the Potts penalty on the partition, passed
-#'   to \code{\link{SCSTEM_Estimation}}. Ignored when \code{k = 1}.
+#'   to \code{\link{SCSTEM_Estimation}}. Ignored when \code{K = 1}.
 #' @param distance \dQuote{geo} or \dQuote{euclidean}. Default is
 #'   \dQuote{euclidean} for the pooled model and \dQuote{geo} for the clustered
 #'   one, which are the defaults of the two functions being called.
 #' @param verbose logical, passed on.
 #' @param ... further arguments passed to \code{\link{STEM_Estimation}} when
-#'   \code{k = 1} and to \code{\link{SCSTEM_Estimation}} when \code{k > 1}.
+#'   \code{K = 1} and to \code{\link{SCSTEM_Estimation}} when \code{K > 1}.
 #'
 #' @return The object the underlying function returns: of class
-#'   \dQuote{STEM_Model} when \code{k = 1}, of class \dQuote{SCSTEM_Estimation} when
-#'   \code{k > 1}. In both cases the penalty in force and the effective number
+#'   \dQuote{STEM_Model} when \code{K = 1}, of class \dQuote{SCSTEM_Estimation} when
+#'   \code{K > 1}. In both cases the penalty in force and the effective number
 #'   of coefficients are recorded, under \code{estimates$penalty} and inside
 #'   each regime's fit respectively.
 #'
@@ -208,7 +208,7 @@
 #'              theta = 1 / 100000, G = matrix(0.8, 1, 1),
 #'              Sigmaeta = matrix(0.2 * s2, 1, 1),
 #'              m0 = as.matrix(0), C0 = as.matrix(1)),
-#'   K = matrix(1, d, 1))
+#'   A = matrix(1, d, 1))
 #'
 #' ## the classical estimator
 #' fit0 <- STEM_Fit(mod, distance = "geo", max.iter = 5)
@@ -218,20 +218,21 @@
 #' }
 #'
 #' @export
-STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
+STEM_Fit <- function(StemModel, K = 1, alpha = 0, lambda = 0, penalize = NULL,
                      lambda_scale = c("relative", "absolute"),
                      lambda_by = c("common", "size"),
                      latent = TRUE, spatial = TRUE,
                      phi_penalty = 0.05, distance = NULL, verbose = FALSE, ...) {
 
+  stem_renamed_args(names(as.list(sys.call()))[-1], c(k = "K"))
   if (!inherits(StemModel, "STEM_Model")) {
     stop("'StemModel' must be an object of class 'STEM_Model'.", call. = FALSE)
   }
   lambda_scale <- match.arg(lambda_scale)
   lambda_by <- match.arg(lambda_by)
-  k <- as.integer(k)
-  if (length(k) != 1L || is.na(k) || k < 1L) {
-    stop("'k' must be a single integer of at least one.", call. = FALSE)
+  K <- as.integer(K)
+  if (length(K) != 1L || is.na(K) || K < 1L) {
+    stop("'K' must be a single integer of at least one.", call. = FALSE)
   }
   if (length(alpha) != 1L || is.na(alpha) || alpha < 0 || alpha > 1) {
     stop("'alpha' must be a single number in [0, 1].", call. = FALSE)
@@ -240,7 +241,7 @@ STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
     stop("'lambda' must be a single non-negative number.", call. = FALSE)
   }
 
-  if (k == 1L) {
+  if (K == 1L) {
     args <- list(StemModel = StemModel, alpha = alpha, lambda = lambda,
                  lambda_scale = lambda_scale,
                  penalize = penalize, latent = latent, spatial = spatial,
@@ -249,7 +250,7 @@ STEM_Fit <- function(StemModel, k = 1, alpha = 0, lambda = 0, penalize = NULL,
     return(do.call(STEM_Estimation, args))
   }
 
-  args <- list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
+  args <- list(StemModel = StemModel, K = K, phi_penalty = phi_penalty,
                lambda_scale = lambda_scale, lambda_by = lambda_by,
                alpha = alpha, lambda = lambda, penalize = penalize,
                latent = latent, spatial = spatial,

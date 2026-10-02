@@ -24,7 +24,7 @@ refits, overriding the settings of the original fit.}
 \value{
 An object of class \dQuote{SCSTEM_Bootstrap}, a list with
 \itemize{
-  \item \code{draws}: a \eqn{B} by \eqn{k} by \eqn{npar} array of the
+  \item \code{draws}: a \eqn{B} by \eqn{K} by \eqn{npar} array of the
     cluster-wise parameter estimates of every refit, with \code{NA} for
     failed draws.
   \item \code{groups}: a \eqn{d} by \eqn{B} matrix of the refit partitions.
@@ -51,7 +51,7 @@ at every draw, rather than conditioning on the estimated partition. The
 algorithm adapts the refit-with-clustering bootstrap of Maranzano, Mattera
 and Sugasawa (2026+) to the spatio-temporal setting:
 \enumerate{
-  \item Fit the SC-STEM model on the observed data at fixed \eqn{k} and
+  \item Fit the SC-STEM model on the observed data at fixed \eqn{K} and
     \eqn{\phi}, obtaining the partition \eqn{\hat{P}} and the cluster-wise
     parameter estimates \eqn{\hat{\phi}_k}.
   \item For \eqn{b = 1,\ldots,B} and for each cluster \eqn{k}, simulate a
@@ -65,7 +65,7 @@ and Sugasawa (2026+) to the spatio-temporal setting:
     data are aligned with the rows of the spatial penalty graph and every
     location keeps its own neighbors.
   \item Re-run \code{\link{SCSTEM_Estimation}} on \eqn{z^{*(b)}} with the same
-    \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
+    \eqn{K}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
     estimates, the refit partition and the convergence diagnostics.
 }
 Because each bootstrap sample is generated cluster by cluster from the
@@ -110,10 +110,10 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
-fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 boot
 }

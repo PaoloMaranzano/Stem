@@ -6,7 +6,7 @@
 \usage{
 SCSTEM_Estimation(
   StemModel,
-  k = 3,
+  K = 3,
   phi_penalty = 0.05,
   phi_scale = c("auto", "per-observation", "raw"),
   knn = 5,
@@ -41,7 +41,7 @@ SCSTEM_Estimation(
 \item{StemModel}{an object of class \dQuote{STEM_Model} given as output by
 the \code{\link{STEM_Model}} function.}
 
-\item{k}{integer, the number of spatial clusters. \code{k = 1} returns the
+\item{K}{integer, the number of spatial clusters. \code{K = 1} returns the
 pooled STEM fit. Default is 3.}
 
 \item{phi_penalty}{non-negative number, the weight of the Potts spatial
@@ -83,7 +83,7 @@ by versions of the package before 2.0.0 can be reproduced by passing
 \code{SCDA::SC_AMKM(...)$df$cluster}. The partition is repaired if it
 violates \code{min_cluster_size}. With \code{phi_penalty > 0} and no
 \code{init_partition}, the fit starts from the solution of the
-unpenalized fit at the same \eqn{k}, itself started from
+unpenalized fit at the same \eqn{K}, itself started from
 \code{init_method}; a given \code{init_partition} is taken as that start,
 which is how \code{\link{SCSTEM_Infocrit}} passes the partition of its
 unpenalized fit.}
@@ -147,7 +147,7 @@ default) or \dQuote{absolute}. See \code{\link{STEM_Estimation}}.}
 which under the relative scale already means the same proportional
 shrinkage, since the reference is computed inside each regime.
 \dQuote{size} sets \eqn{\lambda_g = \lambda \bar n / n_g} with
-\eqn{\bar n = d/k}, shrinking a regime of half the average size twice as
+\eqn{\bar n = d/K}, shrinking a regime of half the average size twice as
 hard. Either way \code{lambda} stays ONE hyperparameter: genuinely
 cluster-specific \eqn{(\alpha_g, \lambda_g)} is a different model and is
 not offered here.}
@@ -176,7 +176,7 @@ environment filled on other data must never be passed.}
 \value{
 An object of class \dQuote{SCSTEM_Estimation}, a list with components:
 \itemize{
-  \item \code{phi_hat}: \eqn{k} by \eqn{npar} matrix of cluster-wise
+  \item \code{phi_hat}: \eqn{K} by \eqn{npar} matrix of cluster-wise
     parameter estimates from the final refit.
   \item \code{group}: integer vector of length \eqn{d} with the estimated
     cluster label of each location.
@@ -205,26 +205,26 @@ An object of class \dQuote{SCSTEM_Estimation}, a list with components:
 \description{
 \code{SCSTEM_Estimation} fits a spatially-clustered spatio-temporal
 expectation-maximization (SC-STEM) model. The \eqn{d} monitoring locations
-are partitioned into \eqn{k} latent spatial regimes, and a separate
+are partitioned into \eqn{K} latent spatial regimes, and a separate
 \dQuote{STEM_Model} is estimated within each regime, so that regression
 coefficients, variance components and latent temporal dynamics are all
 cluster-specific. The partition and the parameters are estimated jointly by
 alternating optimization of a Potts-penalized log-likelihood.
 
 This is one of the two estimation engines of the package. The entry point is
-\code{\link{STEM_Fit}}, which calls this function when \code{k > 1} and
-\code{\link{STEM_Estimation}} when \code{k = 1}, and which takes the same
+\code{\link{STEM_Fit}}, which calls this function when \code{K > 1} and
+\code{\link{STEM_Estimation}} when \code{K = 1}, and which takes the same
 arguments and returns the same object. Call \code{SCSTEM_Estimation} directly only
 to bypass the dispatch.
 }
 \details{
 \strong{Model.} Conditionally on location \eqn{i} belonging to cluster
-\eqn{k}, the SC-STEM model is the cluster-specific STEM model
-\deqn{z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+\eqn{k \in \{1, \ldots, K\}}, the SC-STEM model is the cluster-specific STEM model
+\deqn{z_{it} = x_{it}' \beta_k + A_i y^{(k)}_t + e_{it}, \qquad
       y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,}
 with \eqn{e_t \sim N(0, \Sigma_{e,k})},
 \eqn{\Sigma_{e,k} = \sigma^2_{\epsilon k} I + \sigma^2_{\omega k} C(h;\theta_k)}
-and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{k = 1}
+and \eqn{\eta^{(k)}_t \sim N(0, \Sigma_{\eta k})}. Setting \eqn{K = 1}
 recovers the pooled \code{\link{STEM_Estimation}} fit.
 
 \strong{Objective.} Labels \eqn{k_1,\ldots,k_d} and parameters are estimated
@@ -276,12 +276,12 @@ The effective penalty actually applied is always reported in
 
 \strong{Penalized fits start from the unpenalized one.} With
 \code{phi_penalty > 0} the fit with \code{phi_penalty = 0} at the same
-\eqn{k} is run first, and its solution is the starting partition. A penalty
+\eqn{K} is run first, and its solution is the starting partition. A penalty
 that is strong from the first sweep freezes whatever partition it is given,
 so a start unrelated to the regimes would stay where it is; from the
 unpenalized solution the penalty only has to decide how much spatial
 smoothing that solution can afford. \code{\link{SCSTEM_Infocrit}} fits
-\eqn{\phi = 0} once per \eqn{k} and passes its partition on, so a single fit
+\eqn{\phi = 0} once per \eqn{K} and passes its partition on, so a single fit
 and the corresponding member of a grid coincide.
 
 \strong{Algorithm.} The two steps are iterated until convergence:
@@ -331,7 +331,7 @@ of Gaussian mixtures. With \code{enforce_min_size = TRUE}
 or above \code{min_cluster_size}, which keeps every visited configuration
 admissible while preserving the monotonicity of the ICM sweep within the
 feasible set. The constraint matters most when the number of locations is
-small relative to \eqn{k}; it can be lifted with
+small relative to \eqn{K}; it can be lifted with
 \code{enforce_min_size = FALSE}.
 
 The constraint has a cost of its own: a location sitting in a cluster that is
@@ -357,7 +357,7 @@ starts from its least-squares fit.
 \strong{Final refit and information criteria.} On convergence the
 cluster-wise STEM models are re-estimated once on the final partition, with
 the \code{em_*} settings of \code{control}, the same as the pooled fit at
-\eqn{k = 1}, so that the log-likelihoods compared across \eqn{k} are
+\eqn{K = 1}, so that the log-likelihoods compared across \eqn{K} are
 computed to the same accuracy. All
 reported coefficients, variance components and information criteria come
 from this refit and are based on the \emph{exact} cluster-wise
@@ -378,7 +378,7 @@ stop at different points of the likelihood, usually within the tolerance of
 the EM algorithm, occasionally further apart when a small regime starts near
 the boundary of its parameter space; either way the difference is not a
 property of the penalty. Sharing the refit makes the fits of one partition
-identical, so that a comparison across penalties at one \eqn{k} compares
+identical, so that a comparison across penalties at one \eqn{K} compares
 partitions only. \code{refit_reused} reports whether the refit was shared.
 
 \strong{Statistical features and scope.} The assumptions are inherited from
@@ -387,7 +387,7 @@ response is \emph{Gaussian} and \emph{univariate}: \code{z} is a \eqn{T} by
 \eqn{d} matrix of one variable measured at \eqn{d} sites, so several
 pollutants modeled jointly is a different specification. What is multivariate
 is the \emph{latent state}, of dimension \eqn{p \ge 1}, loaded onto the
-locations by the known matrix \eqn{K}, which is not estimated and is common
+locations by the known matrix \eqn{A}, which is not estimated and is common
 across regimes. The latent dynamics is a VAR(1), with \eqn{G} and
 \eqn{\Sigma_\eta} diagonal by default; \eqn{m_0} is estimated and \eqn{C_0}
 is held fixed. The spatial correlation function is exponential, hence
@@ -441,11 +441,11 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
 # three spatial regimes with a moderate spatial penalty
-fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.05, distance = 'geo')
+fit <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0.05, distance = 'geo')
 fit
 
 # the estimated regimes on the map

@@ -5,6 +5,21 @@ include the spatially-clustered STEM (SC-STEM) model family. The classical STEM
 workflow of version 1.0 is unchanged in its statistical content; what changes is
 its numerical robustness, the whole SC-STEM layer, and the packaging.
 
+## Breaking changes: names aligned with the paper and with SCDA
+
+* The loading matrix is `A` (it was `K`): `STEM_Model(..., A = )`,
+  `skeleton$A`, `STEM_Kriging(..., A.newlocations = )`. Scripts written for
+  version 1.0 must replace `K =` by `A =`.
+* The number of regimes is `K`, with index `k = 1, ..., K`, as in the paper and
+  as in the SCDA package: `STEM_Fit(K = )`, `SCSTEM_Estimation(K = )`,
+  `SCSTEM_Infocrit(K_grid = )`, `SCSTEM_Select()$K_selected`, and the columns
+  `K`, `K_eff` of the grid. The transition matrix stays `G`.
+* The number of free parameters is `df`: `info_crit["df"]` (it was `"k"`) and
+  the column `df` of the grid (it was `npar`).
+* The deprecated arguments `mink` and `maxk` of `SCSTEM_Infocrit()` are removed.
+* There are no aliases: an old name stops with a message naming the new one.
+  This matters for `k`, which R would otherwise complete silently to `knn`.
+
 ## New features
 
 ### Regularized regression coefficients

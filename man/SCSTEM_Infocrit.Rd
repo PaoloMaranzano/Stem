@@ -6,10 +6,8 @@
 \usage{
 SCSTEM_Infocrit(
   StemModel,
-  k_grid = 1:3,
+  K_grid = 1:3,
   phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
-  mink = NULL,
-  maxk = NULL,
   verbose = FALSE,
   ...
 )
@@ -18,21 +16,17 @@ SCSTEM_Infocrit(
 \item{StemModel}{an object of class \dQuote{STEM_Model} given as output by
 the \code{\link{STEM_Model}} function.}
 
-\item{k_grid}{integer vector of candidate numbers of clusters. Default is
-\code{1:3}. The pooled model \eqn{k = 1} is always a useful reference.}
+\item{K_grid}{integer vector of candidate numbers of regimes. Default is
+\code{1:3}. The pooled model \eqn{K = 1} is always a useful reference.}
 
 \item{phi_grid}{numeric vector of candidate non-negative spatial penalties.
 Default is \code{c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1)}: the moderate values
 up to 0.2 form the band in which \code{\link{SCSTEM_Select}} chooses
-\eqn{k}, and the strong values 0.5 and 1 compete only in the choice of
-\eqn{\phi}. At every \eqn{k} the fit at \eqn{\phi = 0} starts the penalized
+\eqn{K}, and the strong values 0.5 and 1 compete only in the choice of
+\eqn{\phi}. At every \eqn{K} the fit at \eqn{\phi = 0} starts the penalized
 ones (see \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.
-The fits at one \eqn{k} that end at the same partition share one final
+The fits at one \eqn{K} that end at the same partition share one final
 refit, and therefore have the same log-likelihood and criteria.}
-
-\item{mink, maxk}{deprecated scalars kept for backward compatibility with
-versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
-missing, the grid is set to \code{mink:maxk}.}
 
 \item{verbose}{logical. If \code{TRUE}, the progress over the grid is
 reported via \code{message()}. Default is \code{FALSE}.}
@@ -45,11 +39,11 @@ reported via \code{message()}. Default is \code{FALSE}.}
 An object of class \dQuote{SCSTEM_Infocrit}: a list with
 \itemize{
   \item \code{table}: a data frame with one row per configuration and columns
-    \code{k}, \code{phi}, \code{k_eff}, \code{admissible}, \code{loglik},
-    \code{npar}, \code{AIC}, \code{BIC}, \code{KIC}, \code{min_size},
+    \code{K}, \code{phi}, \code{K_eff}, \code{admissible}, \code{loglik},
+    \code{df}, \code{AIC}, \code{BIC}, \code{KIC}, \code{min_size},
     \code{convergence}.
   \item \code{fits}: the list of \dQuote{SCSTEM_Estimation} objects, named
-    \code{"k=<k>, phi=<phi>"}, so that the selected configuration can be used
+    \code{"K=<K>, phi=<phi>"}, so that the selected configuration can be used
     without refitting.
   \item \code{groups}: matrix of the estimated partitions, one column per
     configuration, which \code{\link{SCSTEM_Select}} compares with the
@@ -60,26 +54,26 @@ An object of class \dQuote{SCSTEM_Infocrit}: a list with
 }
 \description{
 \code{SCSTEM_Infocrit} fits the spatially-clustered STEM model over a grid of
-numbers of clusters \eqn{k} and spatial penalties \eqn{\phi}, and returns the
+numbers of regimes \eqn{K} and spatial penalties \eqn{\phi}, and returns the
 likelihood-based information criteria of every configuration together with
 the diagnostics needed to decide which of them are admissible. It is the
 input of the two-step tuning rule implemented in
 \code{\link{SCSTEM_Select}}.
 }
 \details{
-For each pair \eqn{(k, \phi)} the function calls \code{\link{SCSTEM_Estimation}}
+For each pair \eqn{(K, \phi)} the function calls \code{\link{SCSTEM_Estimation}}
 and records the exact total log-likelihood of the final refit, the number of
-free parameters \eqn{k_{eff}(r + 3 + 3p)}, and
-\deqn{AIC = -2\ell + 2 K, \qquad BIC = -2\ell + \log(dT) K, \qquad
-      KIC = -2\ell + 3 K,}
+free parameters \eqn{\mathrm{df} = K_{eff}(r + 3 + 3p)}, and
+\deqn{AIC = -2\ell + 2\,\mathrm{df}, \qquad BIC = -2\ell + \log(dT)\,\mathrm{df}, \qquad
+      KIC = -2\ell + 3\,\mathrm{df},}
 where \eqn{d} is the number of locations and \eqn{T} the number of time
 points, so that \eqn{dT} is the number of observations entering the
 likelihood.
 
-\strong{Admissibility.} A configuration is admissible when all its \eqn{k}
-clusters could be re-estimated on the final partition, that is when
-\code{k_eff == k}. A configuration with collapsed clusters has fewer
-effective regimes than its nominal \eqn{k}, its likelihood is not comparable
+\strong{Admissibility.} A configuration is admissible when all its \eqn{K}
+regimes could be re-estimated on the final partition, that is when
+\code{K_eff == K}. A configuration with collapsed regimes has fewer
+effective regimes than its nominal \eqn{K}, its likelihood is not comparable
 with the others, and no parametric bootstrap can be generated from it: the
 \code{admissible} column flags these cases and
 \code{\link{SCSTEM_Select}} discards them.
@@ -87,13 +81,13 @@ with the others, and no parametric bootstrap can be generated from it: the
 \strong{Caveats.} Two warnings apply to any likelihood-based comparison in
 this setting. First, the partition is itself optimized on the data, so the
 maximized likelihood retains an optimism bias that a parameter count of the
-form \eqn{k(r + 3 + 3p)} does not fully correct; in-sample criteria therefore
-tend to favor small \eqn{\phi} and large \eqn{k}. Second, the cluster-wise
+form \eqn{K(r + 3 + 3p)} does not fully correct; in-sample criteria therefore
+tend to favor small \eqn{\phi} and large \eqn{K}. Second, the cluster-wise
 variance components shrink as the assignment step pursues within-cluster
 homogeneity, which inflates the likelihood of the configurations with the
 weakest spatial regularization. Both effects are strongest at
 \eqn{\phi \approx 0}, which is why \code{\link{SCSTEM_Select}} chooses
-\eqn{k} within a moderate band of penalties.
+\eqn{K} within a moderate band of penalties.
 }
 \examples{
 # Daily PM2.5 at 36 background stations of the Po Valley. The first 180
@@ -119,10 +113,10 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.05),
+ic <- SCSTEM_Infocrit(mod, K_grid = 1:3, phi_grid = c(0, 0.05),
                       distance = 'geo')
 ic
 }

@@ -75,7 +75,7 @@
 ## nothing else; rep is unique across the streams, so the outputs of all the
 ## streams stack. Below, <tag> stands for <tag>_s<stream>:
 ##
-##   <tag>.csv           one row per replication: the selected (k, phi), the
+##   <tag>.csv           one row per replication: the selected (K, phi), the
 ##                       recovery of the partition, the error of the fitted
 ##                       signal, the times
 ##   <tag>-params.csv    one row per replication, regime and parameter: the
@@ -83,7 +83,7 @@
 ##                       regimes, after aligning the estimated regimes on the
 ##                       true ones
 ##   <tag>-stations.csv  one row per replication and location
-##   <tag>-grid.csv      one row per replication and (k, phi) of the fitted
+##   <tag>-grid.csv      one row per replication and (K, phi) of the fitted
 ##                       grid: log-likelihood, parameters, criteria, and the
 ##                       ARI of its partition with the truth
 ##   <tag>-obs/*.rds     the full observations of the first keep_obs
@@ -264,7 +264,7 @@ SIM_SCENARIOS <- c("S2", "S1s-ind", "S1s-shr", "S1w-shr",
                    "S3beta-shr", "S3G-shr", "S3Seta-shr", "S3theta-shr", "S3error-shr")
 
 ## The reference levels of the margins:
-##   n        number of locations; not below 40, since the grid reaches k = 4
+##   n        number of locations; not below 40, since the grid reaches K = 4
 ##            regimes of at least N_MIN = 6 locations each
 ##   TN       length of the series
 ##   omega    spatial overlap of the three regimes: the centres sit at the
@@ -370,7 +370,7 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
 
     ## What the estimator searches over. phi_ref is the penalty at which the
     ## recovery at the true number of regimes is read, a point of phi_grid.
-    k_grid   = 1:4,
+    K_grid   = 1:4,
     phi_grid = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
     phi_ref  = 0.05,
 
@@ -435,7 +435,7 @@ sim_model <- function(dat) {
                G = matrix(0.8, 1, 1),
                Sigmaeta = matrix(0.2 * s2, 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1)),
-    K = matrix(1, n, 1))
+    A = matrix(1, n, 1))
 }
 
 ## Write, and if the file is momentarily locked -- a synchronization client
@@ -815,7 +815,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
   ## grid with looser final refits would be another estimator: the departures
   ## that start the unpenalized fits come from the pooled fit of the grid.
   t0 <- proc.time()[["elapsed"]]
-  ic <- Stem::SCSTEM_Infocrit(mod, k_grid = CFG$k_grid, phi_grid = CFG$phi_grid,
+  ic <- Stem::SCSTEM_Infocrit(mod, K_grid = CFG$K_grid, phi_grid = CFG$phi_grid,
                               distance = "euclidean", verbose = FALSE,
                               knn = cell$knn, min_cluster_size = N_MIN,
                               control = Stem::STEM_control())
@@ -826,7 +826,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
   ## number of regimes, so that a poor estimate is not confounded with a poor
   ## selection. Both, and the pooled benchmark, are in the grid.
   grab <- function(kk, pp) {
-    j <- which(ic$table$k == kk & abs(ic$table$phi - pp) < 1e-8)
+    j <- which(ic$table$K == kk & abs(ic$table$phi - pp) < 1e-8)
     if (!length(j)) NULL else ic$fits[[j[1]]]
   }
   K <- dat$K
@@ -865,8 +865,8 @@ sim_one <- function(cell, rep, attempt = 1L) {
                     stringsAsFactors = FALSE)
 
   summ <- cbind(key, data.frame(
-    k_hat = sel$k_selected, phi_hat = sel$phi_selected,
-    k_correct = as.integer(sel$k_selected == K),
+    K_hat = sel$K_selected, phi_hat = sel$phi_selected,
+    K_correct = as.integer(sel$K_selected == K),
     ari_sel = a_sel[["ari"]],   share_sel = a_sel[["share"]],
     ari_true = a_true[["ari"]], share_true = a_true[["share"]],
     rmse_sel = rmse(mh_sel), rmse_true = rmse(mh_true), rmse_pooled = rmse(mh_pool),
@@ -890,11 +890,11 @@ sim_one <- function(cell, rep, attempt = 1L) {
   params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est)
   rownames(params) <- NULL
 
-  ## the fitted grid, one row per (k, phi), with the ARI of every partition, so
+  ## the fitted grid, one row per (K, phi), with the ARI of every partition, so
   ## that the recovery at any penalty, or under another selection rule, can be
   ## read afterwards without refitting
   grid <- cbind(key[rep(1L, nrow(ic$table)), ], ic$table)
-  tags <- paste0("k=", ic$table$k, ", phi=", ic$table$phi)
+  tags <- paste0("K=", ic$table$K, ", phi=", ic$table$phi)
   grid$ari <- if (K == 1L) NA_real_ else vapply(tags, function(tg)
     if (tg %in% colnames(ic$groups)) scstem_ari(ic$groups[, tg], dat$labels) else NA_real_,
     numeric(1), USE.NAMES = FALSE)
@@ -944,7 +944,7 @@ sim_failed <- function(cell, rep, msg, attempt = 1L, secs = NA_real_) {
     n = cell$n, TN = cell$TN, omega = cell$omega,
     spread = if (is.null(cell$spread)) "total" else cell$spread, balance = cell$balance,
     knn = cell$knn, K_true = if (row$family == "S2") 1L else 3L,
-    k_hat = NA_integer_, phi_hat = NA_real_, k_correct = NA_integer_,
+    K_hat = NA_integer_, phi_hat = NA_real_, K_correct = NA_integer_,
     ari_sel = NA_real_, share_sel = NA_real_, ari_true = NA_real_, share_true = NA_real_,
     rmse_sel = NA_real_, rmse_true = NA_real_, rmse_pooled = NA_real_,
     nconf = NA_integer_, nfail = NA_integer_, secs = NA_real_, secs_total = secs,
@@ -1181,7 +1181,7 @@ sim_main <- function() {
   if (!length(tasks)) { cat("nothing to do\n"); return(invisible(NULL)) }
 
   cat(sprintf("%13s %-12s %4s %5s %4s | %8s %5s %6s | %s\n",
-              "", "scenario", "n", "T", "rep", "time", "k_hat", "ARI", "elapsed, and left"))
+              "", "scenario", "n", "T", "rep", "time", "K_hat", "ARI", "elapsed, and left"))
   t_start <- proc.time()[["elapsed"]]
   on_result <- function(out, task, k, n) {
     if (!is.list(out) || is.null(out$summary))
@@ -1212,7 +1212,7 @@ sim_main <- function() {
     save_obs(out$obs, task$cell, task$rep)
     if (!nzchar(s$error)) remember(task$cell$cell, task$cell$n, task$cell$TN, s$secs_total)
     cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | %6.1f s %5s %6s | %s, ~%s left\n",
-                k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, format(s$k_hat),
+                k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, format(s$K_hat),
                 format(round(s$ari_true, 3)), sim_hours(el), sim_hours(el / k * (n - k))))
     if (nzchar(s$error)) cat("              FAILED: ", s$error, "\n", sep = "")
     utils::flush.console()

@@ -34,7 +34,7 @@ ingredients: the observation matrix `z` ($T \times d$), the stacked covariate
 matrix (`(T \cdot d) \times r`, blocks ordered by location), the coordinates
 ($d \times 2$) and a list `phi` of starting values. Two internal constructors do
 the validation: `STEM_Skeleton()` checks the parameter list and the loading
-matrix `K`, `STEM_Data()` checks the data and derives the dimensions.
+matrix `A`, `STEM_Data()` checks the data and derives the dimensions.
 
 Two datasets ship with the package: `pm10`, the small 22-station example, and
 `povalley`, a real network of 36 background stations observed daily over
@@ -93,7 +93,7 @@ ordinary `STEM_Model` estimated by `STEM_Estimation()`.
   `scstem_potts_pairs()` and `scstem_pen_local()` (the penalty),
   `scstem_swap_pass()` (the size-preserving swap step) and `scstem_npar()`
   (the parameter count behind the information criteria).
-* `SCSTEM_Infocrit()` loops `SCSTEM_Estimation()` over a grid of $(k, \phi)$ and
+* `SCSTEM_Infocrit()` loops `SCSTEM_Estimation()` over a grid of $(K, \phi)$ and
   collects the criteria and the admissibility flags.
 * `SCSTEM_Select()` applies the two-step tuning rule to that grid, and uses
   `scstem_ari()` to compare every partition on it with the selected one.
@@ -104,7 +104,7 @@ ordinary `STEM_Model` estimated by `STEM_Estimation()`.
   turns the draws into standard errors, confidence intervals and between-regime
   tests.
 * `SCSTEM_CV()` is an optional validation, separate from the choice of
-  $(k, \phi)$: it refits one or more models on blocked folds (locations, time
+  $(K, \phi)$: it refits one or more models on blocked folds (locations, time
   blocks, both, or random cells), predicts the removed cells with
   `SCSTEM_Complete()` and, at removed locations, with `scstem_predict_new()`,
   which kriges within the regime of the nearest retained location, and ranks
@@ -118,13 +118,13 @@ data(povalley)
 
 # 1. build the model object
 mod <- STEM_Model(z = ..., covariates = ..., coordinates = ...,
-                  phi = ..., K = ...)
+                  phi = ..., A = ...)
 
 # 2. the pooled benchmark
 pooled <- STEM_Estimation(mod, distance = "geo")
 
-# 3. explore the (k, phi) grid and select
-ic  <- SCSTEM_Infocrit(mod, k_grid = 1:4, distance = "geo")
+# 3. explore the (K, phi) grid and select
+ic  <- SCSTEM_Infocrit(mod, K_grid = 1:4, distance = "geo")
 sel <- SCSTEM_Select(ic)
 
 # 4. quantify the uncertainty, partition included

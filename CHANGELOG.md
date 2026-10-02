@@ -16,6 +16,27 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02 (sixth entry)
+
+**Names: the number of regimes `K`, the loading matrix `A`, the parameter
+count `df`.** The user chose the notation after a preview of the paper and of
+the code: `K` regimes with index `k`, as in the SCDA package; `G` the
+transition matrix, as in STEM and D-STEM; `A` the loading matrix, which was
+`K` in the code and Lambda in the paper (Lambda would have collided with the
+lambda of the ridge). The parameter count was `k` in `info_crit` and `npar` in
+the grid; next to `K` for the regimes that would be a trap, so it is `df`, as
+in the paper. `mink`/`maxk`, already deprecated, are removed. No aliases, at
+the user's request; but an old name stops with a message, because the end-to-
+end check showed that `SCSTEM_Estimation(mod, k = 2)` ran silently with
+`knn = 2` and three regimes, R completing `k` to `knn` by partial matching
+(`stem_renamed_args()`). Renamed everywhere: the sources, the docs, the tests,
+the vignettes (in the Woodbury identity of the computational notes the
+generic matrix is now M, to leave A to the loadings), the README, the
+replication scripts (the simulation runner writes `K_hat`, `K_correct`; the
+analysis maps the names of the first pass), the fuel scripts, and dev/paper.
+In the paper Lambda -> A in the manuscript and both supplements, and in
+Section S1 of Supplement A the loading matrix, written Z there, is A too.
+
 ### 2026-10-02 (fifth entry)
 
 **`run-simulations.R`: streams, to run the study on several machines at

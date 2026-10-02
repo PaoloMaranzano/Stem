@@ -44,10 +44,10 @@
 #'             m0=as.matrix(0),
 #'             C0=as.matrix(1))
 #'
-#' K <-matrix(1,ncol(z),1)
+#' A <-matrix(1,ncol(z),1)
 #'
 #' mod1 <- STEM_Model(z=z,covariates=covariates,
-#'                    coordinates=coordinates,phi=phi,K=K)
+#'                    coordinates=coordinates,phi=phi,A=A)
 #'
 #' class(mod1)
 #'
@@ -86,7 +86,7 @@ function (StemModel,distance='euclidean'){
   ####################
   ###Matrix definitions
   ####################
-  Fmat = StemModel$skeleton$K
+  Fmat = StemModel$skeleton$A
   Gmat = phi$G
 
   #cov.spaz = phi_real$sigma2omega * exp(-phi_real$theta * dist)

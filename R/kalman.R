@@ -21,13 +21,13 @@
     ### Newton-Raphson iteration
     cov.spat.takes.E = "E" %in% names(formals(cov.spat))
 
-    ### Switching off the latent process. With K = 0 the state contributes
+    ### Switching off the latent process. With A = 0 the state contributes
     ### nothing to the measurement equation, the filter gain is zero and the
     ### smoothed states are the prior propagated forward; G, Sigma_eta and m0
     ### are then unidentified, so they are held at their input values rather
     ### than updated (see below). This is what reduces the model to a
     ### regression with a spatially correlated error.
-    if (!latent) phi_j$K = matrix(0, p, d)   # phi_j$K is p x d, see STEM_Estimation
+    if (!latent) phi_j$A = matrix(0, p, d)   # phi_j$A is p x d, see STEM_Estimation
 
     ### The spatial correlation at the parameter values this E-step conditions
     ### on. It enters the measurement covariance, the update of sigma2omega and
@@ -44,7 +44,7 @@
     ###if you want to check the model use phi_j=phi_start
     ####################
     SSmodel  = list(z	= zz,
-                    Fmat 	= phi_j$K,
+                    Fmat 	= phi_j$A,
                     Gmat 	= phi_j$G,
                     Vmat 	= phi_j$sigma2omega * Sigmastar_j,
                     Wmat 	= phi_j$Sigmaeta,
@@ -209,7 +209,7 @@
       for (i in 1:p) { G_j[i,i] = num[i,i] / den[i,i]  }
     }
 
-    ### With K = 0 nothing in the data speaks about the latent process, so the
+    ### With A = 0 nothing in the data speaks about the latent process, so the
     ### three parameters that describe it are held where they started instead of
     ### chasing a likelihood that is flat in them.
     if (!latent) {
@@ -343,7 +343,7 @@
     ###PARAMETER 5: beta coefficients
     ############################
     #\sum_t X_t^\prime \Sigma_e^-1 v_t
-    #v_t=z_t-K_t y_t
+    #v_t=z_t-A_t y_t
     ### Superseded:
     ###   Sigmae_inversa = solve(diag(regularization,
     ###     nrow(sigma2omega_j * cov.spat(d=d, logb=phi_j$logb,
@@ -611,7 +611,7 @@
 
     phi_jj = list(
       loglik	        	= mod1.filter$loglik,
-      K      	    	= phi_j$K,
+      A      	    	= phi_j$A,
       sigma2omega	= sigma2omega_j,
       logtheta      	= logtheta_j,
       logb       		= logb_j,

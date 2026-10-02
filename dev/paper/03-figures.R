@@ -36,7 +36,7 @@ if (have("grid") && have("selection")) {
   sel  <- grab("selection")
   best <- sel$fit
   g    <- best$group
-  k    <- sel$k_selected
+  k    <- if (!is.null(sel$K_selected)) sel$K_selected else sel$k_selected   # cache of either version
 
   ## ---- Figure: the estimated regimes on the network ------------------------
   nbg <- Stem:::scstem_neighbors(coords, knn = best$input_args$knn)
@@ -98,7 +98,7 @@ if (have("grid") && have("selection")) {
     x <- seq_len(nrow(st))
     graphics::plot(x, st$value, type = "b", pch = 19, lwd = 1.8, xaxt = "n",
                    col = COL[1], xlab = expression(phi), ylab = "BIC",
-                   main = bquote("(b) BIC over" ~ phi ~ "at" ~ hat(k) == .(sel$k_selected)),
+                   main = bquote("(b) BIC over" ~ phi ~ "at" ~ hat(K) == .(k)),
                    cex.main = 1)
     graphics::axis(1, at = x, labels = format(st$phi, drop0trailing = TRUE))
     graphics::abline(v = x[st$selected], lty = 2, col = COL[2], lwd = 1.6)

@@ -63,7 +63,7 @@ make <- function(env, dn, TT, seed = 1) {
                sigma2eps = 0.6 * s2, sigma2omega = 0.3 * s2, theta = 1/60000,
                G = matrix(0.7, 1, 1), Sigmaeta = matrix(0.1 * s2, 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1)),
-    K = matrix(1, dn, 1))
+    A = matrix(1, dn, 1))
 }
 
 fit <- function(env, dn, TT, iters) {

@@ -33,7 +33,7 @@ STEM_Bootstrap(
 The function returns a list of elements called \dQuote{boot.output}. \bold{Each} element of the list is an object of class \dQuote{STEM_Model} and so
 it is composed by the following elements:
 \itemize{
-\item{skeleton} a list with components \code{phi}, \code{p}, \code{K} where the \code{phi} vector is given by \cr the \code{StemModel$estimates$phi.hat} vector.
+\item{skeleton} a list with components \code{phi}, \code{p}, \code{A} where the \code{phi} vector is given by \cr the \code{StemModel$estimates$phi.hat} vector.
 \item{data} a list with components \code{z}, \code{coordinates}, \code{covariates}, \code{r}, \code{n} and \code{d} where the \code{z} matrix is
  given by the simulated data matrix.
 \item{estimates} A list of four objects: \code{phi.hat}, \code{y.smoothed}, \code{loglik}, \code{convergence.par} as the output of the \code{\link{STEM_Estimation}} function.
@@ -67,10 +67,10 @@ phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
             m0=as.matrix(0),
             C0=as.matrix(1))
 
-K <- matrix(1,ncol(z),1)
+A <- matrix(1,ncol(z),1)
 
 mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
+                   coordinates=coordinates,phi=phi,A=A)
 class(mod1)
 
 \donttest{

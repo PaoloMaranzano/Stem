@@ -6,8 +6,8 @@ test_that("a removed location is predicted by kriging within its regime", {
   rows <- function(idx) as.vector(outer(seq_len(s$Tn), (idx - 1L) * s$Tn, "+"))
   mk <- function(idx) STEM_Model(z = s$z[, idx], covariates = s$covariates[rows(idx), , drop = FALSE],
                                  coordinates = s$coordinates[idx, , drop = FALSE],
-                                 phi = po_phi(), K = matrix(1, length(idx), 1))
-  fit <- SCSTEM_Estimation(mk(keep), k = 1, distance = "geo", precision = 0.05)
+                                 phi = po_phi(), A = matrix(1, length(idx), 1))
+  fit <- SCSTEM_Estimation(mk(keep), K = 1, distance = "geo", precision = 0.05)
 
   ### the same conditional mean through STEM_Complete(): the fit carried over to
   ### the whole network, with the removed columns missing
@@ -15,12 +15,12 @@ test_that("a removed location is predicted by kriging within its regime", {
   full <- fit$fit_list[[1]]
   full$data <- mfull$data
   full$data$z[, drop] <- NA
-  full$skeleton$K <- mfull$skeleton$K
+  full$skeleton$A <- mfull$skeleton$A
   ref <- STEM_Complete(full, distance = "geo")[, drop]
 
   dm <- as.matrix(geodist::geodist(s$coordinates, measure = "geodesic"))
   XX <- changedimension_covariates(mfull$data$covariates, d, ncol(mfull$data$covariates), s$Tn)
-  got <- scstem_predict_new(fit, keep, drop, s$z[, keep], dm, XX, mfull$skeleton$K)
+  got <- scstem_predict_new(fit, keep, drop, s$z[, keep], dm, XX, mfull$skeleton$A)
   expect_equal(got, unname(ref), tolerance = 1e-8)
 })
 
@@ -28,13 +28,13 @@ test_that("SCSTEM_CV evaluates and ranks fits on the same folds", {
   skip_on_cran()
 
   s <- po_subset(Tn = 60L)
-  full <- SCSTEM_Estimation(po_model(Tn = 60L), k = 1, distance = "geo", precision = 0.05)
+  full <- SCSTEM_Estimation(po_model(Tn = 60L), K = 1, distance = "geo", precision = 0.05)
   ### a model with fewer covariates on the same data
   phi2 <- po_phi()
   phi2$beta <- phi2$beta[1:2, , drop = FALSE]
   mod2 <- STEM_Model(z = s$z, covariates = s$covariates[, 1:2, drop = FALSE],
-                     coordinates = s$coordinates, phi = phi2, K = matrix(1, s$d, 1))
-  reduced <- SCSTEM_Estimation(mod2, k = 1, distance = "geo", precision = 0.05)
+                     coordinates = s$coordinates, phi = phi2, A = matrix(1, s$d, 1))
+  reduced <- SCSTEM_Estimation(mod2, K = 1, distance = "geo", precision = 0.05)
 
   cv <- SCSTEM_CV(list(full = full, reduced = reduced), scheme = c("LKLO", "LKLHTO"),
                   folds = 2, seed = 1)
@@ -54,8 +54,8 @@ test_that("SCSTEM_CV evaluates and ranks fits on the same folds", {
 
   ### models on different data cannot be compared
   mod3 <- STEM_Model(z = s$z + 1, covariates = s$covariates, coordinates = s$coordinates,
-                     phi = po_phi(), K = matrix(1, s$d, 1))
-  other <- SCSTEM_Estimation(mod3, k = 1, distance = "geo", precision = 0.05)
+                     phi = po_phi(), A = matrix(1, s$d, 1))
+  other <- SCSTEM_Estimation(mod3, K = 1, distance = "geo", precision = 0.05)
   expect_error(SCSTEM_CV(list(a = full, b = other), folds = 2, seed = 1),
                "share the response")
 })

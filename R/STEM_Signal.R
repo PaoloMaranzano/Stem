@@ -4,7 +4,7 @@
 #' \code{STEM_Signal} returns the fitted values of a STEM model in the sense the
 #' word usually carries: the conditional mean of the response given the latent
 #' path,
-#' \deqn{\hat\mu_{ti} = x_{ti}' \hat\beta + K_i \hat y_t ,}
+#' \deqn{\hat\mu_{ti} = x_{ti}' \hat\beta + A_i \hat y_t ,}
 #' with \eqn{\hat y_t} the smoothed state. It is the systematic part of the
 #' measurement equation --- the regression surface plus the latent process ---
 #' and it excludes the measurement error, which is what makes it an estimate of
@@ -19,7 +19,7 @@
 #' \code{STEM_Complete()} is therefore the data, and scoring it against anything
 #' measures nothing. Use it to impute; use \code{STEM_Signal()} to fit.
 #'
-#' In state-space language \eqn{K_i \hat y_t} is the signal, and the function is
+#' In state-space language \eqn{A_i \hat y_t} is the signal, and the function is
 #' named for it; the regression term is added because in this model the
 #' systematic part is the sum of the two.
 #'
@@ -62,7 +62,7 @@ STEM_Signal <- function(StemModel) {
   r   <- StemModel$data$r
   phi <- StemModel$estimates$phi.hat
   ysm <- as.matrix(StemModel$estimates$y.smoothed)          # n x p
-  Kmat <- as.matrix(StemModel$skeleton$K)                   # d x p
+  Amat <- as.matrix(StemModel$skeleton$A)                   # d x p
 
   XX   <- changedimension_covariates(StemModel$data$covariates, d, r, n)
   beta <- matrix(as.numeric(phi$beta), ncol = 1)
@@ -70,7 +70,7 @@ STEM_Signal <- function(StemModel) {
   out <- matrix(NA_real_, n, d)
   for (tt in seq_len(n)) {
     out[tt, ] <- as.numeric(XX[, , tt] %*% beta +
-                            Kmat %*% matrix(ysm[tt, ], ncol = 1))
+                            Amat %*% matrix(ysm[tt, ], ncol = 1))
   }
   dimnames(out) <- dimnames(as.matrix(StemModel$data$z))
   out
@@ -94,7 +94,7 @@ STEM_Signal <- function(StemModel) {
 #'
 #' @param SCSTEM an object of class \dQuote{SCSTEM_Estimation}, as returned by
 #'   \code{\link{SCSTEM_Estimation}} or by \code{\link{STEM_Fit}} with
-#'   \code{k > 1}.
+#'   \code{K > 1}.
 #'
 #' @return A \eqn{T} by \eqn{d} matrix of fitted values.
 #'

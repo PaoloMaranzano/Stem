@@ -195,7 +195,7 @@ run_fold <- function(fold, cfg) {
   if (any(apply(zk, 2, function(cc) all(is.na(cc))))) return(NULL)
 
   mod <- STEM_Model(z = zk, covariates = Xk, coordinates = ck,
-                    phi = phi0, K = matrix(1, length(keep_idx), 1))
+                    phi = phi0, A = matrix(1, length(keep_idx), 1))
 
   zhat_keep <- matrix(NA_real_, Tn, length(keep_idx))
   fits <- NULL; grp <- NULL
@@ -207,7 +207,7 @@ run_fold <- function(fold, cfg) {
     zhat_keep <- STEM_Complete(f, distance = "geo")
     fits <- list(f); grp <- rep(1L, length(keep_idx))
   } else {
-    f <- try(SCSTEM_Estimation(mod, k = cfg$k, phi_penalty = cfg$phi, knn = KNN,
+    f <- try(SCSTEM_Estimation(mod, K = cfg$k, phi_penalty = cfg$phi, knn = KNN,
                           distance = "geo", precision = 0.1,
                           precision_full_dataset = 0.01, max_iter = 8,
                           seed = SEED, verbose = FALSE), silent = TRUE)

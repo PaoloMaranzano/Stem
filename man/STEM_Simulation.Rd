@@ -41,10 +41,10 @@ phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
             m0=as.matrix(0),
             C0=as.matrix(1))
 
-K <-matrix(1,ncol(z),1)
+A <-matrix(1,ncol(z),1)
 
 mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
+                   coordinates=coordinates,phi=phi,A=A)
 
 class(mod1)
 

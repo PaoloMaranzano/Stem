@@ -81,12 +81,12 @@ one_rep <- function(r, dd, TT, hypothesis) {
                Sigmaeta = matrix(0.1 * stats::var(as.vector(z)), 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1))
   mod <- STEM_Model(z = z, covariates = X, coordinates = coords,
-                    phi = phi0, K = matrix(1, dd, 1))
+                    phi = phi0, A = matrix(1, dd, 1))
 
   n <- dd * TT
   out <- list()
   for (kk in seq_len(K_MAX)) {
-    f <- try(SCSTEM_Estimation(mod, k = kk, phi_penalty = 0, knn = min(5L, dd - 1L),
+    f <- try(SCSTEM_Estimation(mod, K = kk, phi_penalty = 0, knn = min(5L, dd - 1L),
                           distance = "geo", precision = 0.1,
                           precision_full_dataset = 0.05, max_iter = 6,
                           seed = 1000 + r, verbose = FALSE), silent = TRUE)

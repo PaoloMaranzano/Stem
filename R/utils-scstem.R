@@ -21,7 +21,7 @@
 ### The Potts penalty is defined on an UNDIRECTED graph, so the
 ### k-nearest-neighbor graph produced by spdep::knearneigh() -- which is
 ### asymmetric by construction -- is symmetrized before use: j is a neighbor of
-### i whenever i is among the k nearest of j or vice versa. Without this step
+### i whenever i is among the knn nearest of j or vice versa. Without this step
 ### the same pair (i,j) would contribute to the assignment score of one unit but
 ### not of the other, and the sequential ICM sweep would not be maximizing a
 ### well-defined objective.
@@ -99,7 +99,7 @@
 ### PSEUDO-LIKELIHOOD: conditionally on the smoothed latent state path of
 ### cluster k, location i contributes
 ###
-###   l_ik = sum_t log N( z_it ; x_it beta_k + K_i yhat_t(k) ,
+###   l_ik = sum_t log N( z_it ; x_it beta_k + A_i yhat_t(k) ,
 ###                       sigma2eps_k + sigma2omega_k )
 ###
 ### which is the exact conditional density of the series of location i given the
@@ -116,19 +116,19 @@
 ###   X_i          T x ncov numeric, covariates of location i (time-ordered)
 ###   beta         ncov x 1 numeric, cluster-wise regression coefficients
 ###   ysm          T x pdim numeric, smoothed latent state of the cluster
-###   K_i          1 x pdim numeric, loading row of location i
+###   A_i          1 x pdim numeric, loading row of location i
 ###   sigma2eps    scalar, cluster-wise nugget variance
 ###   sigma2omega  scalar, cluster-wise spatial variance
-`scstem_loglike_i` <- function(z_i, X_i, beta, ysm, K_i, sigma2eps, sigma2omega) {
+`scstem_loglike_i` <- function(z_i, X_i, beta, ysm, A_i, sigma2eps, sigma2omega) {
 
   v <- as.numeric(sigma2eps) + as.numeric(sigma2omega)
   if (!is.finite(v) || v <= 0) return(-Inf)
 
   ysm <- as.matrix(ysm)
-  K_i <- matrix(as.numeric(K_i), nrow = 1)
+  A_i <- matrix(as.numeric(A_i), nrow = 1)
 
   fit_t <- as.numeric(as.matrix(X_i) %*% matrix(as.numeric(beta), ncol = 1)) +
-    as.numeric(ysm %*% t(K_i))
+    as.numeric(ysm %*% t(A_i))
 
   ### Only the time points at which this location was observed contribute, and
   ### the count of terms is its own T_i. The missingness pattern of a location
@@ -166,15 +166,15 @@
 ### Arguments
 ###   Xmeans     d x ncov numeric, per-location averages of the covariates
 ###   coords     d x 2 numeric, spatial coordinates
-###   k          number of clusters
+###   K          number of clusters
 ###   method     "kmeans" (default) or "coordinates"
 ###   min_size   minimum admissible cluster size
-`scstem_init` <- function(Xmeans, coords, k, method = c("kmeans", "coordinates"),
+`scstem_init` <- function(Xmeans, coords, K, method = c("kmeans", "coordinates"),
                           min_size = 2L, nstart_ext = 50L, nstart_int = 25L) {
 
   method <- match.arg(method)
   d <- nrow(coords)
-  if (k == 1) return(rep(1L, d))
+  if (K == 1) return(rep(1L, d))
 
   ### Feature space for the k-means starts
   feat <- try({
@@ -202,12 +202,12 @@
   valid <- rep(FALSE, nstart_ext)
   for (m in seq_len(nstart_ext)) {
     CL[[m]] <- tryCatch(
-      stats::kmeans(x = feat, centers = k, nstart = nstart_int, iter.max = 100),
+      stats::kmeans(x = feat, centers = K, nstart = nstart_int, iter.max = 100),
       error = function(e) NULL
     )
     if (!is.null(CL[[m]])) {
       tab <- table(CL[[m]]$cluster)
-      valid[m] <- length(tab) == k && all(tab >= min_size)
+      valid[m] <- length(tab) == K && all(tab >= min_size)
       WSS[m] <- CL[[m]]$tot.withinss
     }
   }
@@ -220,7 +220,7 @@
     ### solution instead of returning a partition that would collapse at the
     ### first cluster-wise fit.
     lab <- as.integer(CL[[which.min(WSS)]]$cluster)
-    lab <- scstem_repair_partition(lab, feat = feat, k = k, min_size = min_size)
+    lab <- scstem_repair_partition(lab, feat = feat, K = K, min_size = min_size)
     lab
   } else {
     stop("The initialization step failed: k-means could not produce any partition.",
@@ -403,13 +403,13 @@
 ### feature space used for the initialization) to the centroid of the most
 ### deficient cluster are moved into it, taken from the clusters that can
 ### afford to lose them.
-`scstem_repair_partition` <- function(labels, feat, k, min_size) {
+`scstem_repair_partition` <- function(labels, feat, K, min_size) {
 
   labels <- as.integer(labels)
   feat <- as.matrix(feat)
   n <- length(labels)
-  if (k * min_size > n) {
-    stop("A partition into ", k, " clusters of at least ", min_size,
+  if (K * min_size > n) {
+    stop("A partition into ", K, " clusters of at least ", min_size,
          " units each is impossible with ", n, " locations.", call. = FALSE)
   }
 
@@ -421,11 +421,11 @@
 
   guard <- 0L
   repeat {
-    sizes <- tabulate(labels, nbins = k)
+    sizes <- tabulate(labels, nbins = K)
     short <- which(sizes < min_size)
     if (!length(short)) break
     guard <- guard + 1L
-    if (guard > n * k) break
+    if (guard > n * K) break
 
     g <- short[which.min(sizes[short])]
     cen <- centroid(g)
@@ -488,7 +488,7 @@
 ###
 ### Arguments
 ###   labels   current partition
-###   LL       d x k matrix of log-likelihood contributions
+###   LL       d x K matrix of log-likelihood contributions
 ###   phi_eff  effective penalty
 ###   nb       neighbor list
 ###   tol      minimum improvement required to accept a swap
@@ -506,7 +506,7 @@
 `scstem_swap_pass` <- function(labels, LL, phi_eff, nb, tol = 1e-8, max_pass = 5L) {
 
   d <- length(labels)
-  k <- ncol(LL)
+  K <- ncol(LL)
   nswap <- 0L
   nbsize <- vapply(nb, length, integer(1))
 
@@ -514,8 +514,8 @@
 
     improved <- FALSE
 
-    for (a in seq_len(k - 1L)) {
-      for (b in (a + 1L):k) {
+    for (a in seq_len(K - 1L)) {
+      for (b in (a + 1L):K) {
 
         Ia <- which(labels == a)
         Ib <- which(labels == b)
@@ -604,4 +604,19 @@ scstem_phi_from_fit <- function(fit_g, phi0) {
     if (length(x) == 1L && is.finite(x) && x > 0) out[[nm]] <- as.numeric(x)
   }
   out
+}
+
+### The arguments renamed in version 2.0.0: the number of regimes k -> K, its
+### grid k_grid -> K_grid, the loading matrix K -> A. There are no aliases,
+### but an old call stops with a message naming the new argument instead of
+### being matched silently: R would complete `k` to `knn` by partial matching.
+###   supplied  names of the arguments of the call
+###   renamed   named character vector, old name = new name
+`stem_renamed_args` <- function(supplied, renamed) {
+  hit <- intersect(supplied, names(renamed))
+  if (length(hit)) {
+    stop(paste0("'", hit, "' is now '", renamed[hit], "'", collapse = "; "),
+         " (renamed in version 2.0.0 of Stem).", call. = FALSE)
+  }
+  invisible(NULL)
 }

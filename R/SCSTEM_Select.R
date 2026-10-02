@@ -2,7 +2,7 @@
 #'
 #' @description
 #' \code{SCSTEM_Select} applies the two-step tuning rule for the number of
-#' clusters \eqn{k} and the spatial penalty \eqn{\phi} of a spatially-clustered
+#' clusters \eqn{K} and the spatial penalty \eqn{\phi} of a spatially-clustered
 #' STEM model, given the grid of fits produced by
 #' \code{\link{SCSTEM_Infocrit}}.
 #'
@@ -12,31 +12,31 @@
 #' that the parameter count does not fully correct, and the cluster-wise
 #' variance components shrink as the assignment step pursues within-cluster
 #' homogeneity. Both effects are strongest at \eqn{\phi \approx 0}, where
-#' in-sample criteria systematically overselect \eqn{k}. The rule therefore
-#' chooses \eqn{k} within a \emph{moderate-penalty band} \eqn{\Phi_M} and
+#' in-sample criteria systematically overselect \eqn{K}. The rule therefore
+#' chooses \eqn{K} within a \emph{moderate-penalty band} \eqn{\Phi_M} and
 #' proceeds in two steps:
 #'
 #' \describe{
 #'   \item{(S1) Number of clusters, by BIC within the band.}{For each
-#'     \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{k} among the
+#'     \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{K} among the
 #'     admissible configurations at that \eqn{\phi} and the pooled model
-#'     \eqn{k = 1}, whose criterion does not depend on \eqn{\phi}; select the
-#'     modal winner \eqn{\hat{k}} across the band, resolving ties towards the
-#'     smaller \eqn{k}. If \eqn{\hat{k} = 1} the data do not support a
+#'     \eqn{K = 1}, whose criterion does not depend on \eqn{\phi}; select the
+#'     modal winner \eqn{\hat{K}} across the band, resolving ties towards the
+#'     smaller \eqn{K}. If \eqn{\hat{K} = 1} the data do not support a
 #'     partition: the pooled fit is returned and (S2) does not apply. Excluding
 #'     \eqn{\phi \approx 0} removes the region where the optimism bias is
 #'     largest. Under-selection is the harmful direction, while residual
 #'     over-selection is comparatively benign for prediction, because
 #'     supernumerary clusters are either small or near-duplicates of existing
 #'     regimes.}
-#'   \item{(S2) Spatial penalty, by the same criterion at \eqn{\hat{k}}.}{Among
-#'     the admissible fits with \eqn{k = \hat{k}} on the whole grid, select the
+#'   \item{(S2) Spatial penalty, by the same criterion at \eqn{\hat{K}}.}{Among
+#'     the admissible fits with \eqn{K = \hat{K}} on the whole grid, select the
 #'     one with the smallest criterion, resolving ties towards the smaller
-#'     \eqn{\phi}. At a given \eqn{k} the parameter count does not depend on
+#'     \eqn{\phi}. At a given \eqn{K} the parameter count does not depend on
 #'     \eqn{\phi} (up to the effective degrees of freedom of a penalty on the
 #'     coefficients), so the step compares the likelihoods reached by the
 #'     partitions estimated at different penalties. Every penalized fit starts
-#'     from the unpenalized one at the same \eqn{k} (see
+#'     from the unpenalized one at the same \eqn{K} (see
 #'     \code{\link{SCSTEM_Estimation}}): a penalty is selected only when it has
 #'     moved the partition to one with a higher likelihood than the
 #'     unpenalized solution, and the optimism bias, which favors
@@ -48,9 +48,9 @@
 #'
 #' Only admissible configurations, in the sense of
 #' \code{\link{SCSTEM_Infocrit}}, enter the rule. The pooled model enters it
-#' whenever \code{k_grid} contains 1, as it should: it is the answer when no
+#' whenever \code{K_grid} contains 1, as it should: it is the answer when no
 #' partition improves on it, and it is selected when no configuration with
-#' \eqn{k > 1} is admissible.
+#' \eqn{K > 1} is admissible.
 #'
 #' @param infocrit an object of class \dQuote{SCSTEM_Infocrit} returned by
 #'   \code{\link{SCSTEM_Infocrit}}.
@@ -66,19 +66,19 @@
 #'
 #' @return An object of class \dQuote{SCSTEM_Select}, a list with
 #' \itemize{
-#'   \item \code{k_selected}, \code{phi_selected}: the selected
-#'     hyperparameters. When \eqn{\hat{k} = 1}, \code{phi_selected} is the grid
+#'   \item \code{K_selected}, \code{phi_selected}: the selected
+#'     hyperparameters. When \eqn{\hat{K} = 1}, \code{phi_selected} is the grid
 #'     value at which the pooled fit is stored, which has no effect on it.
 #'   \item \code{fit}: the corresponding fitted object, taken from
 #'     \code{infocrit$fits} without refitting.
-#'   \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
+#'   \item \code{step1}: data frame with the criterion-minimizing \eqn{K} at
 #'     each penalty in the band.
 #'   \item \code{step2}: data frame with the criterion of every admissible fit
-#'     at \eqn{k = \hat{k}}, one row per penalty; \code{NULL} when
-#'     \eqn{\hat{k} = 1}.
+#'     at \eqn{K = \hat{K}}, one row per penalty; \code{NULL} when
+#'     \eqn{\hat{K} = 1}.
 #'   \item \code{ari_to_selected}: Adjusted Rand Index between every admissible
 #'     partition on the grid and the selected one.
-#'   \item \code{reference}: the pooled \eqn{k = 1} row of the criteria table,
+#'   \item \code{reference}: the pooled \eqn{K = 1} row of the criteria table,
 #'     when available.
 #'   \item \code{band}, \code{criterion}: the settings used.
 #' }
@@ -115,10 +115,10 @@
 #' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 #'                   covariates = povalley$covariates[keep, ],
 #'                   coordinates = povalley$coords,
-#'                   phi = phi, K = matrix(1, d, 1))
+#'                   phi = phi, A = matrix(1, d, 1))
 #'
 #' \donttest{
-#' ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, distance = 'geo')
+#' ic <- SCSTEM_Infocrit(mod, K_grid = 1:3, distance = 'geo')
 #' sel <- SCSTEM_Select(ic)
 #' sel
 #' }
@@ -143,18 +143,18 @@ SCSTEM_Select <- function(infocrit,
   }
 
   tab <- infocrit$table
-  reference <- tab[tab$k == 1, , drop = FALSE]
+  reference <- tab[tab$K == 1, , drop = FALSE]
 
   ### Only admissible configurations enter the rule. The pooled model is fitted
   ### once, at the first grid value of phi, and competes at every phi of the
   ### band, since its criterion does not depend on the penalty.
-  adm <- tab[tab$admissible & tab$k > 1, , drop = FALSE]
-  pooled <- tab[tab$admissible & tab$k == 1 & is.finite(tab[[criterion]]), , drop = FALSE]
+  adm <- tab[tab$admissible & tab$K > 1, , drop = FALSE]
+  pooled <- tab[tab$admissible & tab$K == 1 & is.finite(tab[[criterion]]), , drop = FALSE]
   pooled <- pooled[seq_len(min(1L, nrow(pooled))), , drop = FALSE]
   if (!nrow(adm) && !nrow(pooled)) {
     stop("No admissible configuration is available: every fit on the grid ",
          "collapsed at least one cluster and the grid holds no pooled fit. ",
-         "Include k = 1 in k_grid.", call. = FALSE)
+         "Include K = 1 in K_grid.", call. = FALSE)
   }
 
   ##############################################
@@ -172,35 +172,35 @@ SCSTEM_Select <- function(infocrit,
 
   step1 <- do.call(rbind, lapply(in_band, function(p) {
     sub <- rbind(adm[adm$phi == p, , drop = FALSE], pooled)
-    ### ties resolved towards the smaller k
-    sub <- sub[order(sub[[criterion]], sub$k), , drop = FALSE]
-    data.frame(phi = p, k_best = sub$k[1], value = sub[[criterion]][1],
+    ### ties resolved towards the smaller K
+    sub <- sub[order(sub[[criterion]], sub$K), , drop = FALSE]
+    data.frame(phi = p, K_best = sub$K[1], value = sub[[criterion]][1],
                stringsAsFactors = FALSE)
   }))
   if (is.null(step1)) {
     ### no admissible partition at all: the pooled model is the answer
-    step1 <- data.frame(phi = pooled$phi, k_best = 1L, value = pooled[[criterion]],
+    step1 <- data.frame(phi = pooled$phi, K_best = 1L, value = pooled[[criterion]],
                         stringsAsFactors = FALSE)
   }
 
-  votes <- table(step1$k_best)
+  votes <- table(step1$K_best)
   top <- as.integer(names(votes)[votes == max(votes)])
-  k_sel <- min(top)
+  K_sel <- min(top)
 
   ##############################################
   ########## (S2) spatial penalty ##############
   ##############################################
 
-  tag_of <- function(kk, pp) paste0("k=", kk, ", phi=", pp)
+  tag_of <- function(kk, pp) paste0("K=", kk, ", phi=", pp)
 
-  if (k_sel == 1L) {
+  if (K_sel == 1L) {
     ### one regime: there is no partition and no penalty to choose
     phi_sel <- pooled$phi[1]
     step2 <- NULL
   } else {
-    ### every admissible fit at the selected k, on the whole grid; ties
+    ### every admissible fit at the selected K, on the whole grid; ties
     ### resolved towards the smaller phi
-    sub_k <- adm[adm$k == k_sel & is.finite(adm[[criterion]]), , drop = FALSE]
+    sub_k <- adm[adm$K == K_sel & is.finite(adm[[criterion]]), , drop = FALSE]
     sub_k <- sub_k[order(sub_k$phi), , drop = FALSE]
     best <- order(sub_k[[criterion]], sub_k$phi)[1]
     phi_sel <- sub_k$phi[best]
@@ -213,7 +213,7 @@ SCSTEM_Select <- function(infocrit,
   ########## Output ############################
   ##############################################
 
-  tag_sel <- tag_of(k_sel, phi_sel)
+  tag_sel <- tag_of(K_sel, phi_sel)
   fit_sel <- infocrit$fits[[tag_sel]]
 
   sel_group <- infocrit$groups[, tag_sel]
@@ -224,14 +224,14 @@ SCSTEM_Select <- function(infocrit,
   }))
 
   out <- list(
-    k_selected = k_sel,
+    K_selected = K_sel,
     phi_selected = phi_sel,
     fit = fit_sel,
     step1 = step1,
     step2 = step2,
     ari_to_selected = ari_tab,
     reference = reference,
-    selected_row = tab[tab$k == k_sel & tab$phi == phi_sel, , drop = FALSE],
+    selected_row = tab[tab$K == K_sel & tab$phi == phi_sel, , drop = FALSE],
     band = band,
     criterion = criterion
   )
@@ -255,21 +255,21 @@ print.SCSTEM_Select <- function(x, digits = 3, ...) {
   cat("  moderate-penalty band : [", x$band[1], ", ", x$band[2], "]\n", sep = "")
   cat("  criterion             : ", x$criterion, "\n\n", sep = "")
 
-  cat("(S1) criterion-minimizing k within the band\n")
+  cat("(S1) criterion-minimizing K within the band\n")
   s1 <- x$step1
   s1$value <- round(s1$value, digits)
   print(s1, row.names = FALSE)
 
   if (is.null(x$step2)) {
     cat("\n(S2) not applicable: no partition improves on the pooled model\n")
-    cat("\nSelected configuration: k = 1 (the pooled model)\n")
+    cat("\nSelected configuration: K = 1 (the pooled model)\n")
   } else {
-    cat("\n(S2) criterion over the penalties at k = ", x$k_selected, "\n", sep = "")
+    cat("\n(S2) criterion over the penalties at K = ", x$K_selected, "\n", sep = "")
     s2 <- x$step2
     s2$value <- round(s2$value, digits)
     print(s2, row.names = FALSE)
 
-    cat("\nSelected configuration: k = ", x$k_selected,
+    cat("\nSelected configuration: K = ", x$K_selected,
         " , phi = ", x$phi_selected, "\n", sep = "")
   }
   if (nrow(x$selected_row)) {
@@ -279,7 +279,7 @@ print.SCSTEM_Select <- function(x, digits = 3, ...) {
         " | cluster sizes >= ", sr$min_size, "\n", sep = "")
   }
   if (nrow(x$reference)) {
-    cat("  pooled reference (k = 1): ", x$criterion, " = ",
+    cat("  pooled reference (K = 1): ", x$criterion, " = ",
         round(x$reference[[x$criterion]][1], digits), "\n", sep = "")
   }
   invisible(x)

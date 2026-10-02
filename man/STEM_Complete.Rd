@@ -27,13 +27,13 @@ of fitted values and the interpolator of the missing entries.
 }
 \details{
 The prediction at a missing entry is \emph{not} the signal
-\eqn{x_{it}'\hat\beta + K_i \hat{y}_t} alone. That would be exact only if the
+\eqn{x_{it}'\hat\beta + A_i \hat{y}_t} alone. That would be exact only if the
 measurement covariance were diagonal. Under the STEM specification
 \eqn{\Sigma_e = \sigma^2_\epsilon I + \sigma^2_\omega C_\theta} couples the
 locations, so the missing block of the measurement error is predicted from
 the block observed at the same time point by Gaussian conditioning:
-\deqn{\hat{z}_{M,t} = x_{M,t}'\hat\beta + K_M \hat{y}_t
-      + P_t\left(z_{O,t} - x_{O,t}'\hat\beta - K_O \hat{y}_t\right),
+\deqn{\hat{z}_{M,t} = x_{M,t}'\hat\beta + A_M \hat{y}_t
+      + P_t\left(z_{O,t} - x_{O,t}'\hat\beta - A_O \hat{y}_t\right),
       \qquad
       P_t = \left[\Sigma_e\right]_{MO}\left(\left[\Sigma_e\right]_{OO}\right)^{-1},}
 which is the same algebra as kriging, applied at a fixed time point. This is
@@ -59,7 +59,7 @@ z <- pm10$z
 z[5, 2] <- NA                     # blank one cell
 mod <- STEM_Model(z = z, covariates = pm10$covariates,
                   coordinates = pm10$coords, phi = phi,
-                  K = matrix(1, ncol(z), 1))
+                  A = matrix(1, ncol(z), 1))
 \donttest{
 fit <- STEM_Estimation(mod, precision = 0.05, max.iter = 5)
 zhat <- STEM_Complete(fit)

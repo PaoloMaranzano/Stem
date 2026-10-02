@@ -18,7 +18,7 @@ A \eqn{T} by \eqn{d} matrix of fitted values, with the dimnames of
 \code{STEM_Signal} returns the fitted values of a STEM model in the sense the
 word usually carries: the conditional mean of the response given the latent
 path,
-\deqn{\hat\mu_{ti} = x_{ti}' \hat\beta + K_i \hat y_t ,}
+\deqn{\hat\mu_{ti} = x_{ti}' \hat\beta + A_i \hat y_t ,}
 with \eqn{\hat y_t} the smoothed state. It is the systematic part of the
 measurement equation --- the regression surface plus the latent process ---
 and it excludes the measurement error, which is what makes it an estimate of
@@ -33,7 +33,7 @@ something you have seen is that thing. On a complete record
 \code{STEM_Complete()} is therefore the data, and scoring it against anything
 measures nothing. Use it to impute; use \code{STEM_Signal()} to fit.
 
-In state-space language \eqn{K_i \hat y_t} is the signal, and the function is
+In state-space language \eqn{A_i \hat y_t} is the signal, and the function is
 named for it; the regression term is added because in this model the
 systematic part is the sum of the two.
 

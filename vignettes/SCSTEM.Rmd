@@ -28,16 +28,16 @@ credible: the way concentrations respond to altitude or to a co-pollutant may
 differ between the center of a plain and the areas nearer the reliefs.
 
 The spatially-clustered STEM (SC-STEM) model relaxes the assumption. Each
-location $i$ belongs to one of $k$ latent regimes, and conditionally on regime
+location $i$ belongs to one of $K$ latent regimes, and conditionally on regime
 $k$
 
 $$
-z_{it} = x_{it}' \beta_k + K_i y^{(k)}_t + e_{it}, \qquad
+z_{it} = x_{it}' \beta_k + A_i y^{(k)}_t + e_{it}, \qquad
 y^{(k)}_t = G_k y^{(k)}_{t-1} + \eta^{(k)}_t,
 $$
 
 so that coefficients, variance components *and* latent dynamics are all
-regime-specific. Setting $k = 1$ returns the pooled fit.
+regime-specific. Setting $K = 1$ returns the pooled fit.
 
 Labels and parameters are estimated jointly by maximizing a Potts-penalized
 log-likelihood
@@ -89,7 +89,7 @@ phi <- list(
 )
 
 mod <- STEM_Model(z = z, covariates = X, coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 ```
 
 Coordinates are longitude and latitude, so every call below uses
@@ -98,7 +98,7 @@ Coordinates are longitude and latitude, so every call below uses
 ## Fitting an SC-STEM model
 
 ```{r fit}
-fit <- SCSTEM_Estimation(mod, k = 3, phi_penalty = 0.05, distance = "geo",
+fit <- SCSTEM_Estimation(mod, K = 3, phi_penalty = 0.05, distance = "geo",
                     precision = 0.05)
 fit
 ```
@@ -164,9 +164,9 @@ point where agreeing with one's neighbors is worth about as much as picking
 the best-fitting regime.
 
 A fit with $\phi > 0$ starts from the partition of the unpenalized fit at the
-same $k$, which `SCSTEM_Estimation()` computes first, and the spread is measured
+same $K$, which `SCSTEM_Estimation()` computes first, and the spread is measured
 there, on fitted regimes. The scale is then the same for every $\phi$ at that
-$k$ and does not depend on the initialization, and it is large: it is of the
+$K$ and does not depend on the initialization, and it is large: it is of the
 order of the whole gain of the right regime over the wrong ones, so the useful
 values of $\phi$ are a few hundredths.
 
@@ -174,15 +174,15 @@ values of $\phi$ are a few hundredths.
 c(multiplier = fit$phi_multiplier, effective_phi = fit$phi_effective)
 ```
 
-## Choosing $k$ and $\phi$
+## Choosing $K$ and $\phi$
 
 `SCSTEM_Infocrit()` fits the whole grid and reports the criteria together with
 an admissibility flag.
 
 ```{r grid}
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
+ic <- SCSTEM_Infocrit(mod, K_grid = 1:3, phi_grid = c(0, 0.025, 0.05, 0.1, 0.2),
                       distance = "geo", precision = 0.05)
-ic$table[, c("k", "phi", "k_eff", "admissible", "loglik", "BIC", "min_size")]
+ic$table[, c("K", "phi", "K_eff", "admissible", "loglik", "BIC", "min_size")]
 ```
 
 Two caveats make a naive "minimize the BIC" rule unsafe here. The partition is
@@ -190,12 +190,12 @@ itself optimized on the data, so the maximized likelihood keeps an optimizm bias
 that the parameter count does not fully correct; and the shrinking variance
 components inflate the likelihood of the least regularized configurations. Both
 effects are strongest at $\phi \approx 0$, where in-sample criteria overselect
-$k$ - and where fits often collapse a regime altogether, which is what the
+$K$ - and where fits often collapse a regime altogether, which is what the
 `admissible` column is for.
 
-`SCSTEM_Select()` therefore applies a two-step rule: pick $k$ by BIC *inside a
+`SCSTEM_Select()` therefore applies a two-step rule: pick $K$ by BIC *inside a
 moderate band* of penalties, then pick the $\phi$ with the smallest BIC at that
-$k$ over the whole grid. Every penalized fit starts from the unpenalized one, so
+$K$ over the whole grid. Every penalized fit starts from the unpenalized one, so
 a penalty is chosen only when it leads to a partition with a higher likelihood.
 The default grid of `SCSTEM_Infocrit()` adds the strong values $0.5$ and $1$,
 which compete in the second step only; this example uses the moderate values
@@ -206,7 +206,7 @@ sel <- SCSTEM_Select(ic, band = c(0.025, 0.2))
 sel
 ```
 
-The pooled $k = 1$ model competes in the first step: when no partition improves
+The pooled $K = 1$ model competes in the first step: when no partition improves
 on it, `SCSTEM_Select()` returns it and the second step does not apply.
 
 ## Uncertainty: the refit-with-clustering bootstrap

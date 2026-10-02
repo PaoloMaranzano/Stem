@@ -68,13 +68,13 @@ r    <- r2
 
 ## ---- the grid ---------------------------------------------------------------
 mod2 <- STEM_Model(z = z0, covariates = X0, coordinates = coords,
-                   phi = phi0, K = matrix(1, d, 1))
+                   phi = phi0, A = matrix(1, d, 1))
 
 grid2 <- if (file.exists(file.path(CACHE, "grid_respec.rds"))) {
   readRDS(file.path(CACHE, "grid_respec.rds"))
 } else {
   message("grid over k and phi, alternative specification")
-  g <- SCSTEM_Infocrit(mod2, k_grid = 1:4, phi_grid = c(0, 0.25, 0.5, 1, 2),
+  g <- SCSTEM_Infocrit(mod2, K_grid = 1:4, phi_grid = c(0, 0.25, 0.5, 1, 2),
                        knn = KNN, distance = "geo", precision = 0.1,
                        precision_full_dataset = 0.01, max_iter = 8,
                        seed = SEED, verbose = TRUE)

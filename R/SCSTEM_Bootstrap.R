@@ -14,7 +14,7 @@
 #' algorithm adapts the refit-with-clustering bootstrap of Maranzano, Mattera
 #' and Sugasawa (2026+) to the spatio-temporal setting:
 #' \enumerate{
-#'   \item Fit the SC-STEM model on the observed data at fixed \eqn{k} and
+#'   \item Fit the SC-STEM model on the observed data at fixed \eqn{K} and
 #'     \eqn{\phi}, obtaining the partition \eqn{\hat{P}} and the cluster-wise
 #'     parameter estimates \eqn{\hat{\phi}_k}.
 #'   \item For \eqn{b = 1,\ldots,B} and for each cluster \eqn{k}, simulate a
@@ -28,7 +28,7 @@
 #'     data are aligned with the rows of the spatial penalty graph and every
 #'     location keeps its own neighbors.
 #'   \item Re-run \code{\link{SCSTEM_Estimation}} on \eqn{z^{*(b)}} with the same
-#'     \eqn{k}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
+#'     \eqn{K}, \eqn{\phi} and algorithmic settings, and store the cluster-wise
 #'     estimates, the refit partition and the convergence diagnostics.
 #' }
 #' Because each bootstrap sample is generated cluster by cluster from the
@@ -61,7 +61,7 @@
 #'
 #' @return An object of class \dQuote{SCSTEM_Bootstrap}, a list with
 #' \itemize{
-#'   \item \code{draws}: a \eqn{B} by \eqn{k} by \eqn{npar} array of the
+#'   \item \code{draws}: a \eqn{B} by \eqn{K} by \eqn{npar} array of the
 #'     cluster-wise parameter estimates of every refit, with \code{NA} for
 #'     failed draws.
 #'   \item \code{groups}: a \eqn{d} by \eqn{B} matrix of the refit partitions.
@@ -114,10 +114,10 @@
 #' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 #'                   covariates = povalley$covariates[keep, ],
 #'                   coordinates = povalley$coords,
-#'                   phi = phi, K = matrix(1, d, 1))
+#'                   phi = phi, A = matrix(1, d, 1))
 #'
 #' \donttest{
-#' fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 #' boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 #' boot
 #' }
@@ -141,7 +141,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
 
   args <- SCSTEM$input_args
   base_model <- args$StemModel
-  k <- args$k
+  K <- args$K
   d <- args$d
   Tobs <- args$Tobs
 
@@ -159,15 +159,15 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
   par_names <- colnames(SCSTEM$phi_hat)
   npar <- length(par_names)
 
-  draws <- array(NA_real_, dim = c(B, k, npar),
+  draws <- array(NA_real_, dim = c(B, K, npar),
                  dimnames = list(paste0("b", seq_len(B)),
-                                 paste("cluster", seq_len(k)), par_names))
+                                 paste("cluster", seq_len(K)), par_names))
   groups <- matrix(NA_integer_, nrow = d, ncol = B,
                    dimnames = list(NULL, paste0("b", seq_len(B))))
-  loglik <- matrix(NA_real_, nrow = B, ncol = k,
+  loglik <- matrix(NA_real_, nrow = B, ncol = K,
                    dimnames = list(paste0("b", seq_len(B)),
-                                   paste("cluster", seq_len(k))))
-  info <- data.frame(draw = seq_len(B), ok = FALSE, k_eff = NA_integer_,
+                                   paste("cluster", seq_len(K))))
+  info <- data.frame(draw = seq_len(B), ok = FALSE, K_eff = NA_integer_,
                      loglik = NA_real_, iter = NA_integer_,
                      convergence = NA_character_, message = NA_character_,
                      stringsAsFactors = FALSE)
@@ -175,7 +175,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
   ### Arguments of the refits: the settings of the original fit, overridable
   ### through `...`. The refit must reproduce the estimation actually performed,
   ### so the penalty is passed on the scale that was effectively applied.
-  refit_args <- list(k = k, phi_penalty = args$phi_penalty,
+  refit_args <- list(K = K, phi_penalty = args$phi_penalty,
                      phi_scale = args$phi_scale, knn = args$knn,
                      distance = args$distance, init_method = args$init_method,
                      label_update = args$label_update,
@@ -214,7 +214,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
   ### Cluster-wise generating models: the fitted STEM model of each cluster with
   ### the skeleton set at its own ML estimates, so that STEM_Simulation() draws
   ### from the estimated model rather than from the starting values.
-  gen <- vector("list", k)
+  gen <- vector("list", K)
   for (g in which(SCSTEM$final_refit)) {
     gen[[g]] <- SCSTEM$fit_list[[g]]
     gen[[g]]$skeleton$phi <- gen[[g]]$estimates$phi.hat
@@ -245,7 +245,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                            covariates = base_model$data$covariates,
                            coordinates = base_model$data$coordinates,
                            phi = base_model$skeleton$phi,
-                           K = base_model$skeleton$K)
+                           A = base_model$skeleton$A)
 
     do.call(SCSTEM_Estimation, c(list(StemModel = mod_star), refit_args))
   }
@@ -265,7 +265,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
          group = fit_b$group,
          phi_hat = fit_b$phi_hat,
          loglik_g = fit_b$loglik_g,
-         k_eff = sum(fit_b$final_refit),
+         K_eff = sum(fit_b$final_refit),
          loglik = unname(fit_b$info_crit[["loglik"]]),
          iter = if (nrow(fit_b$obj_trace)) max(fit_b$obj_trace$iter) else NA_integer_,
          convergence = fit_b$convergence)
@@ -279,7 +279,7 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
     draws[b, , ] <- rb$phi_hat
     loglik[b, ] <- rb$loglik_g
     info$ok[b] <- rb$ok
-    info$k_eff[b] <- rb$k_eff
+    info$K_eff[b] <- rb$K_eff
     info$loglik[b] <- rb$loglik
     info$iter[b] <- rb$iter
     info$convergence[b] <- rb$convergence
@@ -316,7 +316,7 @@ print.SCSTEM_Bootstrap <- function(x, ...) {
   cat("  replicates requested : ", x$B, "\n", sep = "")
   cat("  usable replicates    : ", x$B_valid,
       " (", round(100 * x$B_valid / x$B, 1), "%)\n", sep = "")
-  cat("  clusters             : ", x$original$input_args$k, "\n", sep = "")
+  cat("  clusters             : ", x$original$input_args$K, "\n", sep = "")
   cat("  spatial penalty      : phi = ", x$original$input_args$phi_penalty, "\n", sep = "")
   nfail <- sum(!is.na(x$info$message))
   if (nfail) cat("  refits raising an error: ", nfail, "\n", sep = "")

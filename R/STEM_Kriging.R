@@ -7,7 +7,7 @@
 #' @param coord.newlocations  a matrix or a data frame of dimension \eqn{S} by 2.
 #' @param covariates.newlocations a matrix of dimension \eqn{S} by \eqn{r}, where \eqn{r} is the number of covariates as in the \code{StemModel} object. \cr
 #' It has the same structure of the  \code{StemModel$data$covariates} object in the sense that each station data set is stacked under the others; see the \code{DETAILS} of the \code{\link{STEM_Model}} function.
-#' @param K.newlocations a loading matrix of dimension \eqn{S} by p.
+#' @param A.newlocations a loading matrix of dimension \eqn{S} by p.
 #' @param time.point the time point between 1 and \eqn{n} for which the spatial prediction is performed.
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
@@ -17,7 +17,7 @@
 #' @return The function returns a list which is given by:
 #' \itemize{
 #' \item{data.newlocations} a list of five objects related to the new spatial locations: the coordinates (\code{coordinates}),
-#' the covariates (\code{covariates}), the \code{K} matrix, the predictions \code{z} and the prediction standard errors (\code{se.pred}).
+#' the covariates (\code{covariates}), the loading matrix \code{A}, the predictions \code{z} and the prediction standard errors (\code{se.pred}).
 #' \item{time.point}the time point for which the spatial prediction is performed.
 #' }
 #'
@@ -26,11 +26,11 @@
 #' Given the observation matrix and using the multivariate Normal distribution standard theory, the predictor in the new generic spatial location
 #' \eqn{s_0} at time \eqn{t} is an univariate Gaussian distribution with mean \eqn{z(s_0,t)} and variance \eqn{\sigma^2(s_0)} given by:
 #'
-#'   \deqn{z(s_0,t) = X(s_0,t)\beta+K(s_0)y_t+\Omega^{\prime} \Sigma_e^{-1} (z_t-X_t\beta+K y_t)}{z(s_0,t) = X(s_0,t)*\beta+K(s_0)*y_t+\Omega '*\Sigma_e^{-1}*(z_t-X_t*\beta+K*y_t)}
+#'   \deqn{z(s_0,t) = X(s_0,t)\beta+A(s_0)y_t+\Omega^{\prime} \Sigma_e^{-1} (z_t-X_t\beta+A y_t)}{z(s_0,t) = X(s_0,t)*\beta+A(s_0)*y_t+\Omega '*\Sigma_e^{-1}*(z_t-X_t*\beta+A*y_t)}
 #'   \deqn{\sigma^2(s_0)=\sigma^2{\omega}-\Omega^{\prime}\Sigma_e^{-1} \Omega }{\sigma^2(s_0)=\sigma^2{\omega}-\Omega '*\Sigma_e^{-1}*\Omega }
 #'
 #' where \eqn{\Omega} is the \eqn{d \times 1}{d*1} constant in time covariance vector, whose \eqn{i}-th generic element (\eqn{i=1,...,d}) is
-#' \eqn{Cov(z(s_i,t),z(s_0,t))}. Moreover,  \eqn{X(s_0,t)}{X(s_0,t)} is the \eqn{1 \times r}{1*r} vector of covariates for the new site \eqn{s_0}{s_0} and \eqn{K(s_0)}{K(s_0)} is the \eqn{1 \times p}{1*p} loading vector. Note that all the parameters in the previous formula are ML estimates and the latent process \eqn{y_t} is the output of the
+#' \eqn{Cov(z(s_i,t),z(s_0,t))}. Moreover,  \eqn{X(s_0,t)}{X(s_0,t)} is the \eqn{1 \times r}{1*r} vector of covariates for the new site \eqn{s_0}{s_0} and \eqn{A(s_0)}{A(s_0)} is the \eqn{1 \times p}{1*p} loading vector. Note that all the parameters in the previous formula are ML estimates and the latent process \eqn{y_t} is the output of the
 #' Kalman filtering procedures for each time point \eqn{t}.
 #'
 #'
@@ -65,9 +65,9 @@
 #'             m0=as.matrix(0),
 #'             C0=as.matrix(1))
 #'
-#' K<-matrix(1,ncol(z),1)
+#' A<-matrix(1,ncol(z),1)
 #'
-#' mod1 <- STEM_Model(z=z,covariates=covariates,coordinates=coordinates,phi=phi,K=K)
+#' mod1 <- STEM_Model(z=z,covariates=covariates,coordinates=coordinates,phi=phi,A=A)
 #' class(mod1)
 #'
 #' #mod1 is given as output by the STEM_Model function
@@ -99,12 +99,12 @@
 #'                           0.733208, 1.467990, 0.380001, 0.251896, 0.240350,
 #'                           2.292299 ,2.275844 ,1.382322, 0.300729, 0.208798))
 #'
-#' K.new<-matrix(1,25,1)
+#' A.new<-matrix(1,25,1)
 #'
 #' #dynamical spatial prediction (10th day)
 #' mod1.pred <-STEM_Kriging(StemModel=mod1.est,coord.newlocations=coord.new,
 #'                          covariates.newlocations=covariates.new,
-#'                          K.newlocations<-K.new,time.point=10)
+#'                          A.newlocations<-A.new,time.point=10)
 #'
 #' #post-processing: build an image map
 #' image(x=xxx,y=yyy,z=matrix(mod1.pred$data.newlocations$z,
@@ -135,14 +135,14 @@
 
 STEM_Kriging <-
 function(StemModel,coord.newlocations,covariates.newlocations,
-					K.newlocations,time.point,cov.spat=Sigmastar.exp,distance='euclidean'){
+					A.newlocations,time.point,cov.spat=Sigmastar.exp,distance='euclidean'){
 
 z 		= StemModel$data$z
 p 		= StemModel$skeleton$p
 n 		= StemModel$data$n
 d 		= StemModel$data$d
 r 		= StemModel$data$r
-K		= StemModel$skeleton$K
+A		= StemModel$skeleton$A
 
 covariates 	= StemModel$data$covariates
 covariates  = changedimension_covariates(covariates,d=d,r=r,n=n)
@@ -188,14 +188,14 @@ if (distance=='geo'){
 ### Koopman 2012, Sect. 4.10) -- so that the kriging equations are solved on the
 ### observed sub-vector. With nothing observed at that time point the predictor
 ### falls back on the unconditional mean of the new locations.
-mu1.full   = covariates[,,time.point]%*%phi$beta + K%*%y.smoothed[time.point,]
+mu1.full   = covariates[,,time.point]%*%phi$beta + A%*%y.smoothed[time.point,]
 Sigma11.full = phi$sigma2omega * cov.spat(d=d , logb=phi$logb , logtheta=phi$logtheta , dist=dist)
 Sigma12.full = phi$sigma2omega * exp(-phi$theta * new.distancematrix)
 X1.full    = z[time.point,]
 obs.k      = which(!is.na(X1.full))
 
 multi.pred = spatial.pred(mu1 = mu1.full[obs.k, , drop = FALSE],
-				mu2	= covariates.newlocations %*% phi$beta + K.newlocations %*% y.smoothed[time.point,],
+				mu2	= covariates.newlocations %*% phi$beta + A.newlocations %*% y.smoothed[time.point,],
 				Sigma11 = Sigma11.full[obs.k, obs.k, drop = FALSE],
 				Sigma12 = Sigma12.full[, obs.k, drop = FALSE],
 				Sigma22 = diag(phi$sigma2omega,m),
@@ -204,7 +204,7 @@ multi.pred = spatial.pred(mu1 = mu1.full[obs.k, , drop = FALSE],
 
 
 data.newlocations =  list(coordinates = coord.newlocations, covariates=covariates.newlocations,
-					K = K.newlocations,z=multi.pred$pred,se.pred=multi.pred$se.pred)
+					A = A.newlocations,z=multi.pred$pred,se.pred=multi.pred$se.pred)
 
 return(list(data.newlocations=data.newlocations,time.point=time.point))
 

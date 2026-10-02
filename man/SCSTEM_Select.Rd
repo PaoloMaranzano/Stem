@@ -28,26 +28,26 @@ One of \code{"BIC"} (default), \code{"AIC"} or \code{"KIC"}.}
 \value{
 An object of class \dQuote{SCSTEM_Select}, a list with
 \itemize{
-  \item \code{k_selected}, \code{phi_selected}: the selected
-    hyperparameters. When \eqn{\hat{k} = 1}, \code{phi_selected} is the grid
+  \item \code{K_selected}, \code{phi_selected}: the selected
+    hyperparameters. When \eqn{\hat{K} = 1}, \code{phi_selected} is the grid
     value at which the pooled fit is stored, which has no effect on it.
   \item \code{fit}: the corresponding fitted object, taken from
     \code{infocrit$fits} without refitting.
-  \item \code{step1}: data frame with the criterion-minimizing \eqn{k} at
+  \item \code{step1}: data frame with the criterion-minimizing \eqn{K} at
     each penalty in the band.
   \item \code{step2}: data frame with the criterion of every admissible fit
-    at \eqn{k = \hat{k}}, one row per penalty; \code{NULL} when
-    \eqn{\hat{k} = 1}.
+    at \eqn{K = \hat{K}}, one row per penalty; \code{NULL} when
+    \eqn{\hat{K} = 1}.
   \item \code{ari_to_selected}: Adjusted Rand Index between every admissible
     partition on the grid and the selected one.
-  \item \code{reference}: the pooled \eqn{k = 1} row of the criteria table,
+  \item \code{reference}: the pooled \eqn{K = 1} row of the criteria table,
     when available.
   \item \code{band}, \code{criterion}: the settings used.
 }
 }
 \description{
 \code{SCSTEM_Select} applies the two-step tuning rule for the number of
-clusters \eqn{k} and the spatial penalty \eqn{\phi} of a spatially-clustered
+clusters \eqn{K} and the spatial penalty \eqn{\phi} of a spatially-clustered
 STEM model, given the grid of fits produced by
 \code{\link{SCSTEM_Infocrit}}.
 }
@@ -57,31 +57,31 @@ optimized on the data, so the maximized likelihood keeps an optimism bias
 that the parameter count does not fully correct, and the cluster-wise
 variance components shrink as the assignment step pursues within-cluster
 homogeneity. Both effects are strongest at \eqn{\phi \approx 0}, where
-in-sample criteria systematically overselect \eqn{k}. The rule therefore
-chooses \eqn{k} within a \emph{moderate-penalty band} \eqn{\Phi_M} and
+in-sample criteria systematically overselect \eqn{K}. The rule therefore
+chooses \eqn{K} within a \emph{moderate-penalty band} \eqn{\Phi_M} and
 proceeds in two steps:
 
 \describe{
   \item{(S1) Number of clusters, by BIC within the band.}{For each
-    \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{k} among the
+    \eqn{\phi \in \Phi_M}, record the BIC-minimizing \eqn{K} among the
     admissible configurations at that \eqn{\phi} and the pooled model
-    \eqn{k = 1}, whose criterion does not depend on \eqn{\phi}; select the
-    modal winner \eqn{\hat{k}} across the band, resolving ties towards the
-    smaller \eqn{k}. If \eqn{\hat{k} = 1} the data do not support a
+    \eqn{K = 1}, whose criterion does not depend on \eqn{\phi}; select the
+    modal winner \eqn{\hat{K}} across the band, resolving ties towards the
+    smaller \eqn{K}. If \eqn{\hat{K} = 1} the data do not support a
     partition: the pooled fit is returned and (S2) does not apply. Excluding
     \eqn{\phi \approx 0} removes the region where the optimism bias is
     largest. Under-selection is the harmful direction, while residual
     over-selection is comparatively benign for prediction, because
     supernumerary clusters are either small or near-duplicates of existing
     regimes.}
-  \item{(S2) Spatial penalty, by the same criterion at \eqn{\hat{k}}.}{Among
-    the admissible fits with \eqn{k = \hat{k}} on the whole grid, select the
+  \item{(S2) Spatial penalty, by the same criterion at \eqn{\hat{K}}.}{Among
+    the admissible fits with \eqn{K = \hat{K}} on the whole grid, select the
     one with the smallest criterion, resolving ties towards the smaller
-    \eqn{\phi}. At a given \eqn{k} the parameter count does not depend on
+    \eqn{\phi}. At a given \eqn{K} the parameter count does not depend on
     \eqn{\phi} (up to the effective degrees of freedom of a penalty on the
     coefficients), so the step compares the likelihoods reached by the
     partitions estimated at different penalties. Every penalized fit starts
-    from the unpenalized one at the same \eqn{k} (see
+    from the unpenalized one at the same \eqn{K} (see
     \code{\link{SCSTEM_Estimation}}): a penalty is selected only when it has
     moved the partition to one with a higher likelihood than the
     unpenalized solution, and the optimism bias, which favors
@@ -93,9 +93,9 @@ proceeds in two steps:
 
 Only admissible configurations, in the sense of
 \code{\link{SCSTEM_Infocrit}}, enter the rule. The pooled model enters it
-whenever \code{k_grid} contains 1, as it should: it is the answer when no
+whenever \code{K_grid} contains 1, as it should: it is the answer when no
 partition improves on it, and it is selected when no configuration with
-\eqn{k > 1} is admissible.
+\eqn{K > 1} is admissible.
 }
 \examples{
 # Daily PM2.5 at 36 background stations of the Po Valley. The first 180
@@ -121,10 +121,10 @@ phi <- list(beta = matrix(c(1.25, -0.00003, 0.64), 3, 1),
 mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
                   covariates = povalley$covariates[keep, ],
                   coordinates = povalley$coords,
-                  phi = phi, K = matrix(1, d, 1))
+                  phi = phi, A = matrix(1, d, 1))
 
 \donttest{
-ic <- SCSTEM_Infocrit(mod, k_grid = 1:3, distance = 'geo')
+ic <- SCSTEM_Infocrit(mod, K_grid = 1:3, distance = 'geo')
 sel <- SCSTEM_Select(ic)
 sel
 }

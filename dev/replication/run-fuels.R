@@ -276,7 +276,7 @@ fu_model <- function(des, coords) {
                               theta = 3 / dm, G = matrix(0.3, 1, 1),
                               Sigmaeta = matrix(0.2 * s2, 1, 1),
                               m0 = as.matrix(0), C0 = as.matrix(1)),
-                   K = matrix(1, des$d, 1))
+                   A = matrix(1, des$d, 1))
 }
 
 
@@ -295,20 +295,20 @@ fu_fit <- function(panel, dir) {
   mod  <- fu_model(des, coords); modR <- fu_model(desR, coords)
   r <- length(des$names)
   kmax <- min(CFG$k_max[1], floor(des$d / (r + 2)))            # regimes of at least r + 2 pumps
-  ic <- Stem::SCSTEM_Infocrit(mod, k_grid = seq_len(kmax), distance = "geo",
+  ic <- Stem::SCSTEM_Infocrit(mod, K_grid = seq_len(kmax), distance = "geo",
                               knn = CFG$knn[1], lambda = CFG$lambda[1], verbose = FALSE)
   sel <- Stem::SCSTEM_Select(ic)
-  pooled <- ic$fits[[paste0("k=1, phi=", ic$table$phi[ic$table$k == 1][1])]]
+  pooled <- ic$fits[[paste0("K=1, phi=", ic$table$phi[ic$table$K == 1][1])]]
   ## the restricted fits, without the lags of x, on the same partitions
   refit <- function(fit, k, phi) {
-    if (k == 1L) Stem::SCSTEM_Estimation(modR, k = 1, distance = "geo", knn = CFG$knn[1],
+    if (k == 1L) Stem::SCSTEM_Estimation(modR, K = 1, distance = "geo", knn = CFG$knn[1],
                                          lambda = CFG$lambda[1], verbose = FALSE)
-    else Stem::SCSTEM_Estimation(modR, k = k, phi_penalty = phi, distance = "geo",
+    else Stem::SCSTEM_Estimation(modR, K = k, phi_penalty = phi, distance = "geo",
                                  knn = CFG$knn[1], lambda = CFG$lambda[1],
                                  init_partition = fit$group, max_iter = 0, verbose = FALSE)
   }
   pooledR <- refit(pooled, 1L, 0)
-  selR <- if (sel$k_selected == 1L) pooledR else refit(sel$fit, sel$k_selected, sel$phi_selected)
+  selR <- if (sel$K_selected == 1L) pooledR else refit(sel$fit, sel$K_selected, sel$phi_selected)
   list(des = des, ic = ic, sel = sel, pooled = pooled, pooledR = pooledR, selR = selR)
 }
 
@@ -391,7 +391,7 @@ for (prov in CFG$provinces) {
     fit <- cached(paste0("fit_", tag, "_p", CFG$p, "_ecm", CFG$ecm, "_k", CFG$k_max),
                   fu_fit(panel, FU_DIRECTIONS[[dn]]))
     g <- rbind(fu_granger(fit$pooled, fit$pooledR, fit$des$names, "pooled"),
-               if (fit$sel$k_selected > 1)
+               if (fit$sel$K_selected > 1)
                  fu_granger(fit$sel$fit, fit$selR, fit$des$names, "SC-STEM"))
     utils::write.csv(fit$ic$table, file.path(OUT, paste0(tag, "_grid.csv")), row.names = FALSE)
     utils::write.csv(g, file.path(OUT, paste0(tag, "_granger.csv")), row.names = FALSE)
@@ -400,23 +400,23 @@ for (prov in CFG$provinces) {
       utils::write.csv(cbind(panel$meta, regime = fit$sel$fit$group, st$pumps),
                        file.path(OUT, paste0(tag, "_stations.csv")), row.names = FALSE)
     fu_map(panel, fit$sel$fit, st, file.path(OUT, paste0(tag, "_map.pdf")),
-           sprintf("%s, %s: k = %d, phi = %s", prov, gsub("_", " ", dn),
-                   fit$sel$k_selected, format(fit$sel$phi_selected)))
+           sprintf("%s, %s: K = %d, phi = %s", prov, gsub("_", " ", dn),
+                   fit$sel$K_selected, format(fit$sel$phi_selected)))
     bic <- function(f) unname(f$info_crit[["BIC"]])
     summary_rows[[tag]] <- data.frame(
       province = prov, direction = dn, pumps = fit$des$d, weeks = fit$des$Tn,
-      k = fit$sel$k_selected, phi = fit$sel$phi_selected,
+      K = fit$sel$K_selected, phi = fit$sel$phi_selected,
       BIC_pooled = bic(fit$pooled), BIC_selected = bic(fit$sel$fit),
       p_pooled = g$p_value[g$model == "pooled" & g$regime == 0],
-      p_regimes = if (fit$sel$k_selected > 1)
+      p_regimes = if (fit$sel$K_selected > 1)
         paste(format.pval(g$p_value[g$model == "SC-STEM" & g$regime > 0], digits = 2), collapse = "; ")
         else NA_character_,
       DH_Zbar = if (is.null(st)) NA_real_ else st$dh[["Zbar"]],
       DH_p = if (is.null(st)) NA_real_ else st$dh[["p_value"]],
       pumps_rejecting = if (is.null(st)) NA_real_ else st$dh[["share_rejecting"]],
       stringsAsFactors = FALSE)
-    cat(sprintf("  %-20s k = %d, phi = %s | pooled p = %s | DH p = %s\n", dn,
-                fit$sel$k_selected, format(fit$sel$phi_selected),
+    cat(sprintf("  %-20s K = %d, phi = %s | pooled p = %s | DH p = %s\n", dn,
+                fit$sel$K_selected, format(fit$sel$phi_selected),
                 format.pval(summary_rows[[tag]]$p_pooled, digits = 2),
                 format.pval(summary_rows[[tag]]$DH_p, digits = 2)))
   }

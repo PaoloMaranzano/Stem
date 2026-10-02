@@ -26,13 +26,13 @@ make_model <- function(dn = 24L, TT = 90L, seed = 1L) {
                sigma2eps = 0.6 * s2, sigma2omega = 0.3 * s2, theta = 1 / 60000,
                G = matrix(0.7, 1, 1), Sigmaeta = matrix(0.1 * s2, 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1)),
-    K = matrix(1, dn, 1))
+    A = matrix(1, dn, 1))
 }
 
 test_that("lambda = 0 reproduces the unpenalized estimator exactly", {
   a <- STEM_Estimation(make_model(), precision = 0.01, max.iter = 6,
                        distance = "geo")
-  b <- STEM_Fit(make_model(), k = 1, alpha = 0, lambda = 0,
+  b <- STEM_Fit(make_model(), K = 1, alpha = 0, lambda = 0,
                 precision = 0.01, max.iter = 6, distance = "geo")
   expect_identical(unlist(a$estimates$phi.hat), unlist(b$estimates$phi.hat))
   expect_identical(a$estimates$loglik, b$estimates$loglik)
@@ -82,7 +82,7 @@ test_that("the lasso and elastic-net updates satisfy their optimality conditions
 })
 
 test_that("the lasso shrinks coefficients to exactly zero and the count follows", {
-  fit <- STEM_Fit(make_model(), k = 1, alpha = 1, lambda = 5,
+  fit <- STEM_Fit(make_model(), K = 1, alpha = 1, lambda = 5,
                   precision = 0.01, max.iter = 6, distance = "geo")
   b <- as.numeric(fit$estimates$phi.hat$beta)
   expect_true(any(b[-1] == 0))
@@ -92,13 +92,13 @@ test_that("the lasso shrinks coefficients to exactly zero and the count follows"
   expect_lt(fit$estimates$penalty$beta.df, 3)
 })
 
-test_that("STEM_Fit dispatches on k and validates its arguments", {
+test_that("STEM_Fit dispatches on K and validates its arguments", {
   m <- make_model()
-  expect_s3_class(STEM_Fit(m, k = 1, precision = 0.05, max.iter = 3,
+  expect_s3_class(STEM_Fit(m, K = 1, precision = 0.05, max.iter = 3,
                            distance = "geo"), "STEM_Model")
   expect_error(STEM_Fit(m, alpha = 2), "alpha")
   expect_error(STEM_Fit(m, lambda = -1), "lambda")
-  expect_error(STEM_Fit(m, k = 0), "k")
+  expect_error(STEM_Fit(m, K = 0), "K")
   expect_error(STEM_Fit(list()), "STEM_Model")
 })
 
@@ -149,13 +149,13 @@ test_that("latent = FALSE and spatial = FALSE give penalized linear regression",
                sigma2omega = 0.3 * s2, theta = 1 / 100000,
                G = matrix(0.5, 1, 1), Sigmaeta = matrix(0.2 * s2, 1, 1),
                m0 = as.matrix(0), C0 = as.matrix(1)),
-    K = matrix(1, d, 1))
+    A = matrix(1, d, 1))
 
   M0 <- crossprod(X); v0 <- as.numeric(crossprod(X, as.vector(z)))
   w  <- stem_penalized_index(3L)
 
   for (cfg in list(c(0, 0), c(0, 0.3), c(1, 0.3), c(0.5, 0.3))) {
-    fit <- STEM_Fit(mod, k = 1, alpha = cfg[1], lambda = cfg[2],
+    fit <- STEM_Fit(mod, K = 1, alpha = cfg[1], lambda = cfg[2],
                     latent = FALSE, spatial = FALSE, regularization = 0,
                     precision = 1e-8, max.iter = 40, distance = "geo")
     ref <- if (cfg[2] == 0) as.numeric(solve(M0, v0)) else
@@ -164,7 +164,7 @@ test_that("latent = FALSE and spatial = FALSE give penalized linear regression",
   }
 
   ## the parameters that are switched off stay where they started
-  fit <- STEM_Fit(mod, k = 1, latent = FALSE, spatial = FALSE,
+  fit <- STEM_Fit(mod, K = 1, latent = FALSE, spatial = FALSE,
                   regularization = 0, precision = 1e-8, max.iter = 20,
                   distance = "geo")
   expect_equal(as.numeric(fit$estimates$phi.hat$theta), 1 / 100000)
@@ -175,8 +175,8 @@ test_that("latent = FALSE and spatial = FALSE give penalized linear regression",
 
 test_that("lambda_by = 'size' penalizes the smaller regimes more", {
   ## the mapping itself, which is what the option controls
-  d <- 60L; k <- 3L; lambda <- 0.4
-  nbar <- d / k
+  d <- 60L; K <- 3L; lambda <- 0.4
+  nbar <- d / K
   sizes <- c(10L, 20L, 30L)
   expect_equal(lambda * nbar / sizes, c(0.8, 0.4, lambda * 20 / 30))
   expect_true(lambda * nbar / sizes[1] > lambda * nbar / sizes[3])

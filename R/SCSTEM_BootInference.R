@@ -12,7 +12,7 @@
 #' before any statistic is computed each refit cluster is mapped to the cluster
 #' of the original fit with which it shares the largest number of locations,
 #' resolving conflicts greedily by decreasing overlap (majority rule). Draws
-#' whose refit did not recover all \eqn{k} clusters are discarded.
+#' whose refit did not recover all \eqn{K} clusters are discarded.
 #'
 #' \strong{Confidence intervals.} From the same set of aligned draws the
 #' function computes, for every cluster-wise parameter, the intervals of
@@ -59,7 +59,7 @@
 #'   \item \code{tests}: data frame of the pairwise percentile tests between
 #'     clusters.
 #'   \item \code{aligned}: the aligned bootstrap draws, as a
-#'     \eqn{B_{valid}} by \eqn{k} by \eqn{npar} array, so that any further
+#'     \eqn{B_{valid}} by \eqn{K} by \eqn{npar} array, so that any further
 #'     statistic can be computed by the user.
 #'   \item \code{coclustering}: \eqn{d} by \eqn{d} matrix of the bootstrap
 #'     co-clustering frequencies, that is the share of usable draws in which
@@ -103,10 +103,10 @@
 #' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 #'                   covariates = povalley$covariates[keep, ],
 #'                   coordinates = povalley$coords,
-#'                   phi = phi, K = matrix(1, d, 1))
+#'                   phi = phi, A = matrix(1, d, 1))
 #'
 #' \donttest{
-#' fit <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+#' fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 #' boot <- SCSTEM_Bootstrap(fit, B = 20, seed = 1)
 #' inf <- SCSTEM_BootInference(boot)
 #' inf
@@ -130,7 +130,7 @@ SCSTEM_BootInference <- function(SCSTEMboot, level = 0.95,
   }
 
   orig <- SCSTEMboot$original
-  k <- orig$input_args$k
+  K <- orig$input_args$K
   d <- orig$input_args$d
   par_names <- dimnames(SCSTEMboot$draws)[[3]]
   if (is.null(parameters)) parameters <- par_names
@@ -152,8 +152,8 @@ SCSTEM_BootInference <- function(SCSTEMboot, level = 0.95,
   ########## Label alignment (majority rule) #######
   ##################################################
 
-  aligned <- array(NA_real_, dim = c(Bu, k, length(parameters)),
-                   dimnames = list(paste0("b", ok), paste("cluster", seq_len(k)),
+  aligned <- array(NA_real_, dim = c(Bu, K, length(parameters)),
+                   dimnames = list(paste0("b", ok), paste("cluster", seq_len(K)),
                                    parameters))
   ari <- rep(NA_real_, Bu)
   coclust <- matrix(0, d, d)
@@ -161,8 +161,8 @@ SCSTEM_BootInference <- function(SCSTEMboot, level = 0.95,
   for (m in seq_along(ok)) {
     b <- ok[m]
     grp_b <- SCSTEMboot$groups[, b]
-    map <- scstem_align_labels(reference = orig$group, refit = grp_b, K = k)
-    for (g in seq_len(k)) {
+    map <- scstem_align_labels(reference = orig$group, refit = grp_b, K = K)
+    for (g in seq_len(K)) {
       target <- map[g]
       if (is.na(target)) next
       aligned[m, target, ] <- SCSTEMboot$draws[b, g, parameters]
@@ -183,7 +183,7 @@ SCSTEM_BootInference <- function(SCSTEMboot, level = 0.95,
   up_name <- paste0("upper_", round(level * 100), "_")
 
   rows <- list()
-  for (g in seq_len(k)) {
+  for (g in seq_len(K)) {
     for (p in parameters) {
       x <- aligned[, g, p]
       x <- x[is.finite(x)]
@@ -256,10 +256,10 @@ SCSTEM_BootInference <- function(SCSTEMboot, level = 0.95,
   ##################################################
 
   tests <- NULL
-  if (k >= 2L) {
+  if (K >= 2L) {
     trows <- list()
-    for (g in seq_len(k - 1L)) {
-      for (h in (g + 1L):k) {
+    for (g in seq_len(K - 1L)) {
+      for (h in (g + 1L):K) {
         for (p in parameters) {
           dlt <- aligned[, g, p] - aligned[, h, p]
           dlt <- dlt[is.finite(dlt)]

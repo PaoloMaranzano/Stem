@@ -28,7 +28,7 @@ po_phi <- function() {
 po_model <- function(Tn = 90L, d = NULL) {
   s <- po_subset(Tn = Tn, d = d)
   STEM_Model(z = s$z, covariates = s$covariates, coordinates = s$coordinates,
-             phi = po_phi(), K = matrix(1, s$d, 1))
+             phi = po_phi(), A = matrix(1, s$d, 1))
 }
 
 ### The tests check behaviour, not accuracy: a loose, fast setting of the EM

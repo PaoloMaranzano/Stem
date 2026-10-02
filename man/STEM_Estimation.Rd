@@ -82,8 +82,8 @@ Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds 
 The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
 
 This is one of the two estimation engines of the package. The entry point is
-\code{\link{STEM_Fit}}, which calls this function when \code{k = 1} and
-\code{\link{SCSTEM_Estimation}} when \code{k > 1}, and which takes the same
+\code{\link{STEM_Fit}}, which calls this function when \code{K = 1} and
+\code{\link{SCSTEM_Estimation}} when \code{K > 1}, and which takes the same
 arguments and returns the same object. Call \code{STEM_Estimation} directly
 only to bypass the dispatch; it is the historical interface of the package
 and is kept unchanged.
@@ -187,10 +187,10 @@ phi <- list(beta=matrix(c(3.65,0.046,-0.904),3,1),
             m0=as.matrix(0),
             C0=as.matrix(1))
 
-K <-matrix(1,ncol(z),1)
+A <-matrix(1,ncol(z),1)
 
 mod1 <- STEM_Model(z=z,covariates=covariates,
-                   coordinates=coordinates,phi=phi,K=K)
+                   coordinates=coordinates,phi=phi,A=A)
 class(mod1)
 
 #mod1 is given as output by the STEM_Model function

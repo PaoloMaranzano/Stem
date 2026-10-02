@@ -35,10 +35,10 @@
 #' of its regime. A removed location is predicted by the same conditional mean,
 #' computed with the parameters of the regime it inherits and given the
 #' retained locations of that regime observed at the same time point:
-#' \deqn{\hat{z}_{0t} = x_{0t}'\hat\beta_k + K_0 \hat{y}_{k,t}
-#'   + \Sigma_{0O}\Sigma_{OO}^{-1}(z_{Ot} - x_{Ot}'\hat\beta_k - K_O\hat{y}_{k,t}),}
+#' \deqn{\hat{z}_{0t} = x_{0t}'\hat\beta_k + A_0 \hat{y}_{k,t}
+#'   + \Sigma_{0O}\Sigma_{OO}^{-1}(z_{Ot} - x_{Ot}'\hat\beta_k - A_O\hat{y}_{k,t}),}
 #' which is kriging within the regime. For the pooled model, fitted by
-#' \code{SCSTEM_Estimation(..., k = 1)}, this is ordinary kriging.
+#' \code{SCSTEM_Estimation(..., K = 1)}, this is ordinary kriging.
 #'
 #' The refits reproduce the estimation of each model, with the settings stored
 #' in its \code{input_args} (number of regimes, penalty, graph, initialization,
@@ -100,11 +100,11 @@
 #' mod <- STEM_Model(z = povalley$z[seq_len(Tn), ],
 #'                   covariates = povalley$covariates[keep, ],
 #'                   coordinates = povalley$coords,
-#'                   phi = phi, K = matrix(1, d, 1))
+#'                   phi = phi, A = matrix(1, d, 1))
 #'
 #' \donttest{
-#' pooled <- SCSTEM_Estimation(mod, k = 1, distance = 'geo')
-#' fit2 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.05, distance = 'geo')
+#' pooled <- SCSTEM_Estimation(mod, K = 1, distance = 'geo')
+#' fit2 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = 'geo')
 #' cv <- SCSTEM_CV(list(pooled = pooled, k2 = fit2), scheme = "LKLO",
 #'                 folds = 4, seed = 1)
 #' cv
@@ -225,7 +225,7 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
     }
     list(base = base, refit_args = refit_args, dm = dm,
          XX = changedimension_covariates(base$data$covariates, d, ncov, Tobs),
-         K = as.matrix(base$skeleton$K))
+         A = as.matrix(base$skeleton$A))
   }
 
   ### One fold, one model: refit on the retained cells and locations, predict
@@ -243,12 +243,12 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
                       covariates = pr$base$data$covariates[rows, , drop = FALSE],
                       coordinates = pr$base$data$coordinates[keep, , drop = FALSE],
                       phi = pr$base$skeleton$phi,
-                      K = pr$K[keep, , drop = FALSE])
+                      A = pr$A[keep, , drop = FALSE])
     fit <- suppressWarnings(do.call(SCSTEM_Estimation, c(list(StemModel = mod), pr$refit_args)))
     zhat <- matrix(NA_real_, Tobs, d)
     zhat[, keep] <- SCSTEM_Complete(fit)
     if (length(fo$drop)) {
-      zhat[, fo$drop] <- scstem_predict_new(fit, keep, fo$drop, zk, pr$dm, pr$XX, pr$K)
+      zhat[, fo$drop] <- scstem_predict_new(fit, keep, fo$drop, zk, pr$dm, pr$XX, pr$A)
     }
     sc <- fo$score & !is.na(z0)
     err <- (zhat - z0)[sc]
@@ -294,8 +294,8 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
   rownames(summary) <- NULL
 
   models <- data.frame(model = names(fits),
-                       k = vapply(fits, function(f) as.integer(f$input_args$k), integer(1)),
-                       phi = vapply(fits, function(f) if (f$input_args$k == 1L) NA_real_ else
+                       K = vapply(fits, function(f) as.integer(f$input_args$K), integer(1)),
+                       phi = vapply(fits, function(f) if (f$input_args$K == 1L) NA_real_ else
                          as.numeric(f$input_args$phi_penalty), numeric(1)),
                        stringsAsFactors = FALSE)
   rownames(models) <- NULL
@@ -323,8 +323,8 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
 ###   z_train  T x length(keep) response the fit was estimated on
 ###   dm       distance matrix of the whole network
 ###   XX       d x r x T covariate array of the whole network
-###   K        d x p loading matrix of the whole network
-`scstem_predict_new` <- function(fit, keep, new, z_train, dm, XX, K) {
+###   Amat     d x p loading matrix of the whole network
+`scstem_predict_new` <- function(fit, keep, new, z_train, dm, XX, Amat) {
   Tobs <- nrow(z_train)
   pred <- matrix(NA_real_, Tobs, length(new))
   nearest <- keep[apply(dm[new, keep, drop = FALSE], 1L, which.min)]
@@ -348,7 +348,7 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
     out <- matrix(NA_real_, Tobs, length(add))
     for (tt in seq_len(Tobs)) {
       signal <- matrix(XX[A, , tt], nrow = length(A)) %*% beta +
-        K[A, , drop = FALSE] %*% matrix(ysm[tt, ], ncol = 1)
+        Amat[A, , drop = FALSE] %*% matrix(ysm[tt, ], ncol = 1)
       oi <- obs$idx[[tt]]
       if (!length(oi)) {
         out[tt, ] <- signal[at_new]
@@ -379,8 +379,8 @@ print.SCSTEM_CV <- function(x, digits = 3, ...) {
   cat("  folds per scheme : ", x$n_folds, "\n", sep = "")
   cat("  models           : ",
       paste0(x$models$model, " (",
-             ifelse(x$models$k == 1L, "pooled",
-                    paste0("k = ", x$models$k, ", phi = ", x$models$phi)), ")",
+             ifelse(x$models$K == 1L, "pooled",
+                    paste0("K = ", x$models$K, ", phi = ", x$models$phi)), ")",
              collapse = ", "), "\n\n", sep = "")
   s <- x$summary
   s$rmse <- signif(s$rmse, digits)

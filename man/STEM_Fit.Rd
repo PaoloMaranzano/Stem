@@ -6,7 +6,7 @@
 \usage{
 STEM_Fit(
   StemModel,
-  k = 1,
+  K = 1,
   alpha = 0,
   lambda = 0,
   penalize = NULL,
@@ -24,8 +24,8 @@ STEM_Fit(
 \item{StemModel}{an object of class \dQuote{STEM_Model}, from
 \code{\link{STEM_Model}}.}
 
-\item{k}{number of spatial regimes. \code{1}, the default, fits the pooled
-model; \code{k > 1} fits the spatially-clustered model.}
+\item{K}{number of spatial regimes. \code{1}, the default, fits the pooled
+model; \code{K > 1} fits the spatially-clustered model.}
 
 \item{alpha}{the elastic-net mixing parameter, in \eqn{[0,1]}. \code{0} is
 ridge, \code{1} is the lasso, in between is the elastic net. Ignored when
@@ -48,7 +48,7 @@ whose diagonal the internal scaling has already set to one, so a ridge is
 scale free by construction and rescaling it would only break that.}
 
 \item{lambda_by}{how the penalty is spread over the regimes when
-\code{k > 1}: \dQuote{common} (the default) or \dQuote{size}. See
+\code{K > 1}: \dQuote{common} (the default) or \dQuote{size}. See
 \code{\link{SCSTEM_Estimation}}. Both keep \code{lambda} a single
 hyperparameter.}
 
@@ -60,7 +60,7 @@ the identity. Together with \code{latent = FALSE} and
 linear regression -- see the section below.}
 
 \item{phi_penalty}{the strength of the Potts penalty on the partition, passed
-to \code{\link{SCSTEM_Estimation}}. Ignored when \code{k = 1}.}
+to \code{\link{SCSTEM_Estimation}}. Ignored when \code{K = 1}.}
 
 \item{distance}{\dQuote{geo} or \dQuote{euclidean}. Default is
 \dQuote{euclidean} for the pooled model and \dQuote{geo} for the clustered
@@ -69,12 +69,12 @@ one, which are the defaults of the two functions being called.}
 \item{verbose}{logical, passed on.}
 
 \item{...}{further arguments passed to \code{\link{STEM_Estimation}} when
-\code{k = 1} and to \code{\link{SCSTEM_Estimation}} when \code{k > 1}.}
+\code{K = 1} and to \code{\link{SCSTEM_Estimation}} when \code{K > 1}.}
 }
 \value{
 The object the underlying function returns: of class
-  \dQuote{STEM_Model} when \code{k = 1}, of class \dQuote{SCSTEM_Estimation} when
-  \code{k > 1}. In both cases the penalty in force and the effective number
+  \dQuote{STEM_Model} when \code{K = 1}, of class \dQuote{SCSTEM_Estimation} when
+  \code{K > 1}. In both cases the penalty in force and the effective number
   of coefficients are recorded, under \code{estimates$penalty} and inside
   each regime's fit respectively.
 }
@@ -83,14 +83,14 @@ One entry point for the four estimators the package provides. Which one runs
 is decided by two arguments and nothing else:
 
 \tabular{lll}{
-  \strong{k} \tab \strong{lambda} \tab \strong{what is fitted} \cr
+  \strong{K} \tab \strong{lambda} \tab \strong{what is fitted} \cr
   \code{1}   \tab \code{0}        \tab the pooled STEM model, \code{\link{STEM_Estimation}} \cr
   \code{> 1} \tab \code{0}        \tab the spatially-clustered model, \code{\link{SCSTEM_Estimation}} \cr
   \code{1}   \tab \code{> 0}      \tab the pooled model with an elastic net on \eqn{\beta} \cr
   \code{> 1} \tab \code{> 0}      \tab the clustered model with an elastic net on \eqn{\beta} within each regime
 }
 
-The defaults \code{k = 1}, \code{alpha = 0}, \code{lambda = 0} therefore
+The defaults \code{K = 1}, \code{alpha = 0}, \code{lambda = 0} therefore
 reproduce the classical estimator exactly, to floating point.
 }
 \details{
@@ -125,7 +125,7 @@ internally to put the diagonal of \eqn{M} at one, which is what makes a given
 \code{lambda} mean the same thing for every covariate and, in the clustered
 model, for every regime. Coefficients are returned on the original scale.
 
-\strong{Choosing lambda and alpha.} They are hyperparameters like \code{k}
+\strong{Choosing lambda and alpha.} They are hyperparameters like \code{K}
 and \code{phi_penalty} and are chosen the same way: over a grid, by an
 information criterion computed with the \emph{effective} number of
 coefficients the penalty leaves, or by spatio-temporal cross-validation.
@@ -164,13 +164,13 @@ thing separating the two, and on a collinear design it is not negligible.
 On a design with a deliberately collinear pair this agrees with the
 elastic net computed directly on \eqn{X'X} and \eqn{X'y} to between
 \eqn{10^{-14}} and \eqn{10^{-11}}, for the ridge, the lasso, the elastic net
-and the unpenalized case alike. With \code{k > 1} the same switches give
+and the unpenalized case alike. With \code{K > 1} the same switches give
 clusterwise penalized regression, the partition still estimated.
 }
 
 \section{How the penalty and the clustering interact}{
 
-With \code{k > 1} the objective carries two penalties doing different things:
+With \code{K > 1} the objective carries two penalties doing different things:
 \code{phi_penalty} penalizes disagreement between the labels of neighboring
 locations, \code{lambda} penalizes the size of the coefficients within a
 regime. They are not applied one after the other. The algorithm alternates
@@ -193,11 +193,11 @@ Three consequences are worth knowing before choosing the four
 hyperparameters.
 
 \strong{They are not separable.} The \code{lambda} minimizing predictive risk
-grows with \code{k}, because a regime of \eqn{d/k} locations carries less
-information than the pooled network; and the \code{k} a criterion selects
+grows with \code{K}, because a regime of \eqn{d/K} locations carries less
+information than the pooled network; and the \code{K} a criterion selects
 grows with \code{lambda}, because shrinkage lowers the effective number of
 coefficients and so makes an extra regime cheaper. Fixing \code{lambda} once
-on the pooled fit and only then selecting \code{k} under-shrinks precisely
+on the pooled fit and only then selecting \code{K} under-shrinks precisely
 where shrinkage is needed.
 
 \strong{The automatic scale of the Potts penalty moves with lambda.} With
@@ -230,7 +230,7 @@ mod <- STEM_Model(z = z, covariates = X, coordinates = povalley$coords,
              theta = 1 / 100000, G = matrix(0.8, 1, 1),
              Sigmaeta = matrix(0.2 * s2, 1, 1),
              m0 = as.matrix(0), C0 = as.matrix(1)),
-  K = matrix(1, d, 1))
+  A = matrix(1, d, 1))
 
 ## the classical estimator
 fit0 <- STEM_Fit(mod, distance = "geo", max.iter = 5)

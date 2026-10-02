@@ -8,8 +8,9 @@ function(...) {
     else
         x <- list(...)
 
-# STEM_Skeleton components, phi and K must be provided by the user, p is set to 1 by default
-   comp <- c("phi", "p", "K")
+# STEM_Skeleton components, phi and A must be provided by the user, p is set to 1 by default
+   stem_renamed_args(setdiff(names(x), "A"), c(K = "A"))
+   comp <- c("phi", "p", "A")
    if(!any(names(x)== "p")) x$p = 1
 
 #Verify if all the required components are given by user
@@ -32,6 +33,6 @@ function(...) {
 class(x) <- "STEM_Skeleton"
 return(list(phi=x$phi,
 		p=x$p,
-		K=x$K))
+		A=x$A))
 }
 

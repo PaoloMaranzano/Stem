@@ -9,7 +9,7 @@ SCSTEM_Signal(SCSTEM)
 \arguments{
 \item{SCSTEM}{an object of class \dQuote{SCSTEM_Estimation}, as returned by
 \code{\link{SCSTEM_Estimation}} or by \code{\link{STEM_Fit}} with
-\code{k > 1}.}
+\code{K > 1}.}
 }
 \value{
 A \eqn{T} by \eqn{d} matrix of fitted values.

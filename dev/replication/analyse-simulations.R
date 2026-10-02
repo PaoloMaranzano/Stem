@@ -161,16 +161,16 @@ at_ref <- function(d, ...) {
 ## right, and the ARI at the true k and at the selected one; in S2, how often
 ## the network is split.
 metrics <- function(s) {
-  k <- mc(s$k_correct); a <- mc(s$ari_true)
+  k <- mc(s$K_correct); a <- mc(s$ari_true)
   data.frame(
     M       = nrow(s),
     k_ok    = k[["mean"]], k_ok_se = k[["se"]],
-    k_under = mean(s$k_hat < s$K_true, na.rm = TRUE),
-    k_over  = mean(s$k_hat > s$K_true, na.rm = TRUE),
+    k_under = mean(s$K_hat < s$K_true, na.rm = TRUE),
+    k_over  = mean(s$K_hat > s$K_true, na.rm = TRUE),
     ari     = if (s$K_true[1] > 1) a[["mean"]] else NA_real_,
     ari_se  = if (s$K_true[1] > 1) a[["se"]] else NA_real_,
     ari_sel = if (s$K_true[1] > 1) mc(s$ari_sel)[["mean"]] else NA_real_,
-    phi_mode = mode_of(s$phi_hat[s$k_hat == s$K_true]),
+    phi_mode = mode_of(s$phi_hat[s$K_hat == s$K_true]),
     ratio   = stats::median(s$rmse_true / s$rmse_pooled, na.rm = TRUE),
     secs    = stats::median(s$secs_total, na.rm = TRUE))
 }
@@ -179,9 +179,17 @@ metrics <- function(s) {
 ## The results. Several tags are stacked; a (cell, replication) recorded under
 ## two tags counts once.
 ## ---------------------------------------------------------------------------
+## the column names of the results written before the renaming of the package
+## (number of regimes k -> K, parameter count npar -> df)
+legacy_names <- function(d) {
+  if (is.null(d)) return(d)
+  map <- c(k_hat = "K_hat", k_correct = "K_correct", k = "K", k_eff = "K_eff", npar = "df")
+  for (o in names(map)) if (o %in% names(d) && !map[[o]] %in% names(d)) names(d)[names(d) == o] <- map[[o]]
+  d
+}
 ## every stream of every tag, stacked (rep is unique across the streams)
 rd <- function(suffix, key) {
-  d <- lapply(AN$tag, function(tg) sim_read_streams(RES, tg, suffix))
+  d <- lapply(AN$tag, function(tg) legacy_names(sim_read_streams(RES, tg, suffix)))
   d <- d[!vapply(d, is.null, logical(1))]
   if (!length(d)) return(NULL)
   cols <- Reduce(union, lapply(d, names))
@@ -190,7 +198,7 @@ rd <- function(suffix, key) {
 }
 S <- rd("", c("cell", "rep"))
 P <- rd("-params", c("cell", "rep", "regime", "parameter"))
-G <- rd("-grid", c("cell", "rep", "k", "phi"))
+G <- rd("-grid", c("cell", "rep", "K", "phi"))
 for (nm in c("S", "P", "G"))
   cat(sprintf("  %-8s %s\n", c(S = "summary", P = "params", G = "grid")[[nm]],
               if (is.null(get(nm))) "missing" else sprintf("%d rows", nrow(get(nm)))))
@@ -335,9 +343,9 @@ if (nrow(core)) {
 nul <- S[S$scenario == "S2", , drop = FALSE]
 if (nrow(nul)) {
   tn <- agg(nul, c("n", "TN", "knn"), function(s) {
-    f <- mc(as.integer(s$k_hat > 1))
+    f <- mc(as.integer(s$K_hat > 1))
     data.frame(M = f[["M"]], split = f[["mean"]], se = f[["se"]],
-               k_hat_max = max(s$k_hat, na.rm = TRUE))
+               k_hat_max = max(s$K_hat, na.rm = TRUE))
   })
   tn <- tn[order(tn$knn, tn$TN, tn$n), ]
   cat("R3. S2: share of replications with k > 1\n")
@@ -476,7 +484,7 @@ if (!is.null(P) && nrow(P)) {
 ## R6. The penalty: recovery against phi at the true k, and the phi selected
 ## ===========================================================================
 if (!is.null(G) && "ari" %in% names(G)) {
-  g <- G[G$K_true > 1 & G$k == G$K_true & G$admissible & G$cell %in% S$cell[at_ref(S)], ,
+  g <- G[G$K_true > 1 & G$K == G$K_true & G$admissible & G$cell %in% S$cell[at_ref(S)], ,
          drop = FALSE]
   if (nrow(g)) {
     tg <- agg(g, c("scenario", "phi"), function(s) {
@@ -513,7 +521,7 @@ if (!is.null(G) && "ari" %in% names(G)) {
     pdf_close("fig_sim_penalty.pdf")
   } else cat("R6: no grid at the reference yet\n")
   ## the phi selected, over every cell with three regimes where k is right
-  sel <- S[S$K_true > 1 & S$k_hat == S$K_true, , drop = FALSE]
+  sel <- S[S$K_true > 1 & S$K_hat == S$K_true, , drop = FALSE]
   if (nrow(sel)) {
     ts <- as.data.frame.matrix(table(factor(sel$scenario, levels = scen_order(sel$scenario)),
                                      sel$phi_hat))
