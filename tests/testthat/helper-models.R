@@ -30,3 +30,9 @@ po_model <- function(Tn = 90L, d = NULL) {
   STEM_Model(z = s$z, covariates = s$covariates, coordinates = s$coordinates,
              phi = po_phi(), K = matrix(1, s$d, 1))
 }
+
+### The tests check behaviour, not accuracy: a loose, fast setting of the EM
+### algorithm for the whole session, which the tests that set their own
+### tolerance override.
+options(Stem.control = list(em_tol_par = 0.05, em_tol_loglik = 1, em_maxit = 30,
+                            alt_em_tol_par = 0.1, alt_em_tol_loglik = 10, alt_em_maxit = 10))

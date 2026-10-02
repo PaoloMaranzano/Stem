@@ -178,11 +178,11 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
   refit_args <- list(k = k, phi_penalty = args$phi_penalty,
                      phi_scale = args$phi_scale, knn = args$knn,
                      distance = args$distance, init_method = args$init_method,
-                     label_update = args$label_update, precision = args$precision,
-                     precision_full_dataset = args$precision_full_dataset,
+                     label_update = args$label_update,
                      regularization = args$regularization,
-                     max_iter = args$max_iter, abs_tol = args$abs_tol,
-                     rel_tol = args$rel_tol,
+                     ### the computational settings of the original fit; a fit
+                     ### made before `control` existed carries them one by one
+                     control = args$control,
                      min_cluster_size = args$min_cluster_size,
                      enforce_min_size = args$enforce_min_size,
                      swap_pass = args$swap_pass, share2conv = args$share2conv,
@@ -196,6 +196,10 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
                      lambda_scale = args$lambda_scale,
                      lambda_by = args$lambda_by, latent = args$latent,
                      spatial = args$spatial)
+  if (is.null(args$control)) {
+    refit_args[c("precision", "precision_full_dataset", "max_iter", "abs_tol", "rel_tol")] <-
+      args[c("precision", "precision_full_dataset", "max_iter", "abs_tol", "rel_tol")]
+  }
   user_args <- list(...)
   refit_args[names(user_args)] <- user_args
   ### Keep only what SCSTEM_Estimation() actually accepts. The settings are carried

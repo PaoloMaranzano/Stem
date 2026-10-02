@@ -2,7 +2,7 @@
 #' @noRd
 
 `STEM_Bootstrap.fn` <-
-function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',precision=0.01,regularization=regularization, verbose = FALSE){
+function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',precision=NULL,regularization=regularization, verbose = FALSE, control = NULL){
 
 ###########
 #1) fix a seed x
@@ -29,7 +29,7 @@ function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',p
 	StemModel$data$z = simulated.z
 
 	###STEP 3: PARAMETER ESTIMATION
-	MLE 	= STEM_Estimation(StemModel = StemModel,distance=distance,precision=precision,regularization = regularization, verbose = verbose)
+	MLE 	= STEM_Estimation(StemModel = StemModel,distance=distance,precision=precision,regularization = regularization, verbose = verbose, control = control)
 
     ##STEP4: SPATIAL PREDICTION
 	#data.newlocations	= output.kriging$data.newlocations

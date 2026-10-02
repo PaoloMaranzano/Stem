@@ -6,8 +6,8 @@
 \usage{
 STEM_Estimation(
   StemModel,
-  precision = 0.01,
-  max.iter = 50,
+  precision = NULL,
+  max.iter = NULL,
   flag.Gdiag = TRUE,
   flag.Sigmaetadiag = TRUE,
   cov.spat = Sigmastar.exp,
@@ -19,15 +19,19 @@ STEM_Estimation(
   penalize = NULL,
   lambda_scale = c("relative", "absolute"),
   latent = TRUE,
-  spatial = TRUE
+  spatial = TRUE,
+  control = NULL
 )
 }
 \arguments{
 \item{StemModel}{an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.}
 
-\item{precision}{a small positive number used for the algorithm convergence. Default is equal to 0.01. See \code{DETAILS} below.}
+\item{precision}{optional; when given, it replaces \code{em_tol_par} of
+\code{control}, the tolerance of the relative change of every free
+parameter. Kept for the code written before \code{control} existed.}
 
-\item{max.iter}{maximum number of iterations for the EM algorithm. Default is equal to 50.}
+\item{max.iter}{optional; when given, it replaces \code{em_maxit} of
+\code{control}, the maximum number of EM iterations.}
 
 \item{flag.Gdiag}{logical, indicating whether the transition matrix \eqn{G} is diagonal.}
 
@@ -52,6 +56,12 @@ STEM_Estimation(
 \item{latent}{logical. \code{FALSE} switches the latent process off, by setting the loading matrix to zero and holding \eqn{G}, \eqn{\Sigma_\eta} and \eqn{m_0} at their input values, which they are unidentified without it. Default is \code{TRUE}.}
 
 \item{spatial}{logical. \code{FALSE} replaces the exponential correlation by the identity, so that \eqn{\Sigma_e} is a single variance and the Newton-Raphson step is skipped. Only the sum \eqn{\sigma^2_\varepsilon + \sigma^2_\omega} is then identified, and the range has no meaning. Default is \code{TRUE}.}
+
+\item{control}{the computational settings, an object returned by
+\code{\link{STEM_control}} or a list of some of its settings. Default
+\code{NULL}, the defaults of \code{STEM_control()}. This function uses
+\code{em_tol_par}, \code{em_tol_loglik}, \code{em_maxit}, \code{nr_maxit}
+and \code{nr_hess_maxit}.}
 }
 \value{
 The function returns an object of class \dQuote{STEM_Model} which is a list given by:
@@ -61,9 +71,10 @@ The function returns an object of class \dQuote{STEM_Model} which is a list give
 \item{estimates}A list of four objects: \code{phi.hat}, \code{y.smoothed}, \code{loglik}, \code{convergence.par} here described.
 \code{phi.hat} is a list with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}).
 \code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) which is the output of the Kalman filtering procedure. \code{loglik} is the log-likehood value.
-\code{convergence.par} is a list of 4 objects with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
-for the two convergence criteria described above; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
-Newton-Raphson iterations for each EM algorithm iteration.
+\code{convergence.par} is a list with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
+for the two convergence criteria described below, and \code{converged} is their conjunction; \code{max.rel.par} and \code{delta.loglik} are the values
+of the two criteria at the last iteration; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
+Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds the settings used.
 }
 }
 \description{
@@ -134,19 +145,24 @@ The algorithm details and formulas are given in Fasso' and Cameletti (2007, 2009
   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
 
   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
-  The algorithm converges when the following convergence criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) are jointly met
+  The algorithm converges when the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) are jointly met
 
-  \deqn{\frac{\left\|\phi^{\left(i+1\right)}-\phi^{\left(i\right)}
-  \right\|}{\left\|\phi^{\left(i\right)}\right\|} < \pi }{||\phi^{i+1}-\phi^{i}
-  || / ||\phi^{i}|| < \pi }
+  \deqn{\max_l \frac{|\psi_l^{(i)} - \psi_l^{(i-1)}|}{\max(|\psi_l^{(i-1)}|, 10^{-3})} < \texttt{em\_tol\_par}}{max_l |psi_l(i) - psi_l(i-1)| / max(|psi_l(i-1)|, 1e-3) < em_tol_par}
 
-  \deqn{\frac{\left\|\log L\left( \phi^{\left(i+1\right)}\right)-\log
-  L\left( \phi^{\left(i\right)}\right)\right\|}{\left\|\log
-  L\left( \phi^{\left(i\right)}\right)\right\|}<\pi}{||log L(\phi^{i+1}-log
-  L(\phi^{i})|| / ||log L(\phi^{i})||<\pi}
+  \deqn{|\log L(\psi^{(i)}) - \log L(\psi^{(i-1)})| < \texttt{em\_tol\_loglik}}{|log L(psi(i)) - log L(psi(i-1))| < em_tol_loglik}
 
-where \eqn{\pi} is given by the \code{precision} option and \eqn{i} is the number of iteration. The use of these relative criteria instead of some other absolute ones makes it possible to
-correct for the different parameter scales.
+or after \code{em_maxit} iterations, with the settings taken from
+\code{control} (see \code{\link{STEM_control}}). The first criterion is the
+relative change of every free parameter taken one at a time, on the scale on
+which the algorithm updates it (the range and the ratio of the two variances
+on the log scale); the loading matrix and \eqn{C_0}, which are not
+estimated, are excluded. The second is the absolute change of the
+log-likelihood, which, unlike a relative change, does not loosen as the
+log-likelihood grows with the size of the data. Earlier versions of the
+package stopped when the relative change of the whole parameter vector,
+fixed loadings included, and the relative change of the log-likelihood were
+both below \code{precision}; with large log-likelihoods that rule stopped
+while several units could still be gained.
 }
 
 \examples{

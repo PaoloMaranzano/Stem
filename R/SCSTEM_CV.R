@@ -206,6 +206,11 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
     base <- args$StemModel
     ncov <- ncol(base$data$covariates)
     refit_args <- args[setdiff(names(args), "StemModel")]
+    ### a fit that carries `control` passes its settings through it only, so
+    ### that a control given in `...` is not overridden by the historical fields
+    if (!is.null(args$control)) {
+      refit_args[c("precision", "precision_full_dataset", "max_iter", "abs_tol", "rel_tol")] <- NULL
+    }
     refit_args$verbose <- FALSE
     user_args <- list(...)
     refit_args[names(user_args)] <- user_args

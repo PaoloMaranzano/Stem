@@ -8,9 +8,10 @@ STEM_Bootstrap(
   StemModel,
   B,
   distance = "euclidean",
-  precision = 0.01,
+  precision = NULL,
   regularization = 0.01,
-  verbose = FALSE
+  verbose = FALSE,
+  control = NULL
 )
 }
 \arguments{
@@ -20,11 +21,13 @@ STEM_Bootstrap(
 
 \item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 
-\item{precision}{a small positive number used for the STEM_Estimation algorithm convergence. Default is equal to 0.01.}
+\item{precision}{optional; when given, it replaces \code{em_tol_par} of \code{control} in every refit (see \code{\link{STEM_Estimation}}). Default \code{NULL}.}
 
 \item{regularization}{a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01}
 
 \item{verbose}{logical. If TRUE, the progress of each bootstrap iteration is reported through message(). Default is FALSE.}
+
+\item{control}{the computational settings of the refits, an object returned by \code{\link{STEM_control}} or a list of some of its settings. Default \code{NULL}, the defaults.}
 }
 \value{
 The function returns a list of elements called \dQuote{boot.output}. \bold{Each} element of the list is an object of class \dQuote{STEM_Model} and so

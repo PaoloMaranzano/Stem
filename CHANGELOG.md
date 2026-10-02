@@ -16,6 +16,51 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02
+
+**The EM algorithm stopped too early, and the regime fits of SC-STEM started
+from the pooled values: `STEM_control()`, a new stopping rule, data-based and
+warm starts.** The first ten replications of the simulation study showed biased
+regime parameters (the persistence G of the third regime 0.46 against 0.20, the
+intercepts pulled towards the pooled one). Traced on single replications:
+
+- the rule stopped when the relative change of the whole parameter vector AND
+  the relative change of the log-likelihood fell below `precision`. The vector
+  contained the d fixed loadings (and C0), whose norm grows with sqrt(d), so the
+  rule loosened with the network; with log-likelihoods of 1e4 a relative
+  tolerance of 1e-3 stops with several units still to gain. On a regime with
+  G = 0.8 the old rule stopped at 32-39 iterations, 1 log-likelihood unit short,
+  and at the pooled tolerance 0.01 at 5 iterations, 9-12 units short; the D-STEM
+  rule (per-parameter relative change OR relative log-likelihood change, 1e-4)
+  stopped at 12-18 iterations, 4-6 units short, because the relative
+  log-likelihood fires first. The per-parameter relative change (1e-4) AND the
+  absolute log-likelihood change (1e-3) stopped at 129-507 iterations within
+  0.002 units of the maximum. That is the new rule.
+- in SC-STEM every regime fit, in the alternation and in the final refit,
+  started from the user's (pooled) starting values and ran at precision 0.1,
+  while the pooled fit ran at 0.01, so the log-likelihoods compared across k had
+  different accuracies. A regime with a persistent latent process stayed on the
+  ridge between its intercept and the level of the latent process: a warm start
+  from the alternation reached a lower log-likelihood than a start from the
+  regime's own least squares in every replication tried. Now the first fit of a
+  regime starts from its own least-squares coefficients, every later one from
+  its previous estimates, and the final refit runs with the settings of the
+  pooled fit. The pooled fit used only to initialize the partition from the
+  departures runs with the loose settings of the alternation.
+- the bootstrap refits follow the same starting rule as the original fit
+  (least squares on the bootstrap data), not the estimates, which in the
+  bootstrap world are the truth.
+
+`STEM_control()` holds the settings (tolerances and iteration limits of the
+final fits and of the EM inside the alternation, of the alternation, of the
+Newton-Raphson step), all the estimation functions take `control`, and
+`options(Stem.control = )` sets them for a session; the historical arguments
+remain as overrides. The tests run under a loose session setting, since they
+check behaviour and the new defaults cost ten to twenty times more per fit:
+they are what convergence costs, the old fits were simply not converged. On the
+reference cell of the simulation study a fit at k = 3 takes about 60 s instead
+of 3, and the whole grid 11 minutes instead of 40 s.
+
 ### 2026-10-01 (third entry)
 
 **`dev/replication/run-fuels-application.R`, the full fuel application, written

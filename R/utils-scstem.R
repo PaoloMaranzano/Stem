@@ -559,3 +559,49 @@
 
   list(labels = labels, nswap = nswap)
 }
+
+
+### ---------------------------------------------------------------------------
+### Starting values of a regime
+### ---------------------------------------------------------------------------
+### The first time a regime is fitted it starts from the user's starting values
+### with the regression coefficients replaced by the least-squares fit on the
+### regime's own locations: started from the pooled coefficients, the EM
+### algorithm moves the intercept of a regime with a persistent latent process
+### only slowly along the ridge between the intercept and the level of the
+### latent process, and a loose tolerance stops it near the pooled value.
+scstem_phi_ols <- function(phi0, z_g, X_g) {
+  y <- as.vector(z_g)
+  ok <- is.finite(y) & stats::complete.cases(X_g)
+  b <- tryCatch(stats::lm.fit(X_g[ok, , drop = FALSE], y[ok])$coefficients,
+                error = function(e) NULL)
+  if (!is.null(b) && length(b) == length(phi0$beta) && all(is.finite(b))) {
+    phi0$beta <- matrix(b, ncol = 1)
+  }
+  phi0
+}
+
+### Afterwards a regime starts from its own estimates of the previous iteration
+### (warm start), and the final refit from those of the last iteration. Every
+### component is coerced to the shape STEM_Model() requires; a component that is
+### not finite, or a variance or range that is not positive, keeps the user's
+### starting value. C0 is not estimated and is always the user's.
+scstem_phi_from_fit <- function(fit_g, phi0) {
+  ph <- fit_g$estimates$phi.hat
+  if (is.null(ph)) return(phi0)
+  p <- nrow(phi0$G)
+  take <- function(x, ref, shape) {
+    if (is.null(x) || length(x) != length(ref) || any(!is.finite(x))) return(ref)
+    shape(x)
+  }
+  out <- phi0
+  out$beta <- take(ph$beta, phi0$beta, function(x) matrix(x, ncol = 1))
+  out$G <- take(ph$G, phi0$G, function(x) matrix(x, p, p))
+  out$Sigmaeta <- take(ph$Sigmaeta, phi0$Sigmaeta, function(x) matrix(x, p, p))
+  out$m0 <- take(ph$m0, phi0$m0, function(x) matrix(x, p, 1))
+  for (nm in c("sigma2eps", "sigma2omega", "theta")) {
+    x <- ph[[nm]]
+    if (length(x) == 1L && is.finite(x) && x > 0) out[[nm]] <- as.numeric(x)
+  }
+  out
+}

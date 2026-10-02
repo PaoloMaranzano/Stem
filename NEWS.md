@@ -172,6 +172,35 @@ information criteria all come from the exact cluster-wise likelihoods.
   observations. The previous implementation used the *number of clusters* as the
   number of parameters and the number of locations as the sample size.
 
+### Convergence of the EM algorithm and computational settings
+
+* New `STEM_control()`: the computational settings of every estimation
+  function in one object, in the spirit of `optim(control = )`. All the
+  estimation functions take `control`; `options(Stem.control = list(...))` sets
+  them for a whole session.
+* New stopping rule of the EM algorithm: the largest relative change of a free
+  parameter, taken one at a time (as in D-STEM v2), **and** the absolute change
+  of the log-likelihood must both fall below their tolerances (defaults `1e-4`
+  and `1e-3`), or `em_maxit` iterations (default 500) are reached. The previous
+  rule stopped when the relative change of the whole parameter vector and the
+  relative change of the log-likelihood fell below `precision`. That vector
+  contained the fixed loadings, so the rule loosened with the number of
+  locations, and with log-likelihoods of the order of `1e4` a relative tolerance
+  stopped the algorithm while several units could still be gained.
+* SC-STEM: the first time a regime is fitted it starts from the least-squares
+  coefficients of its own locations instead of the pooled starting values; every
+  later fit of the regime, the final refit included, starts from its previous
+  estimates. Started from the pooled coefficients, a regime with a persistent
+  latent process stayed near them.
+* SC-STEM: the final refit runs with the same settings as the pooled fit at
+  `k = 1`, so that the log-likelihoods compared across `k` are computed to the
+  same accuracy; the fit reports in `em_converged` whether the EM algorithm of
+  each regime met its stopping rule.
+* The historical arguments (`precision`, `max.iter`, `precision_full_dataset`,
+  `max_iter`, `abs_tol`, `rel_tol`) still work, as overrides of `control`.
+* The limits of the Newton-Raphson step of the spatial parameters are settings
+  of `control` (`nr_maxit`, `nr_hess_maxit`).
+
 ## Numerical robustness of the STEM core
 
 These were pre-existing defects, harmless for a single pooled fit but fatal for

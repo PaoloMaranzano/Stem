@@ -143,8 +143,20 @@
 #' monotonicity of the algorithm is preserved. The number of accepted swaps is
 #' reported in \code{obj_trace}.
 #'
+#' \strong{Starting values of the regimes.} The first time a regime is fitted,
+#' its EM algorithm starts from the starting values of \code{StemModel} with
+#' the regression coefficients replaced by the least-squares fit on the
+#' locations of the regime. At every later iteration of the alternation a
+#' regime starts from its own estimates of the previous iteration, so that the
+#' EM algorithm resumes rather than restarts, and the final refit starts from
+#' the estimates of the last iteration. A regime that has no estimates yet
+#' starts from its least-squares fit.
+#'
 #' \strong{Final refit and information criteria.} On convergence the
-#' cluster-wise STEM models are re-estimated once on the final partition. All
+#' cluster-wise STEM models are re-estimated once on the final partition, with
+#' the \code{em_*} settings of \code{control}, the same as the pooled fit at
+#' \eqn{k = 1}, so that the log-likelihoods compared across \eqn{k} are
+#' computed to the same accuracy. All
 #' reported coefficients, variance components and information criteria come
 #' from this refit and are based on the \emph{exact} cluster-wise
 #' log-likelihoods returned by \code{\link{STEM_Estimation}}, not on the
@@ -152,6 +164,8 @@
 #' number of free parameters is \eqn{k_{eff} (r + 3 + 3p)} for a diagonal
 #' specification with \eqn{r} covariates and latent dimension \eqn{p}, where
 #' \eqn{k_{eff}} counts the clusters that could actually be re-estimated.
+#' Whether the EM algorithm of each regime met its stopping rule within
+#' \code{em_maxit} iterations is reported in \code{em_converged}.
 #'
 #' \strong{Statistical features and scope.} The assumptions are inherited from
 #' the STEM model and determine which datasets the family applies to. The
@@ -234,17 +248,21 @@
 #' @param label_update character, \code{"ICM"} (default) for the sequential
 #'   Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 #'   update of all labels.
-#' @param precision small positive number, the convergence tolerance of the EM
-#'   algorithm in each cluster-wise fit. Default is 0.1.
-#' @param precision_full_dataset small positive number, the convergence
-#'   tolerance of the EM algorithm for the pooled fit used to initialize the
-#'   procedure. Default is 0.01.
+#' @param precision,precision_full_dataset,max_iter,abs_tol,rel_tol optional
+#'   overrides of \code{control}, kept for the code written before it existed:
+#'   when given, \code{precision} replaces \code{alt_em_tol_par} (the EM
+#'   tolerance inside the alternation), \code{precision_full_dataset} replaces
+#'   \code{em_tol_par} (the EM tolerance of the pooled fit and of the final
+#'   refit), \code{max_iter} replaces \code{alt_maxit}, and \code{abs_tol},
+#'   \code{rel_tol} replace \code{alt_abs_tol}, \code{alt_rel_tol}. Default
+#'   \code{NULL} for all.
+#' @param control the computational settings, an object returned by
+#'   \code{\link{STEM_control}} or a list of some of its settings. Default
+#'   \code{NULL}, the defaults of \code{STEM_control()}. The pooled fit and the
+#'   final refit run with its \code{em_*} settings, the EM algorithm inside the
+#'   alternation with its \code{alt_em_*} settings; see \code{Details}.
 #' @param regularization small positive number added to the diagonal of the
 #'   matrices that have to be inverted. Default is 0.01.
-#' @param max_iter integer, the maximum number of alternating iterations.
-#'   Default is 10.
-#' @param abs_tol,rel_tol absolute and relative tolerances on the improvement
-#'   of the penalized objective. Defaults are 1e-5 and 1e-6.
 #' @param min_cluster_size integer or \code{NULL}. Minimum number of locations
 #'   required to estimate a cluster-wise model. When \code{NULL} (default) it is
 #'   set to \code{ncov + 2}.
@@ -305,6 +323,9 @@
 #'   \item \code{loglik_g}: cluster-wise exact log-likelihoods.
 #'   \item \code{final_refit}: logical vector flagging the clusters that could
 #'     be re-estimated on the final partition.
+#'   \item \code{em_converged}: logical vector, whether the EM algorithm of each
+#'     re-estimated cluster met its stopping rule within \code{em_maxit}
+#'     iterations (\code{NA} for a cluster not re-estimated).
 #'   \item \code{obj_trace}: data frame tracing the penalized objective, the
 #'     number of label changes and the cluster sizes along the iterations.
 #'   \item \code{convergence}: character describing the exit route.
@@ -388,12 +409,12 @@ SCSTEM_Estimation <- function(StemModel,
                          init_method = c("departures", "kmeans", "coordinates"),
                          init_partition = NULL,
                          label_update = c("ICM", "simultaneous"),
-                         precision = 0.1,
-                         precision_full_dataset = 0.01,
+                         precision = NULL,
+                         precision_full_dataset = NULL,
                          regularization = 0.01,
-                         max_iter = 10,
-                         abs_tol = 1e-5,
-                         rel_tol = 1e-6,
+                         max_iter = NULL,
+                         abs_tol = NULL,
+                         rel_tol = NULL,
                          min_cluster_size = NULL,
                          enforce_min_size = TRUE,
                          swap_pass = TRUE,
@@ -406,7 +427,8 @@ SCSTEM_Estimation <- function(StemModel,
                          lambda_by = c("common", "size"),
                          latent = TRUE,
                          spatial = TRUE,
-                         verbose = FALSE) {
+                         verbose = FALSE,
+                         control = NULL) {
 
   ### the arguments as given, for the unpenalized fit that starts a penalized one
   call_args <- as.list(environment())
@@ -458,6 +480,23 @@ SCSTEM_Estimation <- function(StemModel,
     stop("'share2conv' must lie in [0, 1).", call. = FALSE)
   }
 
+  ### The computational settings: those of `control`, with the historical
+  ### arguments, when given, in place of the corresponding settings. The pooled
+  ### fit and the final refit run with the em_* settings, the EM algorithm
+  ### inside the alternation with the alt_em_* ones.
+  control <- unclass(stem_control_resolve(control))
+  if (!is.null(precision)) control$alt_em_tol_par <- precision
+  if (!is.null(precision_full_dataset)) control$em_tol_par <- precision_full_dataset
+  if (!is.null(max_iter)) control$alt_maxit <- max_iter
+  if (!is.null(abs_tol)) control$alt_abs_tol <- abs_tol
+  if (!is.null(rel_tol)) control$alt_rel_tol <- rel_tol
+  control <- do.call(STEM_control, control)
+  max_iter <- control$alt_maxit
+  abs_tol <- control$alt_abs_tol
+  rel_tol <- control$alt_rel_tol
+  ctl_final <- stem_control_em(control, "final")
+  ctl_alt <- stem_control_em(control, "alternation")
+
   ##############################
   ########## Setup ############
   ##############################
@@ -497,7 +536,7 @@ SCSTEM_Estimation <- function(StemModel,
   if (k == 1L) {
     ### Pooled model: a single STEM fit on the whole network
     if (isTRUE(verbose)) message("Pooled STEM fit (k = 1) ...")
-    pooled <- STEM_Estimation(StemModel, precision = precision_full_dataset,
+    pooled <- STEM_Estimation(StemModel, control = ctl_final,
                               distance = distance, regularization = regularization,
                               verbose = FALSE, alpha = alpha, lambda = lambda_of(d),
                               penalize = penalize, lambda_scale = lambda_scale,
@@ -522,6 +561,7 @@ SCSTEM_Estimation <- function(StemModel,
       info_crit = info,
       loglik_g = loglik,
       final_refit = TRUE,
+      em_converged = isTRUE(pooled$estimates$convergence.par$converged),
       obj_trace = data.frame(iter = integer(0), objective = numeric(0),
                              label_changes = integer(0)),
       convergence = "Pooled model (k = 1): no clustering performed",
@@ -529,10 +569,10 @@ SCSTEM_Estimation <- function(StemModel,
       input_args = list(StemModel = StemModel, k = 1L, phi_penalty = phi_penalty,
                         phi_scale = phi_scale, knn = knn, distance = distance,
                         init_method = init_method, label_update = label_update,
-                        precision = precision,
-                        precision_full_dataset = precision_full_dataset,
+                        precision = control$alt_em_tol_par,
+                        precision_full_dataset = control$em_tol_par,
                         regularization = regularization, max_iter = max_iter,
-                        abs_tol = abs_tol, rel_tol = rel_tol,
+                        abs_tol = abs_tol, rel_tol = rel_tol, control = control,
                         min_cluster_size = min_cluster_size,
                         enforce_min_size = enforce_min_size,
                         swap_pass = swap_pass,
@@ -608,8 +648,9 @@ SCSTEM_Estimation <- function(StemModel,
     method0 <- init_method
     if (init_method == "departures") {
       method0 <- "kmeans"
+      ### an initialization device only: the loose settings of the alternation
       pooled0 <- tryCatch(
-        STEM_Estimation(StemModel, precision = precision_full_dataset,
+        STEM_Estimation(StemModel, control = ctl_alt,
                         distance = distance, regularization = regularization,
                         verbose = FALSE, alpha = alpha, lambda = lambda,
                         penalize = penalize, lambda_scale = lambda_scale,
@@ -664,15 +705,20 @@ SCSTEM_Estimation <- function(StemModel,
     for (g in seq_len(k)) {
       idx <- which(labels == g)
       if (length(idx) >= min_cluster_size) {
+        ### start: the regime's estimates of the previous iteration, or, the
+        ### first time, its least-squares coefficients (see scstem_phi_ols())
+        X_g <- covariates[scstem_rows(idx, Tobs), , drop = FALSE]
+        start_g <- if (has_valid[g] && !is.null(fit[[g]])) scstem_phi_from_fit(fit[[g]], phi0) else
+          scstem_phi_ols(phi0, z[, idx, drop = FALSE], X_g)
         mod_g <- try(
           STEM_Model(z = z[, idx, drop = FALSE],
-                     covariates = covariates[scstem_rows(idx, Tobs), , drop = FALSE],
+                     covariates = X_g,
                      coordinates = coordinates[idx, , drop = FALSE],
-                     phi = phi0,
+                     phi = start_g,
                      K = Kmat[idx, , drop = FALSE]),
           silent = TRUE)
         fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
-          STEM_Estimation(mod_g, precision = precision, distance = distance,
+          STEM_Estimation(mod_g, control = ctl_alt, distance = distance,
                           regularization = regularization, verbose = FALSE,
                           alpha = alpha, lambda = lambda_of(length(idx)),
                           penalize = penalize, lambda_scale = lambda_scale,
@@ -888,19 +934,25 @@ SCSTEM_Estimation <- function(StemModel,
   idx_g <- vector("list", k)
   fit_final <- vector("list", k)
   par_list <- vector("list", k)
+  em_converged <- rep(NA, k)
 
   for (g in seq_len(k)) {
     idx_g[[g]] <- which(labels == g)
     if (length(idx_g[[g]]) < min_cluster_size) next
+    ### start: the regime's estimates of the last iteration of the alternation,
+    ### or its least-squares coefficients if it has none
+    X_g <- covariates[scstem_rows(idx_g[[g]], Tobs), , drop = FALSE]
+    start_g <- if (!is.null(fit[[g]])) scstem_phi_from_fit(fit[[g]], phi0) else
+      scstem_phi_ols(phi0, z[, idx_g[[g]], drop = FALSE], X_g)
     mod_g <- try(
       STEM_Model(z = z[, idx_g[[g]], drop = FALSE],
-                 covariates = covariates[scstem_rows(idx_g[[g]], Tobs), , drop = FALSE],
+                 covariates = X_g,
                  coordinates = coordinates[idx_g[[g]], , drop = FALSE],
-                 phi = phi0,
+                 phi = start_g,
                  K = Kmat[idx_g[[g]], , drop = FALSE]),
       silent = TRUE)
     fit_g <- if (inherits(mod_g, "try-error")) mod_g else try(
-      STEM_Estimation(mod_g, precision = precision, distance = distance,
+      STEM_Estimation(mod_g, control = ctl_final, distance = distance,
                       regularization = regularization, verbose = FALSE,
                       alpha = alpha, lambda = lambda_of(length(idx_g[[g]])),
                       penalize = penalize, lambda_scale = lambda_scale,
@@ -911,6 +963,7 @@ SCSTEM_Estimation <- function(StemModel,
       par_list[[g]] <- unlist(fit_g$estimates$phi.hat)
       loglik_g[g] <- as.numeric(fit_g$estimates$loglik)
       final_refit[g] <- TRUE
+      em_converged[g] <- isTRUE(fit_g$estimates$convergence.par$converged)
     }
   }
 
@@ -972,6 +1025,7 @@ SCSTEM_Estimation <- function(StemModel,
     info_crit = info,
     loglik_g = loglik_g,
     final_refit = final_refit,
+    em_converged = em_converged,
     obj_trace = obj_trace,
     convergence = convergence,
     penalized_obj = if (is.finite(best_obj)) best_obj else NA_real_,
@@ -982,10 +1036,10 @@ SCSTEM_Estimation <- function(StemModel,
     input_args = list(StemModel = StemModel, k = k, phi_penalty = phi_penalty,
                       phi_scale = phi_scale, knn = knn, distance = distance,
                       init_method = init_method, label_update = label_update,
-                      precision = precision,
-                      precision_full_dataset = precision_full_dataset,
+                      precision = control$alt_em_tol_par,
+                      precision_full_dataset = control$em_tol_par,
                       regularization = regularization, max_iter = max_iter,
-                      abs_tol = abs_tol, rel_tol = rel_tol,
+                      abs_tol = abs_tol, rel_tol = rel_tol, control = control,
                       min_cluster_size = min_cluster_size,
                       enforce_min_size = enforce_min_size,
                       swap_pass = swap_pass,

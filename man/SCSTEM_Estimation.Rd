@@ -14,12 +14,12 @@ SCSTEM_Estimation(
   init_method = c("departures", "kmeans", "coordinates"),
   init_partition = NULL,
   label_update = c("ICM", "simultaneous"),
-  precision = 0.1,
-  precision_full_dataset = 0.01,
+  precision = NULL,
+  precision_full_dataset = NULL,
   regularization = 0.01,
-  max_iter = 10,
-  abs_tol = 1e-05,
-  rel_tol = 1e-06,
+  max_iter = NULL,
+  abs_tol = NULL,
+  rel_tol = NULL,
   min_cluster_size = NULL,
   enforce_min_size = TRUE,
   swap_pass = TRUE,
@@ -32,7 +32,8 @@ SCSTEM_Estimation(
   lambda_by = c("common", "size"),
   latent = TRUE,
   spatial = TRUE,
-  verbose = FALSE
+  verbose = FALSE,
+  control = NULL
 )
 }
 \arguments{
@@ -90,21 +91,17 @@ unpenalized fit.}
 Iterated Conditional Modes sweep, or \code{"simultaneous"} for the joint
 update of all labels.}
 
-\item{precision}{small positive number, the convergence tolerance of the EM
-algorithm in each cluster-wise fit. Default is 0.1.}
-
-\item{precision_full_dataset}{small positive number, the convergence
-tolerance of the EM algorithm for the pooled fit used to initialize the
-procedure. Default is 0.01.}
+\item{precision, precision_full_dataset, max_iter, abs_tol, rel_tol}{optional
+overrides of \code{control}, kept for the code written before it existed:
+when given, \code{precision} replaces \code{alt_em_tol_par} (the EM
+tolerance inside the alternation), \code{precision_full_dataset} replaces
+\code{em_tol_par} (the EM tolerance of the pooled fit and of the final
+refit), \code{max_iter} replaces \code{alt_maxit}, and \code{abs_tol},
+\code{rel_tol} replace \code{alt_abs_tol}, \code{alt_rel_tol}. Default
+\code{NULL} for all.}
 
 \item{regularization}{small positive number added to the diagonal of the
 matrices that have to be inverted. Default is 0.01.}
-
-\item{max_iter}{integer, the maximum number of alternating iterations.
-Default is 10.}
-
-\item{abs_tol, rel_tol}{absolute and relative tolerances on the improvement
-of the penalized objective. Defaults are 1e-5 and 1e-6.}
 
 \item{min_cluster_size}{integer or \code{NULL}. Minimum number of locations
 required to estimate a cluster-wise model. When \code{NULL} (default) it is
@@ -162,6 +159,12 @@ regime. Default is \code{TRUE}.}
 
 \item{verbose}{logical. If \code{TRUE}, progress information is emitted via
 \code{message()}. Default is \code{FALSE}.}
+
+\item{control}{the computational settings, an object returned by
+\code{\link{STEM_control}} or a list of some of its settings. Default
+\code{NULL}, the defaults of \code{STEM_control()}. The pooled fit and the
+final refit run with its \code{em_*} settings, the EM algorithm inside the
+alternation with its \code{alt_em_*} settings; see \code{Details}.}
 }
 \value{
 An object of class \dQuote{SCSTEM_Estimation}, a list with components:
@@ -179,6 +182,9 @@ An object of class \dQuote{SCSTEM_Estimation}, a list with components:
   \item \code{loglik_g}: cluster-wise exact log-likelihoods.
   \item \code{final_refit}: logical vector flagging the clusters that could
     be re-estimated on the final partition.
+  \item \code{em_converged}: logical vector, whether the EM algorithm of each
+    re-estimated cluster met its stopping rule within \code{em_maxit}
+    iterations (\code{NA} for a cluster not re-estimated).
   \item \code{obj_trace}: data frame tracing the penalized objective, the
     number of label changes and the cluster sizes along the iterations.
   \item \code{convergence}: character describing the exit route.
@@ -330,8 +336,20 @@ construction, and it is accepted only on strict improvement, so the
 monotonicity of the algorithm is preserved. The number of accepted swaps is
 reported in \code{obj_trace}.
 
+\strong{Starting values of the regimes.} The first time a regime is fitted,
+its EM algorithm starts from the starting values of \code{StemModel} with
+the regression coefficients replaced by the least-squares fit on the
+locations of the regime. At every later iteration of the alternation a
+regime starts from its own estimates of the previous iteration, so that the
+EM algorithm resumes rather than restarts, and the final refit starts from
+the estimates of the last iteration. A regime that has no estimates yet
+starts from its least-squares fit.
+
 \strong{Final refit and information criteria.} On convergence the
-cluster-wise STEM models are re-estimated once on the final partition. All
+cluster-wise STEM models are re-estimated once on the final partition, with
+the \code{em_*} settings of \code{control}, the same as the pooled fit at
+\eqn{k = 1}, so that the log-likelihoods compared across \eqn{k} are
+computed to the same accuracy. All
 reported coefficients, variance components and information criteria come
 from this refit and are based on the \emph{exact} cluster-wise
 log-likelihoods returned by \code{\link{STEM_Estimation}}, not on the
@@ -339,6 +357,8 @@ pseudo-likelihood used to rank clusters during the assignment step. The
 number of free parameters is \eqn{k_{eff} (r + 3 + 3p)} for a diagonal
 specification with \eqn{r} covariates and latent dimension \eqn{p}, where
 \eqn{k_{eff}} counts the clusters that could actually be re-estimated.
+Whether the EM algorithm of each regime met its stopping rule within
+\code{em_maxit} iterations is reported in \code{em_converged}.
 
 \strong{Statistical features and scope.} The assumptions are inherited from
 the STEM model and determine which datasets the family applies to. The

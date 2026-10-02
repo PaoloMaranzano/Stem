@@ -2,7 +2,7 @@
 #' @noRd
 
 `kalman` <-
-  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL, lambda_scale = "relative", latent = TRUE, spatial = TRUE) {
+  function (z, coordinates, p, n, d, r, phi_j, max.iter, precision, covariates, Gdiag, Sigmaetadiag, cov.spat,distance,regularization, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL, lambda_scale = "relative", latent = TRUE, spatial = TRUE, nr_maxit = 50L, nr_hess_maxit = 30L) {
 
 
 
@@ -430,7 +430,7 @@
     logb     = phi_j$logb
     logtheta = phi_j$logtheta
 
-    while(!convergence_NR && n_iter_NR < 50) {
+    while(!convergence_NR && n_iter_NR <= nr_maxit) {
 
       Q_addendo1_old = Q_function_addendo1(sigma2omega=sigma2omega_j ,n=n, Sigmastar=do.call(cov.spat, list(d=d, logb=logb, logtheta=logtheta, dist=dist)),B=BB)
       Q_prev = Q_addendo1_old+Q_addendo2+Q_addendo3
@@ -439,7 +439,7 @@
       n_iter_Hess   = 1
       logtheta.iniz = logtheta
 
-      while(!cond.hessiana && n_iter_Hess < 30) {
+      while(!cond.hessiana && n_iter_Hess <= nr_hess_maxit) {
 
         ### The covariance and both of its derivatives with respect to
         ### log(theta) are built on the same exponential kernel exp(-theta h),
