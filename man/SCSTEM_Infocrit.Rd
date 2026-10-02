@@ -26,7 +26,9 @@ Default is \code{c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1)}: the moderate values
 up to 0.2 form the band in which \code{\link{SCSTEM_Select}} chooses
 \eqn{k}, and the strong values 0.5 and 1 compete only in the choice of
 \eqn{\phi}. At every \eqn{k} the fit at \eqn{\phi = 0} starts the penalized
-ones (see \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.}
+ones (see \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.
+The fits at one \eqn{k} that end at the same partition share one final
+refit, and therefore have the same log-likelihood and criteria.}
 
 \item{mink, maxk}{deprecated scalars kept for backward compatibility with
 versions of the package prior to 2.0.0. When supplied and \code{k_grid} is

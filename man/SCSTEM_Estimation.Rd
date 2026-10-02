@@ -33,7 +33,8 @@ SCSTEM_Estimation(
   latent = TRUE,
   spatial = TRUE,
   verbose = FALSE,
-  control = NULL
+  control = NULL,
+  refit_cache = NULL
 )
 }
 \arguments{
@@ -165,6 +166,12 @@ regime. Default is \code{TRUE}.}
 \code{NULL}, the defaults of \code{STEM_control()}. The pooled fit and the
 final refit run with its \code{em_*} settings, the EM algorithm inside the
 alternation with its \code{alt_em_*} settings; see \code{Details}.}
+
+\item{refit_cache}{\code{NULL} (default) or an environment in which the final
+refits are stored by number of regimes and partition, so that fits of the
+same data share them (see \code{Details}). \code{\link{SCSTEM_Infocrit}}
+passes one to every fit of its grid; it is not a setting to tune, and an
+environment filled on other data must never be passed.}
 }
 \value{
 An object of class \dQuote{SCSTEM_Estimation}, a list with components:
@@ -185,6 +192,8 @@ An object of class \dQuote{SCSTEM_Estimation}, a list with components:
   \item \code{em_converged}: logical vector, whether the EM algorithm of each
     re-estimated cluster met its stopping rule within \code{em_maxit}
     iterations (\code{NA} for a cluster not re-estimated).
+  \item \code{refit_reused}: logical, whether the final refit was shared
+    with an earlier fit of the same partition.
   \item \code{obj_trace}: data frame tracing the penalized objective, the
     number of label changes and the cluster sizes along the iterations.
   \item \code{convergence}: character describing the exit route.
@@ -359,6 +368,18 @@ specification with \eqn{r} covariates and latent dimension \eqn{p}, where
 \eqn{k_{eff}} counts the clusters that could actually be re-estimated.
 Whether the EM algorithm of each regime met its stopping rule within
 \code{em_maxit} iterations is reported in \code{em_converged}.
+
+\strong{Shared refits.} The refit depends on the data, the partition and the
+settings, not on the penalty, so fits of the same data that end at the same
+partition share one refit: a penalized fit that ends where its unpenalized
+start ended reuses that refit, and \code{\link{SCSTEM_Infocrit}} shares the
+refits across its grid. Two refits of one partition from different starts
+stop at different points of the likelihood, usually within the tolerance of
+the EM algorithm, occasionally further apart when a small regime starts near
+the boundary of its parameter space; either way the difference is not a
+property of the penalty. Sharing the refit makes the fits of one partition
+identical, so that a comparison across penalties at one \eqn{k} compares
+partitions only. \code{refit_reused} reports whether the refit was shared.
 
 \strong{Statistical features and scope.} The assumptions are inherited from
 the STEM model and determine which datasets the family applies to. The

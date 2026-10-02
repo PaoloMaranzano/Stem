@@ -214,6 +214,7 @@ SCSTEM_CV <- function(SCSTEM, scheme = "LKLO", folds = 5L, seed = NULL,
     refit_args$verbose <- FALSE
     user_args <- list(...)
     refit_args[names(user_args)] <- user_args
+    refit_args$refit_cache <- NULL   # every fold is new data: no refit is shared
     refit_args <- refit_args[names(refit_args) %in% names(formals(SCSTEM_Estimation))]
     refit_args <- refit_args[!vapply(refit_args, is.null, logical(1))]
     dist_type <- if (is.null(args$distance)) "euclidean" else args$distance

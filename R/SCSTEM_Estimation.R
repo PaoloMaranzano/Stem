@@ -167,6 +167,18 @@
 #' Whether the EM algorithm of each regime met its stopping rule within
 #' \code{em_maxit} iterations is reported in \code{em_converged}.
 #'
+#' \strong{Shared refits.} The refit depends on the data, the partition and the
+#' settings, not on the penalty, so fits of the same data that end at the same
+#' partition share one refit: a penalized fit that ends where its unpenalized
+#' start ended reuses that refit, and \code{\link{SCSTEM_Infocrit}} shares the
+#' refits across its grid. Two refits of one partition from different starts
+#' stop at different points of the likelihood, usually within the tolerance of
+#' the EM algorithm, occasionally further apart when a small regime starts near
+#' the boundary of its parameter space; either way the difference is not a
+#' property of the penalty. Sharing the refit makes the fits of one partition
+#' identical, so that a comparison across penalties at one \eqn{k} compares
+#' partitions only. \code{refit_reused} reports whether the refit was shared.
+#'
 #' \strong{Statistical features and scope.} The assumptions are inherited from
 #' the STEM model and determine which datasets the family applies to. The
 #' response is \emph{Gaussian} and \emph{univariate}: \code{z} is a \eqn{T} by
@@ -307,6 +319,11 @@
 #'   regime. Default is \code{TRUE}.
 #' @param verbose logical. If \code{TRUE}, progress information is emitted via
 #'   \code{message()}. Default is \code{FALSE}.
+#' @param refit_cache \code{NULL} (default) or an environment in which the final
+#'   refits are stored by number of regimes and partition, so that fits of the
+#'   same data share them (see \code{Details}). \code{\link{SCSTEM_Infocrit}}
+#'   passes one to every fit of its grid; it is not a setting to tune, and an
+#'   environment filled on other data must never be passed.
 #'
 #' @return An object of class \dQuote{SCSTEM_Estimation}, a list with components:
 #' \itemize{
@@ -326,6 +343,8 @@
 #'   \item \code{em_converged}: logical vector, whether the EM algorithm of each
 #'     re-estimated cluster met its stopping rule within \code{em_maxit}
 #'     iterations (\code{NA} for a cluster not re-estimated).
+#'   \item \code{refit_reused}: logical, whether the final refit was shared
+#'     with an earlier fit of the same partition.
 #'   \item \code{obj_trace}: data frame tracing the penalized objective, the
 #'     number of label changes and the cluster sizes along the iterations.
 #'   \item \code{convergence}: character describing the exit route.
@@ -428,10 +447,14 @@ SCSTEM_Estimation <- function(StemModel,
                          latent = TRUE,
                          spatial = TRUE,
                          verbose = FALSE,
-                         control = NULL) {
+                         control = NULL,
+                         refit_cache = NULL) {
 
   ### the arguments as given, for the unpenalized fit that starts a penalized one
   call_args <- as.list(environment())
+  if (!is.null(refit_cache) && !is.environment(refit_cache)) {
+    stop("'refit_cache' must be NULL or an environment.", call. = FALSE)
+  }
 
   ##############################
   ########## Checks ###########
@@ -562,6 +585,7 @@ SCSTEM_Estimation <- function(StemModel,
       loglik_g = loglik,
       final_refit = TRUE,
       em_converged = isTRUE(pooled$estimates$convergence.par$converged),
+      refit_reused = FALSE,
       obj_trace = data.frame(iter = integer(0), objective = numeric(0),
                              label_changes = integer(0)),
       convergence = "Pooled model (k = 1): no clustering performed",
@@ -602,11 +626,15 @@ SCSTEM_Estimation <- function(StemModel,
   ### is the one of the unpenalized fit and does not depend on init_method.
   ### A given init_partition is taken as that start (SCSTEM_Infocrit() passes
   ### the partition of its unpenalized fit).
+  ### The two fits share their final refits: a penalized fit that ends at the
+  ### partition of the unpenalized one reuses its refit (see refit_cache).
   if (phi_penalty > 0 && is.null(init_partition)) {
     if (isTRUE(verbose)) message("* Fitting phi = 0 first: its solution is the start ...")
+    if (is.null(refit_cache)) refit_cache <- new.env(parent = emptyenv())
     args0 <- call_args
     args0$phi_penalty <- 0
     args0$verbose <- FALSE
+    args0$refit_cache <- refit_cache
     fit0 <- tryCatch(suppressWarnings(do.call(SCSTEM_Estimation, args0)),
                      error = function(e) NULL)
     if (!is.null(fit0) && length(unique(fit0$group)) == k) {
@@ -936,7 +964,23 @@ SCSTEM_Estimation <- function(StemModel,
   par_list <- vector("list", k)
   em_converged <- rep(NA, k)
 
+  ### A partition already refitted on these data, by another fit of the same
+  ### grid or by the unpenalized fit that started this one, is not refitted
+  ### again: the refit depends on the partition and the settings, not on the
+  ### penalty, and where two refits of one partition from different starts
+  ### stop is not a property of the penalty either.
+  refit_key <- paste0(k, ":", paste(as.integer(labels), collapse = ","))
+  refit_reused <- !is.null(refit_cache) &&
+    exists(refit_key, envir = refit_cache, inherits = FALSE)
+  if (refit_reused) {
+    hit <- get(refit_key, envir = refit_cache, inherits = FALSE)
+    idx_g <- hit$idx_g; fit_final <- hit$fit_final; par_list <- hit$par_list
+    loglik_g <- hit$loglik_g; final_refit <- hit$final_refit
+    em_converged <- hit$em_converged
+  }
+
   for (g in seq_len(k)) {
+    if (refit_reused) break
     idx_g[[g]] <- which(labels == g)
     if (length(idx_g[[g]]) < min_cluster_size) next
     ### start: the regime's estimates of the last iteration of the alternation,
@@ -965,6 +1009,12 @@ SCSTEM_Estimation <- function(StemModel,
       final_refit[g] <- TRUE
       em_converged[g] <- isTRUE(fit_g$estimates$convergence.par$converged)
     }
+  }
+  if (!refit_reused && !is.null(refit_cache) && any(final_refit)) {
+    assign(refit_key, list(idx_g = idx_g, fit_final = fit_final, par_list = par_list,
+                           loglik_g = loglik_g, final_refit = final_refit,
+                           em_converged = em_converged),
+           envir = refit_cache)
   }
 
   if (!any(final_refit)) {
@@ -1026,6 +1076,7 @@ SCSTEM_Estimation <- function(StemModel,
     loglik_g = loglik_g,
     final_refit = final_refit,
     em_converged = em_converged,
+    refit_reused = refit_reused,
     obj_trace = obj_trace,
     convergence = convergence,
     penalized_obj = if (is.finite(best_obj)) best_obj else NA_real_,

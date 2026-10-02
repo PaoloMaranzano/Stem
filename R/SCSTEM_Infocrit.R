@@ -47,6 +47,8 @@
 #'   \eqn{k}, and the strong values 0.5 and 1 compete only in the choice of
 #'   \eqn{\phi}. At every \eqn{k} the fit at \eqn{\phi = 0} starts the penalized
 #'   ones (see \code{\link{SCSTEM_Estimation}}), so the grid should contain 0.
+#'   The fits at one \eqn{k} that end at the same partition share one final
+#'   refit, and therefore have the same log-likelihood and criteria.
 #' @param mink,maxk deprecated scalars kept for backward compatibility with
 #'   versions of the package prior to 2.0.0. When supplied and \code{k_grid} is
 #'   missing, the grid is set to \code{mink:maxk}.
@@ -185,6 +187,12 @@ SCSTEM_Infocrit <- function(StemModel,
     dots$min_cluster_size
   ms0 <- max(2L, as.integer(ms0))
 
+  ### The final refits are shared across the grid: the fits at one k that end
+  ### at the same partition, as the penalized ones often do when the penalty
+  ### does not move the unpenalized solution, are refitted once (see
+  ### SCSTEM_Estimation(), "Shared refits").
+  refit_cache <- if (is.null(dots$refit_cache)) new.env(parent = emptyenv()) else dots$refit_cache
+
   for (j in seq_len(nconf)) {
 
     kk <- grid$k[j]
@@ -197,6 +205,7 @@ SCSTEM_Infocrit <- function(StemModel,
 
     args_j <- c(list(StemModel = StemModel, k = kk, phi_penalty = pp,
                      verbose = FALSE), list(...))
+    args_j$refit_cache <- refit_cache
     if (pp > 0 && !is.null(start_k[[as.character(kk)]])) {
       args_j$init_partition <- start_k[[as.character(kk)]]
     }

@@ -198,6 +198,15 @@ information criteria all come from the exact cluster-wise likelihoods.
   `k = 1`, so that the log-likelihoods compared across `k` are computed to the
   same accuracy; the fit reports in `em_converged` whether the EM algorithm of
   each regime met its stopping rule.
+* SC-STEM: fits of the same data that end at the same partition share their
+  final refit. `SCSTEM_Infocrit()` shares the refits across its grid, and a
+  penalized fit that ends at the partition of the unpenalized fit it starts
+  from reuses that refit. The refit depends on the partition and the settings,
+  not on `phi_penalty`; two refits of one partition from different starts
+  stopped at different points of the likelihood, and that difference decided
+  between penalties with the same partition. The fit reports
+  `refit_reused`; the argument `refit_cache` carries the shared refits and is
+  not a setting to tune.
 * The historical arguments (`precision`, `max.iter`, `precision_full_dataset`,
   `max_iter`, `abs_tol`, `rel_tol`) still work, as overrides of `control`.
 * The limits of the Newton-Raphson step of the spatial parameters are settings

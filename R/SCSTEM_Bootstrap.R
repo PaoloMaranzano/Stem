@@ -202,6 +202,8 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
   }
   user_args <- list(...)
   refit_args[names(user_args)] <- user_args
+  ### every bootstrap sample is new data: no refit may be shared across them
+  refit_args$refit_cache <- NULL
   ### Keep only what SCSTEM_Estimation() actually accepts. The settings are carried
   ### over from a stored list, so without this filter a change in the signature
   ### of SCSTEM_Estimation() would make every refit fail at run time with an

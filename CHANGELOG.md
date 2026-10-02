@@ -16,6 +16,39 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02 (fourth entry)
+
+**Shared final refits: `refit_cache` in `SCSTEM_Estimation()`, one cache per
+grid in `SCSTEM_Infocrit()`.** With the EM algorithm run to convergence the
+final refits take 85-92% of a grid (instrumented on replication 1 of the
+reference cell: 398 of 462 s in S1-strong-ind, 342 of 401 s in S1-weak-shr,
+224 of 244 s at d = 40, T = 60), and many of them refit the same partition:
+the penalized fits at one k often end where the unpenalized one ended (13 of
+22 configurations in S1-strong-ind, 7 of 22 in S1-weak-shr). The refit
+depends on the data, the partition and the settings, not on phi, so it is now
+computed once per (k, partition) and shared. A penalized fit run on its own
+shares the refit of the unpenalized fit it starts from. The bootstrap and the
+cross-validation never share refits across samples or folds. `refit_reused`
+in the output says whether the refit was shared.
+
+Checked on replication 1 of the reference cell against the grid without the
+cache: the configurations whose refit is not shared have identical BICs; the
+grid takes 107 s instead of 185 s in S1-strong-ind (about 2.9 times the old,
+unconverged package, against 5 without the cache); the selection is unchanged
+in S1-weak-shr and moves from phi = 0.025 to phi = 0 in S1-strong-ind, where
+the two penalties had the same partition and the BICs differed by 0.005. The
+shared refits are not always within tolerance of the ones they replace: at
+k = 2, 3 the BICs moved by less than 0.01, at k = 4 of S1-strong-ind by 2.1
+(the shared refit the better), at k = 3, 4 of S1-weak-shr by 30 (the shared
+refit the worse). The 30 is a regime of 6 locations whose refit, warm-started
+from the alternation of phi = 0, sits on the boundary theta = 0 (an infinite
+range) and stays there after 3000 more iterations under em_stop = "all"
+(log-likelihood -3323.8), while from the alternation of phi = 0.025 it
+converges to theta = 0.24 (-3309.0). The trap exists without the cache (the
+fit at phi = 0 reported it); the cache only makes the fits of one partition
+agree. A guard on warm starts at the boundary is a candidate, to be verified
+before it is adopted.
+
 ### 2026-10-02 (third entry)
 
 **The simulation study, second design (`tag = "main2"`): new values, a fourth

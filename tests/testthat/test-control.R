@@ -55,3 +55,27 @@ test_that("SC-STEM records its settings and starts the regimes from their own da
   ols <- stats::lm.fit(s$covariates[rows, ], as.vector(s$z[, idx]))$coefficients
   expect_equal(as.numeric(ph$beta), as.numeric(ols))
 })
+
+test_that("fits of the same data that end at one partition share the final refit", {
+  mod <- po_model(Tn = 60L)
+  ic <- SCSTEM_Infocrit(mod, k_grid = 2, phi_grid = c(0, 0.025, 0.05), distance = "geo")
+  f0 <- ic$fits[["k=2, phi=0"]]
+  expect_false(f0$refit_reused)
+  pen <- ic$fits[c("k=2, phi=0.025", "k=2, phi=0.05")]
+  same <- vapply(pen, function(f) identical(f$group, f0$group), logical(1))
+  expect_true(any(same))
+  for (f in pen[same]) {
+    expect_true(f$refit_reused)
+    expect_identical(f$loglik_g, f0$loglik_g)
+    expect_identical(f$phi_hat, f0$phi_hat)
+  }
+  for (f in pen[!same]) expect_false(f$refit_reused)
+  ## a penalized fit on its own shares the refit of the unpenalized fit it runs first
+  f1 <- SCSTEM_Estimation(mod, k = 2, phi_penalty = 0.025, distance = "geo")
+  if (identical(f1$group, f0$group)) {
+    expect_true(f1$refit_reused)
+    expect_identical(f1$loglik_g, f0$loglik_g)
+  }
+  expect_error(SCSTEM_Estimation(mod, k = 2, distance = "geo", refit_cache = list()),
+               "environment")
+})
