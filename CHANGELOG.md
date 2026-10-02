@@ -16,6 +16,27 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-02 (fifth entry)
+
+**`run-simulations.R`: streams, to run the study on several machines at
+once.** The user runs the study on two machines with different numbers of
+replications (for instance 10 on 3 cores and 40 on 7) and wants the data
+different and the results cumulable. A new setting `stream` (one per machine):
+replication r of stream s is recorded as `rep = 1000 (s - 1) + r` and drawn
+with seed `1000 rep + 1`, so no two streams share a seed; each stream writes
+its own files, `<tag>_s<stream>*`, so the results folders of the machines are
+put together by copying the files side by side, and `analyse-simulations.R`
+stacks every stream of a tag (`sim_read_streams()`, which also reads the
+`<tag>.csv` of the first pass). The seed of a redraw after a timeout is now
+`1000 rep + 1 + 100 (attempt - 1)`, at most 9 attempts: the former offset of
+100000 per attempt collided with the seeds of replications above 100. Stream
+1 at its first attempt keeps the seeds of the first design. `rep_to` defaults
+to `nrep`. The time limits and the cost are measured on every stream found in
+the results folder. Checked: stream 1 with one replication and stream 2 with
+two, written to one folder, give three different data sets (seeds 1001,
+1001001, 1002001), and the analysis reads them as three replications of the
+cell.
+
 ### 2026-10-02 (fourth entry)
 
 **Shared final refits: `refit_cache` in `SCSTEM_Estimation()`, one cache per

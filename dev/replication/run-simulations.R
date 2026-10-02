@@ -33,23 +33,34 @@
 ## first replication of every cell (rep_to = 1), then "dry", and the estimate
 ## printed is the one to plan on.
 ##
-## Do not run the same tag on two machines at once: they would write to the same
-## files. To share the work between machines give each its own `tag` and its own
-## range of replications.
+## SEVERAL MACHINES. Give each machine its own `stream` (1, 2, ...) and as many
+## replications as it can carry, for instance
+##
+##     machine 1:  stream = 1, nrep = 10, cores = 3
+##     machine 2:  stream = 2, nrep = 40, cores = 7
+##
+## Each stream draws its own data, with seeds that no other stream uses, and
+## writes its own files, <tag>_s<stream>*. Copy the results/ files of one
+## machine beside those of the other: the analysis stacks every stream of the
+## tag, here 50 replications per cell. Replication r of stream s is recorded
+## as rep = 1000 (s - 1) + r, its seed is 1000 rep + 1. Never run the same
+## stream on two machines at once: they would draw the same data.
 ##
 ## THE TIME LIMIT. Every replication runs in a separate R process (package
 ## callr) under a time limit set from the times already recorded: cap_mult times
 ## the median of the cell once cap_after replications of it are done, before
 ## that cap_first_mult times the median of the cells with the same (n, T), and
 ## cap_first_min seconds when nothing is known yet. A replication over its limit
-## is stopped, written to <tag>-timeouts.csv, and drawn again with the seed of
-## the next attempt (1000 rep + 1 + 100000 (attempt - 1)), up to cap_attempts;
-## the last one is recorded as failed. cap_mult = 0 removes the limit.
+## is stopped, written to <tag>_s<stream>-timeouts.csv, and drawn again with
+## the seed of the next attempt (1000 rep + 1 + 100 (attempt - 1)), up to
+## cap_attempts; the last one is recorded as failed. cap_mult = 0 removes the
+## limit.
 ##
 ## Every setting of the SETUP can also be given from a terminal, which overrides
 ## it; lists are separated by commas:
 ##
-##     Rscript run-simulations.R --cores=8 --rep_from=51 --rep_to=100
+##     Rscript run-simulations.R --stream=2 --nrep=40 --cores=7
+##     Rscript run-simulations.R --cores=8 --rep_from=11 --rep_to=20
 ##     Rscript run-simulations.R --blocks=core --mode=dry
 ##
 ## Margins given this way (--n, --TN, --omega, --balance, --knn) replace the
@@ -60,7 +71,9 @@
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package, and nothing here is shipped with it.
 ##
-## SIX OUTPUTS, keyed on (cell, rep) and joining on it and on nothing else:
+## SIX OUTPUTS per stream, keyed on (cell, rep) and joining on it and on
+## nothing else; rep is unique across the streams, so the outputs of all the
+## streams stack. Below, <tag> stands for <tag>_s<stream>:
 ##
 ##   <tag>.csv           one row per replication: the selected (k, phi), the
 ##                       recovery of the partition, the error of the fitted
@@ -341,12 +354,19 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## How many cores. Each core runs one replication at a time.
     cores    = sim_default_cores(),
 
-    ## replications per cell, and the slice this invocation covers. A long
-    ## study is executed in slices on whatever machine is free: the files are
-    ## appended, so the slices compose.
+    ## The stream: one per machine. Two machines that run the study at the
+    ## same time give themselves different streams; each draws its own data
+    ## (different seeds) and writes its own files, <tag>_s<stream>*, and the
+    ## analysis stacks every stream of a tag. Copy the results/ files of one
+    ## machine beside those of the other to put them together.
+    stream   = 1L,
+
+    ## replications per cell in this stream, and the slice this invocation
+    ## covers (rep_to defaults to nrep). A stream can also be run in slices:
+    ## the files are appended, so the slices compose. At most 999 per stream.
     nrep     = 10L,
     rep_from = 1L,
-    rep_to   = 10L,
+    rep_to   = NA_integer_,
 
     ## What the estimator searches over. phi_ref is the penalty at which the
     ## recovery at the true number of regimes is read, a point of phi_grid.
@@ -648,17 +668,40 @@ dgp_error <- function(labels, psi, coords, TN, field) {
 }
 
 ## ---------------------------------------------------------------------------
-## One complete data set. Seeds are derived from the replication index, so
+## Replications and seeds. A STREAM is the run of one machine: its
+## replications are numbered r = 1, ..., 999 within it, and the number recorded
+## in the results, `rep`, is unique across streams,
+##
+##   rep = 1000 (stream - 1) + r ,
+##
+## so that two machines with different streams draw different data and their
+## results stack. The seed of a replication follows from `rep` and from the
+## attempt (a replication over its time limit is drawn again):
+##
+##   seed = 1000 rep + 1 + 100 (attempt - 1) ,
+##
+## and the data set uses seed, seed + 1 and seed + 2. With at most 9 attempts
+## no two (rep, attempt) share a seed. Stream 1, attempt 1 gives 1000 r + 1, the
+## seeds of the first design.
+## ---------------------------------------------------------------------------
+SIM_REP_MAX <- 999L
+sim_rep_id    <- function(r, stream) as.integer((SIM_REP_MAX + 1L) * (as.integer(stream) - 1L) + r)
+sim_stream_of <- function(rep) as.integer((as.integer(rep) - 1L) %/% (SIM_REP_MAX + 1L) + 1L)
+sim_rep_local <- function(rep) as.integer((as.integer(rep) - 1L) %% (SIM_REP_MAX + 1L) + 1L)
+sim_seed      <- function(rep, attempt = 1L)
+  as.integer(1000L * as.integer(rep) + 1L + 100L * (as.integer(attempt) - 1L))
+
+## ---------------------------------------------------------------------------
+## One complete data set. Seeds are derived from the replication, so
 ## replication r uses the same locations and covariate in every
 ## scenario-variant (S2, with its single cloud, apart), and the same random
 ## numbers for the latent and the error, so that two variants differ by their
-## definition and not by their draw. A replication that exceeds its time limit
-## is drawn again with the seed of the next attempt, 100000 further on.
+## definition and not by their draw.
 ## ---------------------------------------------------------------------------
 dgp_draw <- function(cell, rep, attempt = 1L) {
   row  <- SIM_SCEN[SIM_SCEN$id == cell$scenario, , drop = FALSE]
   K    <- if (row$family == "S2") 1L else 3L
-  seed <- 1000L * rep + 1L + 100000L * (as.integer(attempt) - 1L)
+  seed <- sim_seed(rep, attempt)
   spread <- if (is.null(cell$spread) || K == 1L) "total" else cell$spread
   loc  <- dgp_locations(cell$n, K, if (K == 1L) 0 else cell$omega,
                         balance = if (K == 1L) "balanced" else cell$balance,
@@ -813,7 +856,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
     sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
 
   row <- dat$row
-  key <- data.frame(cell = cell$cell, rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
+  key <- data.frame(cell = cell$cell, stream = sim_stream_of(rep), rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
                     family = row$family, level = row$level, common = row$common,
                     variant = row$variant, rho = row$rho, field = row$field,
                     n = cell$n, TN = cell$TN, omega = cell$omega,
@@ -872,7 +915,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
   rownames(station) <- NULL
 
   obs <- NULL
-  if (rep <= CFG$keep_obs[1]) {
+  if (sim_rep_local(rep) <= CFG$keep_obs[1]) {
     ii <- rep(seq_len(cell$n), each = cell$TN)
     tt <- rep(seq_len(cell$TN), times = cell$n)
     obs <- cbind(key[rep(1L, cell$n * cell$TN), ], data.frame(
@@ -895,7 +938,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
 sim_failed <- function(cell, rep, msg, attempt = 1L, secs = NA_real_) {
   row <- SIM_SCEN[SIM_SCEN$id == cell$scenario, , drop = FALSE]
   list(summary = data.frame(
-    cell = cell$cell, rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
+    cell = cell$cell, stream = sim_stream_of(rep), rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
     family = row$family, level = row$level, common = row$common,
     variant = row$variant, rho = row$rho, field = row$field,
     n = cell$n, TN = cell$TN, omega = cell$omega,
@@ -1004,6 +1047,19 @@ sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task)
   invisible(length(tasks))
 }
 
+## The results of every stream of a tag found in a folder, stacked: the files
+## <tag>_s<stream><suffix>.csv, and <tag><suffix>.csv of the runs made before
+## the streams existed. NULL when there are none.
+sim_read_streams <- function(dir, tag, suffix = "") {
+  pat <- sprintf("^%s(_s[0-9]+)?%s[.]csv$", gsub(".", "[.]", tag, fixed = TRUE), suffix)
+  f <- list.files(dir, pattern = pat, full.names = TRUE)
+  if (!length(f)) return(NULL)
+  d <- lapply(f, utils::read.csv, stringsAsFactors = FALSE)
+  cols <- Reduce(union, lapply(d, names))
+  d <- lapply(d, function(x) { x[setdiff(cols, names(x))] <- NA; x[cols] })
+  do.call(rbind, d)
+}
+
 ## Replication by replication, so an interrupted run leaves whole replications
 ## of the design behind; within a replication in a shuffled but fixed order of
 ## the cells, so the running estimate of the time left is representative early.
@@ -1043,25 +1099,38 @@ sim_main <- function() {
   OUT <- normalizePath(CFG$out[1], winslash = "/", mustWork = FALSE)
   sim_print_config(CFG)
 
-  CSV     <- file.path(OUT, sprintf("%s.csv", CFG$tag))
-  CSV_PAR <- file.path(OUT, sprintf("%s-params.csv", CFG$tag))
-  CSV_GRD <- file.path(OUT, sprintf("%s-grid.csv", CFG$tag))
-  CSV_STA <- file.path(OUT, sprintf("%s-stations.csv", CFG$tag))
-  CSV_TO  <- file.path(OUT, sprintf("%s-timeouts.csv", CFG$tag))
-  DIR_OBS <- file.path(OUT, sprintf("%s-obs", CFG$tag))
+  stream <- CFG$stream[1]
+  rep_to <- if (is.na(CFG$rep_to[1])) CFG$nrep[1] else CFG$rep_to[1]
+  if (!(stream >= 1L)) stop("stream must be a positive integer", call. = FALSE)
+  if (CFG$rep_from[1] < 1L || rep_to < CFG$rep_from[1] || rep_to > SIM_REP_MAX)
+    stop("replications run from rep_from to rep_to, within 1 to ", SIM_REP_MAX,
+         " in a stream", call. = FALSE)
+  if (CFG$cap_attempts[1] > 9L) stop("cap_attempts must be at most 9", call. = FALSE)
+
+  ## the files of this stream; the analysis stacks every stream of the tag
+  STEM_F  <- sprintf("%s_s%d", CFG$tag, stream)
+  CSV     <- file.path(OUT, sprintf("%s.csv", STEM_F))
+  CSV_PAR <- file.path(OUT, sprintf("%s-params.csv", STEM_F))
+  CSV_GRD <- file.path(OUT, sprintf("%s-grid.csv", STEM_F))
+  CSV_STA <- file.path(OUT, sprintf("%s-stations.csv", STEM_F))
+  CSV_TO  <- file.path(OUT, sprintf("%s-timeouts.csv", STEM_F))
+  DIR_OBS <- file.path(OUT, sprintf("%s-obs", STEM_F))
 
   cells <- sim_cells()
   prev  <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
+  ## every stream of the tag found here, for the times: the cost and the time
+  ## limits are measured on all of them
+  all_prev <- sim_read_streams(OUT, CFG$tag)
   per_block <- table(factor(cells$block, levels = unique(cells$block)))
-  cat(sprintf("%d cells (%s) x %d replications, writing to\n  %s\n\n", nrow(cells),
+  cat(sprintf("%d cells (%s) x %d replications in stream %d, writing to\n  %s\n\n", nrow(cells),
               paste(names(per_block), per_block, sep = " ", collapse = ", "),
-              CFG$nrep, OUT))
+              CFG$nrep, stream, file.path(OUT, paste0(STEM_F, "*"))))
 
   if (identical(CFG$mode[1], "dry")) {
     print(cells[, c("block", "scenario", "n", "TN", "omega", "spread", "balance", "knn")],
           row.names = FALSE)
     cat("\n")
-    sim_print_cost(cells, prev, CFG)
+    sim_print_cost(cells, all_prev, CFG)
     return(invisible(cells))
   }
 
@@ -1078,9 +1147,9 @@ sim_main <- function() {
     assign(cell, c(get0(cell, T_CELL, inherits = FALSE), secs), envir = T_CELL)
     key <- paste(n, TN); assign(key, c(get0(key, T_NT, inherits = FALSE), secs), envir = T_NT)
   }
-  if (!is.null(prev)) {
-    ok <- is.na(prev$error) | !nzchar(prev$error)
-    for (i in which(ok)) remember(prev$cell[i], prev$n[i], prev$TN[i], prev$secs_total[i])
+  if (!is.null(all_prev)) {
+    ok <- is.na(all_prev$error) | !nzchar(all_prev$error)
+    for (i in which(ok)) remember(all_prev$cell[i], all_prev$n[i], all_prev$TN[i], all_prev$secs_total[i])
   }
   cap_of <- function(cell) {
     if (!(CFG$cap_mult[1] > 0)) return(Inf)
@@ -1104,10 +1173,10 @@ sim_main <- function() {
     sim_retry(function() saveRDS(df, file.path(DIR_OBS, f), compress = "xz"))
   }
 
-  reps  <- seq.int(CFG$rep_from[1], CFG$rep_to[1])
+  reps  <- sim_rep_id(seq.int(CFG$rep_from[1], rep_to), stream)
   tasks <- sim_tasks(cells, reps, done)
-  cat(sprintf("replications %d to %d: %d tasks to run, %d already recorded\n\n",
-              CFG$rep_from[1], CFG$rep_to[1], length(tasks),
+  cat(sprintf("stream %d, replications %d to %d (recorded as rep %d to %d): %d tasks to run, %d already recorded\n\n",
+              stream, CFG$rep_from[1], rep_to, min(reps), max(reps), length(tasks),
               nrow(cells) * length(reps) - length(tasks)))
   if (!length(tasks)) { cat("nothing to do\n"); return(invisible(NULL)) }
 
@@ -1123,11 +1192,11 @@ sim_main <- function() {
     ## are left, drawn again with the seed of the next attempt (the last
     ## attempt is also written to the results, as a failed replication)
     if (grepl("^timeout", s$error))
-      sim_append(data.frame(cell = task$cell$cell, rep = task$rep, attempt = task$attempt,
+      sim_append(data.frame(cell = task$cell$cell, stream = sim_stream_of(task$rep), rep = task$rep, attempt = task$attempt,
                             scenario = task$cell$scenario, n = task$cell$n, TN = task$cell$TN,
                             omega = task$cell$omega, spread = task$cell$spread,
                             cap = round(task$cap), secs = round(s$secs_total),
-                            seed = 1000L * task$rep + 1L + 100000L * (task$attempt - 1L)), CSV_TO)
+                            seed = sim_seed(task$rep, task$attempt)), CSV_TO)
     if (grepl("^timeout", s$error) && task$attempt < CFG$cap_attempts[1]) {
       cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | TIMEOUT after %.0f s (limit %.0f s), attempt %d of %d: drawn again\n",
                   k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, task$cap,
@@ -1152,7 +1221,7 @@ sim_main <- function() {
 
   sim_run_tasks(tasks, sim_task_fun, on_result, CFG$cores[1], prepare = prepare)
   cat(sprintf("\ndone in %s\n\n", sim_hours((proc.time()[["elapsed"]] - t_start) / 3600)))
-  sim_print_cost(cells, utils::read.csv(CSV, stringsAsFactors = FALSE), CFG)
+  sim_print_cost(cells, sim_read_streams(OUT, CFG$tag), CFG)
   invisible(NULL)
 }
 

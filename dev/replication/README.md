@@ -70,9 +70,21 @@ To know what a design costs before running it: run the first replication of
 every cell (`rep_to = 1`), then `mode = "dry"`. The cost printed is measured on
 those replications, for `nrep` replications on `cores` cores.
 
-Do not run the same `tag` on two machines at once: they would write to the same
-files. To share the work between machines, give each its own `tag` and its own
-range of replications.
+To share the work between machines, give each machine its own `stream` and as
+many replications as it can carry, for instance
+
+```
+Rscript run-simulations.R --stream=1 --nrep=10 --cores=3   # machine 1
+Rscript run-simulations.R --stream=2 --nrep=40 --cores=7   # machine 2
+```
+
+Each stream draws its own data, with seeds no other stream uses, and writes its
+own files, `results/<tag>_s<stream>*`. Copy the `results/` files of one machine
+beside those of the other: the analysis stacks every stream of the tag (here 50
+replications per cell). Replication r of stream s is recorded as
+`rep = 1000 (s - 1) + r`, with seed `1000 rep + 1`. Never run the same stream on
+two machines at once: they would draw the same data. A stream can also be
+extended later, with `--rep_from` and `--rep_to` (at most 999 per stream).
 
 Every replication runs in its own R process (package `callr`, installed when
 missing) under a time limit that adapts to its cell; a replication over the
@@ -102,8 +114,8 @@ of those margins around the reference.
 
 ## The outputs
 
-`results/<tag>.csv`, `<tag>-params.csv`, `<tag>-grid.csv`,
-`<tag>-stations.csv`, `<tag>-timeouts.csv` and the folder `<tag>-obs/` share
-the primary key
-(cell, rep) and join on it and on nothing else. What each holds is described at
+For every stream, `results/<tag>_s<stream>.csv`, `-params.csv`, `-grid.csv`,
+`-stations.csv`, `-timeouts.csv` and the folder `-obs/` share the primary key
+(cell, rep) and join on it and on nothing else; `rep` is unique across the
+streams, so the files of all the streams stack. What each holds is described at
 the top of `run-simulations.R`.

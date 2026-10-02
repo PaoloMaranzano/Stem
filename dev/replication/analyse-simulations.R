@@ -22,7 +22,8 @@
 ##   R7  the cost of a replication, by n and T and by geometry
 ##   R8  the replications stopped by the time limit and drawn again
 ##
-## Inputs  : <here>/results/<tag>.csv, -params.csv, -grid.csv  (--results=)
+## Inputs  : <here>/results/<tag>_s<stream>.csv, -params.csv, -grid.csv, -timeouts.csv,
+##           every stream of the tag stacked; <tag>.csv of the first pass  (--results=)
 ## Outputs : <here>/output/  tables (.tex, .csv) and figures (.pdf)  (--out=)
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
@@ -178,11 +179,13 @@ metrics <- function(s) {
 ## The results. Several tags are stacked; a (cell, replication) recorded under
 ## two tags counts once.
 ## ---------------------------------------------------------------------------
+## every stream of every tag, stacked (rep is unique across the streams)
 rd <- function(suffix, key) {
-  f <- file.path(RES, sprintf("%s%s.csv", AN$tag, suffix))
-  f <- f[file.exists(f)]
-  if (!length(f)) return(NULL)
-  d <- do.call(rbind, lapply(f, utils::read.csv, stringsAsFactors = FALSE))
+  d <- lapply(AN$tag, function(tg) sim_read_streams(RES, tg, suffix))
+  d <- d[!vapply(d, is.null, logical(1))]
+  if (!length(d)) return(NULL)
+  cols <- Reduce(union, lapply(d, names))
+  d <- do.call(rbind, lapply(d, function(x) { x[setdiff(cols, names(x))] <- NA; x[cols] }))
   d[!duplicated(d[, key, drop = FALSE]), , drop = FALSE]
 }
 S <- rd("", c("cell", "rep"))
