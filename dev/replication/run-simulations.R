@@ -144,8 +144,9 @@ sim_require <- function(pkgs) {
 ## Pinned to the commit of 2026-10-02 (STEM_control, the stopping rule of the
 ## EM algorithm with em_stop = "any", the regimes started from their own least
 ## squares and then warm, the final refit at the settings of the pooled fit,
-## the final refits shared across the grid by partition)
-SIM_STEM_REF <- "PaoloMaranzano/Stem@2f8fb535ef57a886c157b441c265b3212cdb36dd"
+## the final refits shared across the grid by partition, the names K for the
+## number of regimes and A for the loading matrix)
+SIM_STEM_REF <- "PaoloMaranzano/Stem@94d650ca48ff4f289edb26f6ba868ee745074d28"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
@@ -176,7 +177,8 @@ sim_stem_ok <- function(latest = NA_character_) {
   have <- c("STEM_control", "STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "scstem_neighbors", "scstem_align_labels", "scstem_ari")
   all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
-    "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
+    "distance" %in% names(formals(get("scstem_neighbors", envir = ns))) &&
+    "K_grid" %in% names(formals(get("SCSTEM_Infocrit", envir = ns)))   # the names of 2.0.0
 }
 
 SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) NA_character_ else sim_github_sha()

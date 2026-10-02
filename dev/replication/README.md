@@ -29,7 +29,7 @@ Rscript analyse-simulations.R --tag=main,ref   # several tags, stacked
 ## Requirements
 
 R, and nothing else to set up. `run-simulations.R` installs Stem from GitHub
-at the commit it is pinned to (`SIM_STEM_REF`, currently 2f8fb53), and
+at the commit it is pinned to (`SIM_STEM_REF`, currently 94d650c), and
 reinstalls it whenever the installed Stem is a different commit; the commit is
 read from the installed DESCRIPTION file, without loading the package. Restart
 R before the first run on a machine where Stem is already loaded in the
