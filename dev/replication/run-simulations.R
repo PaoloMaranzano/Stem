@@ -130,8 +130,9 @@ sim_require <- function(pkgs) {
 
 ## Pinned to the commit of 2026-10-02 (STEM_control, the stopping rule of the
 ## EM algorithm with em_stop = "any", the regimes started from their own least
-## squares and then warm, the final refit at the settings of the pooled fit)
-SIM_STEM_REF <- "PaoloMaranzano/Stem@9f9c81edd05661233f1cdd76fbdeb886587465bd"
+## squares and then warm, the final refit at the settings of the pooled fit,
+## the final refits shared across the grid by partition)
+SIM_STEM_REF <- "PaoloMaranzano/Stem@2f8fb535ef57a886c157b441c265b3212cdb36dd"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
