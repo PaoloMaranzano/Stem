@@ -62,7 +62,7 @@ source(runner, local = globalenv())
 ## Options
 ## ---------------------------------------------------------------------------
 AN <- sim_config(list(
-  tag     = "main2",
+  tag     = "main3",
   results = file.path(ana_here, "results"),
   out     = file.path(ana_here, "output")
 ))

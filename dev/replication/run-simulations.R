@@ -141,12 +141,13 @@ sim_require <- function(pkgs) {
   }
 }
 
-## Pinned to the commit of 2026-10-02 (STEM_control, the stopping rule of the
-## EM algorithm with em_stop = "any", the regimes started from their own least
-## squares and then warm, the final refit at the settings of the pooled fit,
-## the final refits shared across the grid by partition, the names K for the
-## number of regimes and A for the loading matrix)
-SIM_STEM_REF <- "PaoloMaranzano/Stem@94d650ca48ff4f289edb26f6ba868ee745074d28"
+## Pinned to the commit of 2026-10-03: the commit of 2026-10-02 (STEM_control,
+## the stopping rule with em_stop = "any", the regimes started from their own
+## least squares and then warm, the final refits shared across the grid, the
+## names K and A) plus the four estimation algorithms with SQUAREM as the
+## default, tolerances 1e-3 on both criteria, regularization 0, and the
+## penalized fits started from the refits of the unpenalized solution
+SIM_STEM_REF <- "PaoloMaranzano/Stem@6808cfeb5a1b3fff9258e38945b93d8e1b495e51"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
@@ -178,7 +179,8 @@ sim_stem_ok <- function(latest = NA_character_) {
             "scstem_neighbors", "scstem_align_labels", "scstem_ari")
   all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
     "distance" %in% names(formals(get("scstem_neighbors", envir = ns))) &&
-    "K_grid" %in% names(formals(get("SCSTEM_Infocrit", envir = ns)))   # the names of 2.0.0
+    "K_grid" %in% names(formals(get("SCSTEM_Infocrit", envir = ns))) &&  # the names of 2.0.0
+    "algorithm" %in% names(formals(get("STEM_control", envir = ns)))     # the algorithms
 }
 
 SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) NA_character_ else sim_github_sha()
@@ -399,10 +401,12 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     cap_attempts   = 3L,
 
     ## Bookkeeping. `out` defaults to a results/ folder beside this script.
-    ## "main2": the design of October 2026 (new values of the strong level,
-    ## the fourth geometry, the new stopping rule of the EM algorithm); the
-    ## first pass of September, under "main", is not comparable with it.
-    tag      = "main2",
+    ## "main3": the design of October 2026 (new values of the strong level,
+    ## the fourth geometry) with the estimator of the commit pinned above
+    ## (SQUAREM, tolerances 1e-3, no regularization). "main2", the same design
+    ## with the EM algorithm at regularization 0.01, and "main", the first pass
+    ## of September, are not comparable with it.
+    tag      = "main3",
     out      = file.path(SIM_HERE, "results")
   )))
 

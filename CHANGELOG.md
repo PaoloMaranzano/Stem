@@ -16,6 +16,23 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-03 (second entry)
+
+**`kalman()` restored, and the simulation study re-pinned as `main3`.** The
+user wanted `kalman()` back: the model is in state-space form, and the Kalman
+filter and the smoother should be visible next to the E- and M-steps. It is
+now the state-space core of an iteration (the filter, the fixed-interval
+smoother, the smoothed initial state and the lag-one covariance smoother), the
+E-step builds the expected sufficient statistics from its output, and
+`STEM_Estimation()` calls it once more at the estimates. A pure move: the
+equivalence test against the old code still agrees to 1e-13 and the tests
+pass. The user asked to relaunch main2 with the new code: the runner is
+pinned to 6808cfe and writes under the tag `main3`, so that its results never
+mix with those of main2 (same design, EM algorithm, regularization 0.01).
+main2 was still running when the runner was changed, so the runner is not
+synced to Drive until the user has stopped it: every capped replication
+re-sources the runner.
+
 ### 2026-10-03
 
 **Four estimation algorithms, `regularization = 0`, tolerances 1e-3, and the

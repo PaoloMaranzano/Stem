@@ -22,14 +22,14 @@ support so far. The analysis of the previous design is archived in
 `dev/archive/sim-design-generic`.
 
 ```
-Rscript analyse-simulations.R                  # the results of tag "main2"
+Rscript analyse-simulations.R                  # the results of tag "main3"
 Rscript analyse-simulations.R --tag=main,ref   # several tags, stacked
 ```
 
 ## Requirements
 
 R, and nothing else to set up. `run-simulations.R` installs Stem from GitHub
-at the commit it is pinned to (`SIM_STEM_REF`, currently 94d650c), and
+at the commit it is pinned to (`SIM_STEM_REF`, currently 6808cfe), and
 reinstalls it whenever the installed Stem is a different commit; the commit is
 read from the installed DESCRIPTION file, without loading the package. Restart
 R before the first run on a machine where Stem is already loaded in the
