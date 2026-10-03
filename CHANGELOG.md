@@ -16,6 +16,42 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-03 (fourth entry)
+
+**Documentation split by topic, and the Computational Supplement shipped with
+the package.** The user asked for the technical material on the estimation to
+be in the Computational Supplement of the paper (Supplementary Material A),
+attached to the package as documentation, and for the GitHub page to be
+divided by topic. The code of the package did not change.
+
+- `docs/` (outside the built package) holds the topic pages: the models,
+  computational aspects (the Kalman filter and smoother, the EM algorithm and
+  where it is slow, ECME, SQUAREM, the stopping rule against that of D-STEM,
+  the limits of the range, the ridge, the numerical experiments), the penalty
+  on the coefficients, the design notes of SC-STEM, the function map and the
+  references.
+- `README.md` keeps the short account of the models, of the estimation
+  algorithms and of the range at the boundary, and points to the pages; the
+  long sections moved to `docs/`.
+- `inst/extdata/Stem-computational-supplement.pdf` is the compiled
+  `supplement.tex` of the paper; it has to be refreshed from the Overleaf
+  project before a release.
+- The function map shows the new estimation engine (`stem_em_fit()`, the
+  plain and SQUAREM iterations, `stem_estep()` on `kalman()`, the M-steps of
+  EM and ECME and their conditional updates).
+- The getting-started vignette states the new stopping rule and the
+  algorithms; the computational notes point to the supplement.
+- Replication (not run, as asked): `run-fuels-application.R` and
+  `run-application.R` pinned to 0f7b744, the commit of the simulation study
+  `main3` (the fuel application was still on 4325536, before the algorithms
+  and the limits of the range); both pass `STEM_control()` explicitly, as the
+  simulation runner does, and `run-application.R` no longer overrides the
+  tolerances with those of the old rule (`precision = 0.1`, `max_iter = 8` on
+  the grid, `max.iter = 60` on the pooled fit). Their caches live in a folder
+  named after the commit, and the summary of the fuel application leaves out
+  rows written by an earlier Stem: a cache of the old estimator would
+  otherwise be read as a result of the new one.
+
 ### 2026-10-03 (third entry)
 
 **The range kept within what the distances identify, and a safer

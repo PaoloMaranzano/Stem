@@ -39,7 +39,7 @@
 ##
 ## Inputs: the outputs of fuels-pretreatment.R and, for part B, the pair
 ## datasets of fuels-leader-follower.R. Every stage of every model is cached in
-## <out>/cache, so an interrupted run resumes where it stopped; the models can
+## <out>/cache/<commit>, so an interrupted run resumes where it stopped; the models can
 ## be split across R processes, and every process rewrites the summary with
 ## all the models finished so far.
 ##
@@ -54,11 +54,14 @@
 ##                                                     in summary.csv
 ##
 ## COST. The grid of a model is cheap; the bootstrap is not: every draw re-runs
-## the whole SC-STEM fit, partition included. Some draws are pathological: when
-## a regime is small and the spatial range is not identified, the
-## Newton-Raphson step of the spatial parameters inside the EM runs to its
-## limits at every iteration. On a model of 14 independents one draw of eight
-## took about 13 minutes against 3 to 4 seconds for the others.
+## the whole SC-STEM fit, partition included. With the Stem of 4325536 some
+## draws were pathological: when a regime was small and the spatial range not
+## identified, the Newton-Raphson step of the spatial parameters ran to its
+## limits at every iteration (on a model of 14 independents one draw of eight
+## took about 13 minutes against 3 to 4 seconds for the others). The Stem pinned
+## below keeps the range within the limits that the distances identify, which
+## removes that cause, and estimates with SQUAREM by default. The cache is kept
+## per pinned commit, so that fits of an earlier Stem are never reused.
 ##
 ## This is part of the REPLICATION MATERIAL, not of the Stem package.
 ## ===========================================================================
@@ -134,10 +137,12 @@ FA_SETTING <- c("1" = "Y major, X independent", "2" = "Y independent, X major",
 
 
 ## ===========================================================================
-## Stem, pinned to the commit of the simulation study; installed from GitHub
-## when the installed copy is another commit
+## Stem, pinned to the commit of the simulation study (main3: the four
+## estimation algorithms with SQUAREM as the default, tolerances 1e-3,
+## regularization 0, the range within the limits the distances identify);
+## installed from GitHub when the installed copy is another commit
 ## ===========================================================================
-FA_STEM_REF <- "PaoloMaranzano/Stem@4325536872218e27a39f9fd21ba533196c9ace50"
+FA_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
 fa_stem_ok <- function() {
   if (!nzchar(system.file(package = "Stem"))) return(FALSE)
   identical(utils::packageDescription("Stem")$RemoteSha, sub("^.*@", "", FA_STEM_REF))
@@ -153,7 +158,7 @@ if (!DRY && !fa_stem_ok()) {
 }
 
 OUT <- normalizePath(CFG$out[1], winslash = "/", mustWork = FALSE)
-CACHE <- file.path(OUT, "cache")
+CACHE <- file.path(OUT, "cache", substr(sub("^.*@", "", FA_STEM_REF), 1L, 7L))
 dir.create(CACHE, recursive = TRUE, showWarnings = FALSE)
 ## a cached stage keeps the minutes it took, for the summary
 cached <- function(name, expr) {
@@ -366,7 +371,8 @@ fa_run <- function(M, seed) {
     mod <- fa_model(des, coords)
     Stem::SCSTEM_Infocrit(mod, K_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid,
                           knn = min(CFG$knn[1], M$n - 1L), distance = "geo",
-                          min_cluster_size = CFG$m[1], seed = seed, verbose = TRUE)
+                          min_cluster_size = CFG$m[1], seed = seed, verbose = TRUE,
+                          control = Stem::STEM_control())
   })
   sel <- Stem::SCSTEM_Select(ic, band = CFG$band, criterion = "BIC")
   pooled <- ic$fits[[which(ic$table$K == 1)[1]]]
@@ -410,7 +416,8 @@ fa_run <- function(M, seed) {
                     B_valid = inf_sel$B_valid,
                     ARI_boot_median = if (!is.null(stab) && nrow(stab)) stats::median(stab$ARI, na.rm = TRUE) else NA_real_,
                     min_grid = fa_minutes(ic), min_boot = fa_minutes(inf_sel),
-                    min_boot_pooled = if (sel$K_selected > 1L) fa_minutes(inf_pool) else NA_real_)
+                    min_boot_pooled = if (sel$K_selected > 1L) fa_minutes(inf_pool) else NA_real_,
+                    stem = basename(CACHE))
   saveRDS(row, file.path(od, "summary_row.rds"))
   message(sprintf("   K = %d, phi = %s | Granger p by regime: %s", sel$K_selected,
                   format(sel$phi_selected), row$p_regimes))
@@ -425,7 +432,11 @@ for (k in MINE) {
   res <- tryCatch(fa_run(MODELS[[k]], seed = CFG$seed[1] + k), error = function(e) e)
   if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
 }
-rows <- lapply(MODELS, function(M) { f <- file.path(OUT, M$id, "summary_row.rds"); if (file.exists(f)) readRDS(f) })
+## only the models fitted with the pinned Stem: a row of an earlier run is left out
+rows <- lapply(MODELS, function(M) {
+  f <- file.path(OUT, M$id, "summary_row.rds")
+  if (file.exists(f)) { r <- readRDS(f); if (identical(r$stem, basename(CACHE))) r }
+})
 summ <- rbindlist(rows, fill = TRUE)
 if (nrow(summ)) {
   fwrite(summ, file.path(OUT, "summary.csv"))

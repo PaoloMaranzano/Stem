@@ -2,7 +2,7 @@
 ## SC-STEM: the application. One script, self-contained.
 ##
 ## It needs nothing but an installed Stem package, it runs from whatever folder
-## it sits in, and it writes its results beside itself, in application/. The
+## it sits in, and it writes its results beside itself, in application/<commit>/. The
 ## script is staged and every stage caches its result, so an interrupted run
 ## resumes where it stopped: delete a cache file to force that stage to run
 ## again.
@@ -49,12 +49,15 @@ app_here <- local({
 })
 
 ## ---------------------------------------------------------------------------
-## The only prerequisite: Stem, installed from GitHub, and again whenever GitHub
-## holds a newer commit than the installed one. Offline, an installed Stem that
-## carries what is used here is accepted as it is. The development builds all
-## say 2.0.0, so the check is on the features and on the commit.
+## The only prerequisite: Stem, installed from GitHub at the commit of the
+## simulation study (main3: the four estimation algorithms with SQUAREM as the
+## default, tolerances 1e-3, regularization 0, the range within the limits the
+## distances identify), and again whenever the installed copy is another
+## commit. Offline, an installed Stem that carries what is used here is
+## accepted as it is. The development builds all say 2.0.0, so the check is on
+## the features and on the commit.
 ## ---------------------------------------------------------------------------
-APP_STEM_REF <- "PaoloMaranzano/Stem"
+APP_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
 
 app_github_sha <- function(ref = APP_STEM_REF) {
   repo <- sub("@.*$", "", ref)
@@ -71,11 +74,12 @@ app_github_sha <- function(ref = APP_STEM_REF) {
 app_stem_ok <- function(latest = NA_character_) {
   if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
   ns <- asNamespace("Stem")
-  have <- c("STEM_Model", "STEM_Estimation", "STEM_Signal", "SCSTEM_Infocrit",
-            "SCSTEM_Select", "SCSTEM_Bootstrap", "SCSTEM_BootInference",
-            "scstem_neighbors")
+  have <- c("STEM_Model", "STEM_Estimation", "STEM_Signal", "STEM_control",
+            "SCSTEM_Infocrit", "SCSTEM_Select", "SCSTEM_Bootstrap",
+            "SCSTEM_BootInference", "scstem_neighbors")
   feats <- all(vapply(have, exists, logical(1), envir = ns, inherits = FALSE)) &&
-    "distance" %in% names(formals(get("scstem_neighbors", envir = ns)))
+    "distance" %in% names(formals(get("scstem_neighbors", envir = ns))) &&
+    "algorithm" %in% names(formals(get("STEM_control", envir = ns)))
   here <- utils::packageDescription("Stem")$RemoteSha
   feats && (is.na(latest) || (!is.null(here) && identical(here, latest)))
 }
@@ -126,7 +130,8 @@ CFG <- app_config(list(
   lambda   = 0,
   B        = 200L,
   seed     = 20260904L,
-  out      = file.path(app_here, "application")
+  ## one folder per pinned commit, so that a cache of an earlier Stem is never reused
+  out      = file.path(app_here, "application", substr(sub("^.*@", "", APP_STEM_REF), 1L, 7L))
 ))
 OUT <- CFG$out[1]
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
@@ -184,7 +189,7 @@ mod <- Stem::STEM_Model(z = z, covariates = X, coordinates = coords,
 ## ---- B: pooled reference ----------------------------------------------------
 message("B. pooled STEM fit")
 pooled <- cached("pooled", {
-  Stem::STEM_Estimation(mod, precision = 0.001, max.iter = 60, distance = "geo",
+  Stem::STEM_Estimation(mod, distance = "geo", control = Stem::STEM_control(),
                         alpha = CFG$alpha[1], lambda = CFG$lambda[1])
 })
 
@@ -193,9 +198,9 @@ message("C. grid over k and phi")
 grid <- cached("grid", {
   Stem::SCSTEM_Infocrit(mod, K_grid = CFG$K_grid, phi_grid = CFG$phi_grid,
                         knn = CFG$knn[1], distance = "geo",
-                        precision = 0.1, precision_full_dataset = 0.01,
-                        max_iter = 8, seed = CFG$seed[1], verbose = TRUE,
-                        alpha = CFG$alpha[1], lambda = CFG$lambda[1])
+                        seed = CFG$seed[1], verbose = TRUE,
+                        alpha = CFG$alpha[1], lambda = CFG$lambda[1],
+                        control = Stem::STEM_control())
 })
 
 ## ---- D: selection -----------------------------------------------------------

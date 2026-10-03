@@ -199,7 +199,7 @@ information criteria all come from the exact cluster-wise likelihoods.
   generalized least-squares step computed with the Kalman filter; and both
   accelerated by SQUAREM (Varadhan and Roland 2008). They reach the same
   maximum. The default is `"SQUAREM"`: in the simulation study it fitted the
-  regimes in about 40% of the time of the EM algorithm, closer to the maximum,
+  regimes in about a third of the time of the EM algorithm, closer to the maximum,
   and ran the whole grid of `SCSTEM_Infocrit()` in about half the time, on
   small and large cells alike, with the same selections. The
   algorithm applies to the pooled fit and to the final refits; inside the

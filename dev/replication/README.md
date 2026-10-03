@@ -11,6 +11,7 @@ disconnected from its sources.
 | `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `design-figures.R` | the figures and tables that describe the design (geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into Supplementary Material B of the paper |
 | `run-application.R` | runs the application, staged and cached |
+| `run-fuels-application.R` | the fuel-price application of the paper: Granger causality between gasoline and diesel at the pump, and leaders and followers, city by city; grid, selection, bootstrap and tests, staged and cached. Reads the outputs of `fuels-pretreatment.R` and `fuels-leader-follower.R` |
 | `run-fuels.R` | first version of the fuel-price application: Granger causality between gasoline and diesel at the pump, by province, on weekly changes; pooled STEM against SC-STEM and a pump-by-pump benchmark. Reads `App_FuelsITA/station_level.zip` beside it, writes to `fuels/` |
 
 The design of the simulation study is described in full in
@@ -34,9 +35,13 @@ reinstalls it whenever the installed Stem is a different commit; the commit is
 read from the installed DESCRIPTION file, without loading the package. Restart
 R before the first run on a machine where Stem is already loaded in the
 session. Offline, an installed Stem that carries what the script uses is
-accepted as it is. `run-application.R` installs the current GitHub commit
-(`APP_STEM_REF`), to be pinned in the same way before the results go into the
-paper.
+accepted as it is. `run-application.R` (`APP_STEM_REF`) and
+`run-fuels-application.R` (`FA_STEM_REF`) are pinned to the same commit, and
+keep their caches in a folder named after it (`application/0f7b744/`,
+`<out>/cache/0f7b744/`), so that fits of an earlier Stem are never reused. All
+three run the computational settings of the package (`STEM_control()`: SQUAREM,
+tolerances 1e-3), passed explicitly so that a session option cannot change
+them.
 
 ## Running the simulations from RStudio
 
@@ -106,7 +111,7 @@ Rscript run-simulations.R --mode=dry                  # the cells and the cost
 Rscript run-simulations.R --cores=8                   # the whole study -> results/
 Rscript run-simulations.R --blocks=core               # some blocks only
 Rscript run-simulations.R --TN=60,120,365 --n=50,100  # one block of other margins
-Rscript run-application.R                             # the application -> application/
+Rscript run-application.R                             # the application -> application/<commit>/
 ```
 
 Margins given on the command line replace the blocks with one factorial block

@@ -33,7 +33,7 @@ crossing the picture, are named here but do not get a box of their own.
 |---|---|
 | Data | `pm10`, `povalley` |
 | Model object | `STEM_Model`*, `STEM_Skeleton`, `STEM_Data`, `is.STEM_*` |
-| Estimation engine | `STEM_Estimation`*, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `Q_function_addendo1/2/3`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `Sigmastar.nugget`, `B_function`, `cov_lagone`, `changedimension_covariates` |
+| Estimation engine | `STEM_Estimation`*, `STEM_control`*, `stem_em_data`, `stem_em_fit`, `stem_iterate_plain`, `stem_iterate_squarem`, `stem_par_vec`, `stem_par_unvec`, `stem_em_check`, `stem_em_free`, `stem_par_finite`, `stem_map_em`, `stem_map_ecme`, `stem_estep`, `kalman`, `filtering`, `filterstep`, `smoothing`, `smootherstep`, `smootherstep.uni`, `stem_mstep_em`, `stem_mstep_ecme`, `stem_update_latent`, `stem_update_sigma2omega`, `stem_update_beta`, `stem_update_spatial`, `stem_update_mean_observed`, `stem_gls_mean`, `stem_theta_limits`, `stem_theta_bound`, `Q_function_addendo1`, `d1_Q`, `d2_Q`, `d12_Q`, `d1/d2_Sigmastar_logb.exp`, `d1/d2_Sigmastar_logtheta.exp`, `Sigmastar.exp`, `Sigmastar.nugget`, `changedimension_covariates` |
 | Entry point | `STEM_Fit`* |
 | Missing-data bookkeeping | `stem_obs_index`, `stem_blocks_cache`, `stem_missing_blocks` |
 | Structured linear algebra | `stem_xprod`, `stem_xtrace` |
@@ -47,41 +47,74 @@ crossing the picture, are named here but do not get a box of their own.
 STEM_Model               -> STEM_Skeleton
 STEM_Model               -> STEM_Data
 
-STEM_Fit                 -> STEM_Estimation            [when k = 1]
-STEM_Fit                 -> SCSTEM_Estimation               [when k > 1]
+STEM_Fit                 -> STEM_Estimation            [when K = 1]
+STEM_Fit                 -> SCSTEM_Estimation               [when K > 1]
 
-STEM_Estimation          -> kalman
-STEM_Estimation          -> changedimension_covariates
-kalman                   -> filtering
-kalman                   -> smoothing
-kalman                   -> Q_function_addendo1
-kalman                   -> Q_function_addendo2
-kalman                   -> Q_function_addendo3
-kalman                   -> d1_Q
-kalman                   -> d2_Q
-kalman                   -> d12_Q
-kalman                   -> d1_Sigmastar_logb.exp
-kalman                   -> d2_Sigmastar_logb.exp
-kalman                   -> d1_Sigmastar_logtheta.exp
-kalman                   -> d2_Sigmastar_logtheta.exp
-kalman                   -> B_function
-kalman                   -> cov_lagone
-kalman                   -> stem_obs_index
-kalman                   -> stem_blocks_cache
-filtering                -> filterstep
-filtering                -> stem_obs_index
-smoothing                -> smootherstep
-smoothing                -> smootherstep.uni
-stem_blocks_cache        -> stem_missing_blocks
-d1_Q                     -> stem_xprod
-d1_Q                     -> stem_xtrace
-d2_Q                     -> stem_xprod
-d2_Q                     -> stem_xtrace
-d12_Q                    -> stem_xprod
-kalman                   -> stem_penalized_index
-kalman                   -> stem_beta_update
-stem_beta_update         -> stem_soft
-stem_beta_update         -> stem_lambda_ref
+STEM_Estimation            -> stem_control_resolve
+STEM_Estimation            -> stem_em_data
+STEM_Estimation            -> stem_penalized_index
+STEM_Estimation            -> stem_theta_limits
+STEM_Estimation            -> stem_em_fit
+STEM_Estimation            -> kalman
+STEM_Estimation            -> stem_theta_bound
+                           [the correlation function, Sigmastar.exp or Sigmastar.nugget,
+                            is passed on in the data of the fit and called by kalman(),
+                            stem_gls_mean() and stem_update_spatial()]
+stem_em_data               -> changedimension_covariates
+stem_em_data               -> stem_obs_index
+stem_em_fit                -> stem_map_em
+stem_em_fit                -> stem_map_ecme
+stem_em_fit                -> stem_iterate_plain
+stem_em_fit                -> stem_iterate_squarem
+stem_iterate_plain         -> stem_em_check
+stem_iterate_plain         -> stem_par_finite
+stem_iterate_squarem       -> stem_em_check
+stem_iterate_squarem       -> stem_par_finite
+stem_iterate_squarem       -> stem_par_vec
+stem_iterate_squarem       -> stem_par_unvec
+stem_em_check              -> stem_em_free
+stem_par_finite            -> stem_em_free
+stem_map_em                -> stem_estep
+stem_map_em                -> stem_mstep_em
+stem_map_ecme              -> stem_estep
+stem_map_ecme              -> stem_mstep_ecme
+stem_estep                 -> kalman
+stem_estep                 -> stem_blocks_cache
+kalman                     -> filtering
+kalman                     -> smoothing
+filtering                  -> filterstep
+filtering                  -> stem_obs_index
+smoothing                  -> smootherstep
+smoothing                  -> smootherstep.uni
+stem_blocks_cache          -> stem_missing_blocks
+stem_mstep_em              -> stem_update_latent
+stem_mstep_em              -> stem_update_sigma2omega
+stem_mstep_em              -> stem_update_beta
+stem_mstep_em              -> stem_update_spatial
+stem_mstep_ecme            -> stem_update_latent
+stem_mstep_ecme            -> stem_update_sigma2omega
+stem_mstep_ecme            -> stem_update_spatial
+stem_mstep_ecme            -> stem_update_mean_observed
+stem_update_beta           -> stem_beta_update
+stem_update_mean_observed  -> stem_gls_mean
+stem_update_mean_observed  -> stem_beta_update
+stem_update_spatial        -> Q_function_addendo1
+stem_update_spatial        -> d1_Q
+stem_update_spatial        -> d2_Q
+stem_update_spatial        -> d12_Q
+stem_update_spatial        -> d1_Sigmastar_logb.exp
+stem_update_spatial        -> d2_Sigmastar_logb.exp
+stem_update_spatial        -> d1_Sigmastar_logtheta.exp
+stem_update_spatial        -> d2_Sigmastar_logtheta.exp
+d1_Q                       -> stem_xprod
+d1_Q                       -> stem_xtrace
+d2_Q                       -> stem_xprod
+d2_Q                       -> stem_xtrace
+d12_Q                      -> stem_xprod
+stem_beta_update           -> stem_soft
+stem_beta_update           -> stem_lambda_ref
+stem_beta_update           -> stem_penalized_index
+stem_control_resolve       -> STEM_control
 
 STEM_Simulation          -> changedimension_covariates
 STEM_Simulation          -> Sigmastar.exp

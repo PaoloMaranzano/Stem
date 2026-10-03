@@ -106,10 +106,14 @@ class(mod)
 
 ## Estimation
 
-`STEM_Estimation()` runs the EM algorithm. Convergence is declared when both the
-relative change of the parameter vector and the relative change of the
-log-likelihood fall below `precision`. Progress messages are off by default and
-can be turned on with `verbose = TRUE`.
+`STEM_Estimation()` runs the EM algorithm on the state-space form of the model
+(the Kalman filter and smoother make the E-step), accelerated by default by
+SQUAREM; `STEM_control(algorithm = )` chooses among EM, ECME, SQUAREM and
+SQUAREM on ECME, which reach the same maximum. The iterations stop when the
+largest relative change of a parameter or the absolute change of the
+log-likelihood falls below its tolerance, `1e-3` by default; `precision`, used
+below to keep the example short, replaces the first. Progress messages are off
+by default and can be turned on with `verbose = TRUE`.
 
 ```{r estimation}
 fit <- STEM_Estimation(mod, precision = 0.01, distance = "euclidean")

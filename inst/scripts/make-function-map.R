@@ -9,7 +9,7 @@
 ## horizontal bands, from the data upwards to the spatially-clustered layer --
 ## and an automatic layout would not reproduce it.
 ##
-## The coordinate system is the SVG one throughout: 960 by 892 user units, y
+## The coordinate system is the SVG one throughout: 960 by 972 user units, y
 ## growing downwards. The PDF device is opened so that one user unit is one
 ## point, and the font sizes below are converted to cex, so that text has the
 ## same size in both outputs.
@@ -22,8 +22,9 @@
 ## inst/extdata/STEM_function_map.md, which is the place to look when adding a
 ## function: update that file, then the tables here, then rerun the script.
 
+DY  <- 80
 W   <- 960
-H   <- 892
+H   <- 892 + DY
 out <- file.path("inst", "extdata")
 
 ## ---------------------------------------------------------------------------
@@ -44,11 +45,11 @@ pal <- list(
 ## ---------------------------------------------------------------------------
 bands <- data.frame(
   x     = c(24, 24, 24, 24),
-  y     = c(70, 180, 438, 574),
+  y     = c(70, 180, 438 + DY, 574 + DY),
   w     = rep(912, 4),
-  h     = c(92, 240, 118, 262),
+  h     = c(92, 240 + DY, 118, 262),
   label = c("DATA AND MODEL OBJECT",
-            "ESTIMATION ENGINE (EM + KALMAN)",
+            "ESTIMATION ENGINE (KALMAN + EM)",
             "SIMULATION, PREDICTION AND UNCERTAINTY",
             "SPATIALLY-CLUSTERED STEM (SC-STEM)"),
   stringsAsFactors = FALSE
@@ -64,30 +65,34 @@ box <- function(x, y, w, h, label, kind, size = NA) {
              size = size, stringsAsFactors = FALSE)
 }
 
-boxes <- rbind(
-  ## band 1
+boxes_1 <- rbind(
   box( 44, 100,  96, 34, "pm10",                          "dataset"),
   box(152, 100, 104, 34, "povalley",                      "dataset"),
   box(330, 100, 140, 34, "STEM_Model",                    "exported"),
   box(530, 100, 130, 34, "STEM_Skeleton",                 "internal"),
   box(686, 100, 130, 34, "STEM_Data",                     "internal"),
-  box(826, 100, 100, 34, "STEM_Fit",                      "exported"),
-  ## band 2
-  box( 44, 215, 150, 36, "STEM_Estimation",               "exported"),
-  box(250, 215, 110, 36, "kalman",                        "internal"),
-  box(420, 196, 112, 30, "filtering",                     "internal"),
-  box(570, 196, 112, 30, "filterstep",                    "internal"),
-  box(420, 238, 112, 30, "smoothing",                     "internal"),
-  box(570, 238, 150, 30, "smootherstep(.uni)",            "internal"),
-  box(250, 290, 200, 30, "Q_function_addendo1/2/3",       "internal"),
-  box(250, 330, 200, 30, "d1_Q, d2_Q, d12_Q",             "internal"),
-  box(250, 370, 200, 30, "B_function, cov_lagone",        "internal"),
-  box(480, 290, 250, 30, "stem_obs_index, stem_blocks_cache", "internal", 10.5),
-  box(480, 330, 250, 30, "d1/d2_Sigmastar_logb.exp",      "internal"),
-  box(480, 370, 250, 30, "d1/d2_Sigmastar_logtheta.exp",  "internal"),
-  box(760, 290, 160, 30, "Sigmastar.exp",                 "internal"),
-  box(760, 330, 160, 30, "stem_missing_blocks",           "internal", 9.5),
-  box(760, 370, 160, 30, "changedimension_covariates",    "internal", 9.5),
+  box(826, 100, 100, 34, "STEM_Fit",                      "exported")
+)
+boxes_2 <- rbind(
+  box( 44, 212, 150, 36, "STEM_Estimation",               "exported"),
+  box(214, 212, 112, 36, "stem_em_fit",                   "internal"),
+  box(346, 198, 165, 28, "stem_iterate_plain",            "internal"),
+  box(346, 234, 165, 28, "stem_iterate_squarem",          "internal"),
+  box(346, 274, 150, 24, "stem_par_vec / _unvec",         "internal", 10.5),
+  box(531, 212, 150, 36, "stem_map_em / _ecme",           "internal"),
+  box(531, 290, 150, 30, "stem_estep",                    "internal"),
+  box(701, 290, 100, 30, "kalman",                        "internal"),
+  box(821, 270, 105, 26, "filtering",                     "internal"),
+  box(821, 310, 105, 26, "smoothing",                     "internal"),
+  box(346, 330, 165, 30, "stem_mstep_em / _ecme",         "internal"),
+  box(346, 382, 165, 28, "stem_update_*",                 "internal"),
+  box(531, 382, 150, 28, "stem_gls_mean",                 "internal"),
+  box(346, 428, 210, 26, "Q_function_addendo1, d1_Q, d2_Q, d12_Q", "internal", 10),
+  box(576, 428, 190, 26, "Sigmastar.exp, d1/d2_Sigmastar_*", "internal", 10),
+  box( 44, 456, 150, 24, "changedimension_covariates",    "internal", 9.5),
+  box(576, 462, 350, 24, "stem_obs_index, stem_blocks_cache, stem_missing_blocks", "internal", 10)
+)
+boxes_34 <- rbind(
   ## band 3
   box( 44, 472, 150, 34, "STEM_Simulation",               "exported"),
   box(230, 472, 140, 34, "STEM_Kriging",                  "exported"),
@@ -99,7 +104,7 @@ boxes <- rbind(
   box(742, 472, 140, 34, "SCSTEM_Signal",                  "exported", 11.5),
   box(742, 512, 140, 30, "SCSTEM_Complete",                "exported", 10.5),
   ## band 4
-  box( 44, 612, 160, 38, "SCSTEM_Estimation",                  "exported"),
+  box( 44, 612, 160, 38, "SCSTEM_Estimation",             "exported"),
   box( 44, 676, 160, 34, "SCSTEM_Infocrit",               "exported"),
   box( 44, 732, 160, 34, "SCSTEM_Select",                 "exported"),
   box( 44, 788, 160, 34, "SCSTEM_Bootstrap",              "exported", 11.5),
@@ -113,6 +118,8 @@ boxes <- rbind(
   box(470, 700, 200, 28, "scstem_ari",                    "internal"),
   box(690, 700, 200, 28, "scstem_align_labels",           "internal")
 )
+boxes_34$y <- boxes_34$y + DY
+boxes <- rbind(boxes_1, boxes_2, boxes_34)
 
 ## ---------------------------------------------------------------------------
 ## Edges. A straight edge is given by its two endpoints; a curved one by the
@@ -129,35 +136,51 @@ cur <- function(x1, y1, cx1, cy1, cx2, cy2, x2, y2,
   list(type = "C", pts = c(x1, y1, cx1, cy1, cx2, cy2, x2, y2),
        accent = accent, dashed = dashed)
 }
+## shift the y coordinates of an edge that lie in the two lower bands
+shift <- function(e, from = 430) {
+  i <- seq(2, length(e$pts), by = 2)
+  e$pts[i] <- ifelse(e$pts[i] >= from, e$pts[i] + DY, e$pts[i])
+  e
+}
 
-edges <- list(
-  ## band 1
+edges_1 <- list(
   seg(256, 117, 324, 117),
   seg(470, 117, 524, 117),
   seg(660, 117, 680, 117),
-  ## band 2
-  cur(876, 138, 968, 330, 520, 282, 130, 255, accent = TRUE),
-  seg(194, 233, 244, 233, accent = TRUE),
-  seg(360, 226, 414, 213),
-  seg(532, 211, 564, 211),
-  seg(360, 240, 414, 253),
-  seg(532, 253, 564, 253),
-  seg(305, 251, 305, 284),
-  seg(305, 320, 305, 324),
-  seg(305, 360, 305, 364),
-  seg(450, 345, 474, 345),
-  seg(450, 385, 474, 385),
-  ## band 2: the missing-data bookkeeping
-  cur(350, 251, 430, 252, 468, 305, 476, 305),
-  seg(734, 310, 754, 338),
+  ## STEM_Fit -> STEM_Estimation, above the boxes of the engine
+  cur(876, 138, 860, 178, 200, 172, 150, 210, accent = TRUE)
+)
+edges_2 <- list(
+  ## the spine: STEM_Estimation -> stem_em_fit -> the iterations -> the map
+  seg(194, 230, 208, 230, accent = TRUE),
+  seg(326, 224, 340, 213, accent = TRUE),
+  seg(326, 236, 340, 247, accent = TRUE),
+  seg(511, 212, 525, 224, accent = TRUE),
+  seg(511, 248, 525, 236, accent = TRUE),
+  seg(428, 262, 428, 268),
+  ## the map: E-step and M-step
+  seg(606, 248, 606, 284, accent = TRUE),
+  seg(681, 305, 695, 305, accent = TRUE),
+  seg(801, 298, 815, 284, accent = TRUE),
+  seg(801, 312, 815, 322, accent = TRUE),
+  seg(531, 240, 504, 324, accent = TRUE),
+  seg(428, 360, 428, 376),
+  seg(511, 350, 525, 390),
+  seg(428, 410, 428, 422),
+  seg(511, 404, 570, 436),
+  ## the missing-data bookkeeping, from the E-step and from the filter
+  cur(640, 320, 700, 345, 800, 400, 812, 456),
+  cur(926, 283, 934, 320, 934, 430, 910, 456),
+  ## STEM_Estimation -> changedimension_covariates (through stem_em_data)
+  seg(119, 248, 119, 450)
+)
+edges_34 <- lapply(list(
   ## band 3
   seg(300, 506, 300, 509),
   seg(495, 506, 495, 509),
   seg(738, 489, 728, 489),
   seg(738, 527, 728, 527),
-  cur(672, 468, 700, 440, 780, 425, 830, 404),
   seg(419, 530, 200, 500, dashed = TRUE),
-  seg(445, 515, 160, 258, dashed = TRUE),
   ## band 4: the pipeline
   seg(124, 710, 124, 726, accent = TRUE),
   seg(124, 766, 124, 782, accent = TRUE),
@@ -169,10 +192,15 @@ edges <- list(
   seg(204, 636, 244, 650),
   cur(204, 748, 380, 748, 400, 726, 464, 716),
   cur(435, 800, 560, 800, 640, 746, 700, 728),
-  ## across the bands
-  cur( 60, 612,  30, 560,  30, 300, 110, 254, accent = TRUE),
   cur(196, 786, 235, 700, 235, 540, 150, 510, dashed = TRUE)
+), shift)
+edges_x <- list(
+  ## SCSTEM_Estimation -> STEM_Estimation: one STEM fit per regime
+  cur(60, 612 + DY, 18, 560 + DY, 18, 300, 38, 232, accent = TRUE),
+  ## STEM_Bootstrap.fn -> STEM_Estimation
+  seg(445, 515 + DY, 160, 254, dashed = TRUE)
 )
+edges <- c(edges_1, edges_2, edges_34, edges_x)
 
 ## ---------------------------------------------------------------------------
 ## Free text
@@ -185,16 +213,16 @@ titles <- list(
 )
 
 footnotes <- list(
-  list(x = 24, y = 856, text = "SCSTEM_Bootstrap regenerates the data regime by regime and re-runs"),
-  list(x = 24, y = 872, text = "the whole SC-STEM procedure, clustering included, on every draw."),
-  list(x = 470, y = 856, text = "STEM_Fit is the single entry point: it dispatches to STEM_Estimation"),
-  list(x = 470, y = 872, text = "when k = 1 and to SCSTEM_Estimation when k > 1, with or without a penalty on beta.")
+  list(x = 24, y = 856 + DY, text = "SCSTEM_Bootstrap regenerates the data regime by regime and re-runs"),
+  list(x = 24, y = 872 + DY, text = "the whole SC-STEM procedure, clustering included, on every draw."),
+  list(x = 470, y = 856 + DY, text = "STEM_Fit is the single entry point: it dispatches to STEM_Estimation"),
+  list(x = 470, y = 872 + DY, text = "when K = 1 and to SCSTEM_Estimation when K > 1, with or without a penalty on beta.")
 )
 
 ## Labels set along a vertical edge, rotated a quarter turn counterclockwise.
 rotated <- list(
-  list(x =  8, y = 662, text = "grid"),
-  list(x = 26, y = 470, text = "one STEM fit per regime")
+  list(x =  8, y = 662 + DY, text = "grid"),
+  list(x = 14, y = 560, text = "one STEM fit per regime")
 )
 
 style_of <- function(kind) {

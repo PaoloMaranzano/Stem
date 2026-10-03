@@ -12,7 +12,12 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 ```
 
 This vignette explains how the estimation engine is actually computed, and why
-the way it is computed is not the way the equations are written. None of it
+the way it is computed is not the way the equations are written. The estimation
+algorithms themselves -- the EM algorithm and where it is slow, ECME, SQUAREM,
+the stopping rule and the limits of the range -- are described in the
+Computational Supplement that ships with the package,
+`system.file("extdata", "Stem-computational-supplement.pdf", package = "Stem")`,
+and on the page `docs/computational-aspects.md` of the repository. None of it
 changes the model or the estimator: every step below is an algebraic identity,
 and the estimates it produces agree with the direct form to about $10^{-13}$ in
 relative terms. What changes is what the package can fit at all.
