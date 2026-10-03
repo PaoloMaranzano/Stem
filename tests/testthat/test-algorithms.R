@@ -51,7 +51,7 @@ test_that("the reported log-likelihood is that of the reported estimates", {
   phi <- list(A = t(f$skeleton$A), sigma2omega = ph$sigma2omega, logtheta = log(ph$theta),
               logb = log(ph$sigma2eps / ph$sigma2omega), beta = ph$beta, G = ph$G,
               Sigmaeta = ph$Sigmaeta, m0 = ph$m0, C0 = ph$C0)
-  expect_equal(Stem:::stem_filter_smooth(phi, dat)$loglik, f$estimates$loglik)
+  expect_equal(Stem:::kalman(phi, dat)$loglik, f$estimates$loglik)
 })
 
 test_that("the ECME step is the GLS of beta and m0 under the covariance of the model", {

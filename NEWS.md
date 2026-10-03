@@ -216,10 +216,13 @@ information criteria all come from the exact cluster-wise likelihoods.
 * The estimates, the log-likelihood and the smoothed states returned by
   `STEM_Estimation()` refer to the same parameters: the log-likelihood and the
   smoothed states used to be those of the last-but-one iteration.
-* The EM code is split by role: the E-step (`R/estep.R`), the conditional
-  updates of the M-step (`R/mstep-updates.R`), the M-steps of the EM and ECME
-  algorithms (`R/mstep-em.R`, `R/mstep-ecme.R`), SQUAREM (`R/squarem.R`) and
-  the wrapper that runs the algorithm chosen (`R/em-fit.R`). With
+* The EM code is split by role: the Kalman filter and smoother of the
+  state-space model (`kalman()`, `R/kalman.R`), the E-step (`R/estep.R`), the
+  conditional updates of the M-step (`R/mstep-updates.R`), the M-steps of the
+  EM and ECME algorithms (`R/mstep-em.R`, `R/mstep-ecme.R`), SQUAREM
+  (`R/squarem.R`) and the wrapper that runs the algorithm chosen
+  (`R/em-fit.R`). `kalman()` used to run a whole EM iteration; it now runs the
+  filter and the smoothers, which the E-step and the fit at the estimates use. With
   `algorithm = "EM"` and `regularization = 0.01` the iterations reproduce those
   of the previous code to 1e-13. The smoother gain of the initial state now
   uses the transpose of `G`, which matters only for a non-symmetric `G`.

@@ -4,7 +4,9 @@
 ### ---------------------------------------------------------------------------
 ### The estimation algorithms: the wrapper
 ### ---------------------------------------------------------------------------
-### Four algorithms, chosen by `algorithm` in STEM_control():
+### Four algorithms, chosen by `algorithm` in STEM_control(), all on the
+### state-space form of the model: every iteration runs the Kalman filter and
+### smoother of kalman.R inside its E-step.
 ###
 ###   "EM"            the EM algorithm: E-step (estep.R), M-step (mstep-em.R);
 ###   "ECME"          the same E-step, with the M-step of mstep-ecme.R, in which

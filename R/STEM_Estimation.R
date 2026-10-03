@@ -294,14 +294,15 @@ function(StemModel, precision = NULL, max.iter = NULL, flag.Gdiag = TRUE, flag.S
 
   fit <- stem_em_fit(phi, dat, opt, control)
 
-  ### the log-likelihood and the smoothed latent states at the estimates
-  fin <- stem_filter_smooth(fit$phi, dat)
+  ### the Kalman filter and smoother at the estimates: the log-likelihood and
+  ### the smoothed latent states reported
+  fin <- kalman(fit$phi, dat, regularization)
   ph <- fit$phi
   StemModel$estimates$phi.hat <- list(sigma2omega = ph$sigma2omega, beta = ph$beta, G = ph$G,
                                       Sigmaeta = ph$Sigmaeta, m0 = ph$m0, C0 = ph$C0,
                                       theta = exp(ph$logtheta),
                                       sigma2eps = exp(ph$logb) * ph$sigma2omega)
-  StemModel$estimates$y.smoothed <- fin$smo$m
+  StemModel$estimates$y.smoothed <- fin$smoothed$m
   StemModel$estimates$loglik <- fin$loglik
   StemModel$estimates$convergence.par <- list(conv.log = fit$crit$conv_log,
                                               conv.par = fit$crit$conv_par,

@@ -48,7 +48,9 @@ iterations of the EM or of the ECME algorithm, plain or accelerated by SQUAREM
 (`R/squarem.R`). One iteration is an E-step, `stem_estep()` (`R/estep.R`),
 followed by an M-step, `stem_mstep_em()` (`R/mstep-em.R`) or
 `stem_mstep_ecme()` (`R/mstep-ecme.R`), both built from the conditional updates
-of `R/mstep-updates.R`. Underneath:
+of `R/mstep-updates.R`. The E-step rests on `kalman()` (`R/kalman.R`), the
+state-space core of the model: the Kalman filter, the fixed-interval smoother
+and the lag-one covariance smoother at the current parameters. Underneath:
 
 * `filtering()` / `filterstep()` - the forward Kalman recursions, which also
   accumulate the log-likelihood. They never form the $d \times d$ predictive
