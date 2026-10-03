@@ -193,9 +193,39 @@ information criteria all come from the exact cluster-wise likelihoods.
   function in one object, in the spirit of `optim(control = )`. All the
   estimation functions take `control`; `options(Stem.control = list(...))` sets
   them for a whole session.
+* Four estimation algorithms, chosen by `STEM_control(algorithm = )`: the EM
+  algorithm; the ECME algorithm (Liu and Rubin 1994), in which the regression
+  coefficients and `m0` are updated on the observed likelihood by a
+  generalized least-squares step computed with the Kalman filter; and both
+  accelerated by SQUAREM (Varadhan and Roland 2008). They reach the same
+  maximum. The default is `"SQUAREM"`: in the simulation study it fitted the
+  regimes in about 40% of the time of the EM algorithm, closer to the maximum,
+  and ran the whole grid of `SCSTEM_Infocrit()` in about half the time on the
+  large cells (20% more on the small ones), with the same selections. The
+  algorithm applies to the pooled fit and to the final refits; inside the
+  alternation of SC-STEM, whose fits stop after a few iterations, the
+  iterations are not accelerated. Penalized fits (`lambda > 0`) run the plain
+  iterations.
+* `regularization` defaults to 0 (it was 0.01) in `STEM_Estimation()`,
+  `SCSTEM_Estimation()` and `STEM_Bootstrap()`. The constant was added to every
+  matrix the EM algorithm inverts but not to the filter that computes the
+  likelihood, so the iterations converged to a point that is not the maximum:
+  the variance parameters were off by 3 to 13% on the regimes of the
+  simulation study, and the variance of the latent innovations of a pooled fit
+  by 84%, whatever the tolerance.
+* The estimates, the log-likelihood and the smoothed states returned by
+  `STEM_Estimation()` refer to the same parameters: the log-likelihood and the
+  smoothed states used to be those of the last-but-one iteration.
+* The EM code is split by role: the E-step (`R/estep.R`), the conditional
+  updates of the M-step (`R/mstep-updates.R`), the M-steps of the EM and ECME
+  algorithms (`R/mstep-em.R`, `R/mstep-ecme.R`), SQUAREM (`R/squarem.R`) and
+  the wrapper that runs the algorithm chosen (`R/em-fit.R`). With
+  `algorithm = "EM"` and `regularization = 0.01` the iterations reproduce those
+  of the previous code to 1e-13. The smoother gain of the initial state now
+  uses the transpose of `G`, which matters only for a non-symmetric `G`.
 * New stopping rule of the EM algorithm, on two criteria: the largest relative
   change of a free parameter, taken one at a time (as in D-STEM v2), and the
-  absolute change of the log-likelihood, with tolerances `1e-4` and `1e-3` by
+  absolute change of the log-likelihood, with a tolerance of `1e-3` on both by
   default. With `em_stop = "any"` (the default, as in D-STEM v2) the algorithm
   stops when either criterion is met, with `em_stop = "all"` only when both are;
   in either case after `em_maxit` iterations (default 500). The previous
@@ -208,7 +238,9 @@ information criteria all come from the exact cluster-wise likelihoods.
   coefficients of its own locations instead of the pooled starting values; every
   later fit of the regime, the final refit included, starts from its previous
   estimates. Started from the pooled coefficients, a regime with a persistent
-  latent process stayed near them.
+  latent process stayed near them. A penalized fit, which starts from the
+  partition of the unpenalized fit, starts its regimes from the final refit of
+  that partition when it is at hand (always within `SCSTEM_Infocrit()`).
 * SC-STEM: the final refit runs with the same settings as the pooled fit at
   `k = 1`, so that the log-likelihoods compared across `k` are computed to the
   same accuracy; the fit reports in `em_converged` whether the EM algorithm of

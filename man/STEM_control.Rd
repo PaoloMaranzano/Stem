@@ -5,7 +5,8 @@
 \title{Computational settings of the STEM and SC-STEM estimators}
 \usage{
 STEM_control(
-  em_tol_par = 1e-04,
+  algorithm = c("SQUAREM", "EM", "ECME", "SQUAREM-ECME"),
+  em_tol_par = 0.001,
   em_tol_loglik = 0.001,
   em_maxit = 500L,
   em_stop = c("any", "all"),
@@ -20,8 +21,14 @@ STEM_control(
 )
 }
 \arguments{
+\item{algorithm}{the algorithm that maximizes the likelihood:
+\code{"SQUAREM"} (default), \code{"EM"}, \code{"ECME"} or
+\code{"SQUAREM-ECME"}. It applies to the pooled fit and to the final
+refits of SC-STEM; inside the alternation, whose fits stop after a few
+iterations, the iterations of EM or ECME are not accelerated.}
+
 \item{em_tol_par}{tolerance of the relative change of every free parameter,
-for the pooled fit and the final refit. Default \code{1e-4}.}
+for the pooled fit and the final refit. Default \code{1e-3}.}
 
 \item{em_tol_loglik}{tolerance of the absolute change of the
 log-likelihood, for the pooled fit and the final refit. Default
@@ -58,14 +65,24 @@ An object of class \dQuote{STEM_control}: a named list of the
 }
 \description{
 \code{STEM_control} collects the settings that govern the numerical side of
-the estimation -- when the EM algorithm stops, how many iterations it may
-take, how long the alternation of SC-STEM runs and how hard the
-Newton-Raphson step of the spatial parameters tries -- in one object, in the
-spirit of the \code{control} argument of \code{\link[stats]{optim}}. The
-defaults are meant for an analysis; an expert user may change them, for
-instance to trade accuracy for speed in a simulation study.
+the estimation -- which algorithm maximizes the likelihood, when it stops,
+how many iterations it may take, how long the alternation of SC-STEM runs
+and how hard the Newton-Raphson step of the spatial parameters tries -- in
+one object, in the spirit of the \code{control} argument of
+\code{\link[stats]{optim}}. The defaults are meant for an analysis; an
+expert user may change them, for instance to trade accuracy for speed in a
+simulation study.
 }
 \details{
+\strong{The algorithm.} \code{"EM"}, \code{"ECME"}, \code{"SQUAREM"} (the
+default) or \code{"SQUAREM-ECME"}; see the section "Algorithms" of
+\code{\link{STEM_Estimation}}. All four maximize the same likelihood. The EM
+algorithm converges linearly and slowly on the regimes of SC-STEM, where the
+latent process and the spatial field share most of their variation; ECME
+updates the regression coefficients and \eqn{m_0} on the observed
+likelihood, which makes their estimates accurate at the stop; SQUAREM
+extrapolates the iterations and cuts their number.
+
 \strong{When the EM algorithm stops.} Two criteria; with
 \code{em_stop = "any"} (the default) the algorithm stops as soon as either is
 met, with \code{em_stop = "all"} only when both are met at the same
@@ -83,16 +100,15 @@ of the whole parameter vector. The floor \eqn{10^{-3}} keeps the criterion
 finite for parameters near zero. The loading matrix and the initial variance
 \eqn{C_0}, which the EM algorithm does not estimate, are excluded. The second
 criterion is the absolute change of the log-likelihood: a relative change of
-the log-likelihood depends on its scale, and with log-likelihoods of the
-order of \eqn{10^4} a relative tolerance of \eqn{10^{-3}} stops the algorithm
-while several units can still be gained. On a regime with a persistent
-latent process the EM algorithm is slow along the ridge between the
-intercept and the level of the latent process. There, with the default
-tolerances, \code{"any"} stopped within a few hundredths of a
-log-likelihood unit of the maximum and \code{"all"} within a few
-thousandths, at 1.5 to 5 times the iterations; D-STEM's rule, the relative
-change of the parameters or of the log-likelihood, stopped several units
-short, because the relative change of the log-likelihood is met first.
+the log-likelihood depends on its scale, which grows with the size of the
+data, while the differences that matter -- between fits, in the information
+criteria -- are absolute. D-STEM stops when the relative change of the
+parameters or of the log-likelihood is below \eqn{10^{-4}}: with
+log-likelihoods of the order of \eqn{10^4} the second is met first, while
+several units can still be gained. In a simulation study of SC-STEM,
+tolerances of \eqn{10^{-3}} on both criteria left the estimates within 1 to
+2\% of those at \eqn{10^{-4}} and the selected models unchanged, while
+\eqn{10^{-2}} moved the range and the variances by tens of percent.
 
 \strong{Session defaults.} Every estimation function takes
 \code{control = NULL} by default, which means the defaults of
@@ -111,8 +127,8 @@ its estimates of the previous iteration, so looser settings suffice there:
 }
 \examples{
 STEM_control()
-## a faster, looser setting, for a simulation study
-STEM_control(em_tol_par = 1e-3, em_tol_loglik = 1e-2, em_maxit = 200)
+## the plain EM algorithm, with a tighter stopping rule
+STEM_control(algorithm = "EM", em_tol_par = 1e-4, em_tol_loglik = 1e-4)
 
 }
 \references{

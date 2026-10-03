@@ -197,13 +197,17 @@ side by side; `dev/paper/11-engine-profile.R` profiles the current one.
 |---|---|
 | `R/filterstep.R` | one step of the filter in Woodbury form, with the algebra and the superseded code in the header |
 | `R/filtering.R` | the pass, and the cache of pattern constants |
-| `R/kalman.R` | the E-step and the M-step, with the cross-product accumulations |
+| `R/estep.R` | the E-step: the smoothed moments and the cross-product accumulations |
+| `R/mstep-updates.R`, `R/mstep-em.R`, `R/mstep-ecme.R` | the conditional updates of the M-step, and the M-steps of the EM and ECME algorithms |
+| `R/squarem.R`, `R/em-fit.R` | the SQUAREM acceleration, and the wrapper that runs the algorithm chosen and applies the stopping rule |
 | `R/d1_Q.R`, `R/d2_Q.R`, `R/d12_Q.R` | the derivatives of the objective, with the shared products |
 | `R/Stem-02-internal.R` | the structured products used when a derivative is a multiple of the identity |
 | `R/stem-penalty.R` | the regularised update of the coefficients, a separate matter |
 
-Every one of them keeps the expression it replaced, commented, immediately above
-the expression that replaced it.
+The files of the filter and of the derivatives keep the expression they
+replaced, commented, immediately above the expression that replaced it; the
+E-step and the M-step were rewritten as separate files in version 2.0.0, and
+the code they replaced is in the history of the repository (`R/kalman.R`).
 
 ## References
 

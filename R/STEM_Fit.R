@@ -73,13 +73,13 @@
 #' Newton-Raphson step, which would be estimating a range that has nothing to
 #' estimate, is skipped. What is left is
 #' \deqn{z_{ti} = x_{ti}'\beta + e_{ti}, \qquad e \sim N(0, \sigma^2 I),}
-#' estimated by penalized least squares. Set \code{regularization = 0} as well
-#' -- the small ridge the package adds for conditioning is otherwise the only
-#' thing separating the two, and on a collinear design it is not negligible.
+#' estimated by penalized least squares, provided \code{regularization} is left
+#' at its default of 0: a ridge added for conditioning would be the only thing
+#' separating the two, and on a collinear design it is not negligible.
 #'
 #' \preformatted{
 #'   fit <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3,
-#'                   latent = FALSE, spatial = FALSE, regularization = 0)
+#'                   latent = FALSE, spatial = FALSE)
 #' }
 #'
 #' On a design with a deliberately collinear pair this agrees with the
@@ -159,9 +159,9 @@
 #'   hyperparameter.
 #' @param latent logical. \code{FALSE} switches the latent process off.
 #' @param spatial logical. \code{FALSE} replaces the exponential correlation by
-#'   the identity. Together with \code{latent = FALSE} and
-#'   \code{regularization = 0} this reduces the model exactly to penalized
-#'   linear regression -- see the section below.
+#'   the identity. Together with \code{latent = FALSE}, and with
+#'   \code{regularization} at its default of 0, this reduces the model exactly
+#'   to penalized linear regression -- see the section below.
 #' @param phi_penalty the strength of the Potts penalty on the partition, passed
 #'   to \code{\link{SCSTEM_Estimation}}. Ignored when \code{K = 1}.
 #' @param distance \dQuote{geo} or \dQuote{euclidean}. Default is

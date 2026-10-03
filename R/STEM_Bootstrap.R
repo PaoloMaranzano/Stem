@@ -8,7 +8,7 @@
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param precision optional; when given, it replaces \code{em_tol_par} of \code{control} in every refit (see \code{\link{STEM_Estimation}}). Default \code{NULL}.
 #' @param control the computational settings of the refits, an object returned by \code{\link{STEM_control}} or a list of some of its settings. Default \code{NULL}, the defaults.
-#' @param regularization a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01
+#' @param regularization a non-negative number added to the diagonal of the matrices inverted by the EM algorithm of every refit; see \code{\link{STEM_Estimation}}. Default is 0.
 #' @param verbose logical. If TRUE, the progress of each bootstrap iteration is reported through message(). Default is FALSE.
 #'
 #'
@@ -131,7 +131,7 @@
 #' @export
 
 STEM_Bootstrap<-
-  function(StemModel, B,distance='euclidean',precision=NULL,regularization=0.01, verbose = FALSE, control = NULL) {
+  function(StemModel, B,distance='euclidean',precision=NULL,regularization=0, verbose = FALSE, control = NULL) {
 
     seed.list = list()
     for (i in 1:B) {

@@ -58,7 +58,10 @@ white over time.
 Estimation is by maximum likelihood, through Kalman filtering and smoothing
 inside an EM algorithm: $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and $m_0$
 have closed-form updates, while $\theta$ and $\sigma^2_\varepsilon$ need a
-Newton-Raphson step.
+Newton-Raphson step. By default the iterations are accelerated by SQUAREM;
+the plain EM algorithm, the ECME algorithm (which updates $\beta$ and $m_0$ on
+the observed likelihood) and SQUAREM on ECME are the alternatives, all reaching
+the same maximum (`STEM_control(algorithm = )`).
 
 ### SC-STEM: spatial regimes
 
@@ -235,12 +238,12 @@ estimated by penalized least squares.
 
 ```r
 fit <- STEM_Fit(mod, alpha = 0.5, lambda = 0.3,
-                latent = FALSE, spatial = FALSE, regularization = 0)
+                latent = FALSE, spatial = FALSE)
 ```
 
-Set `regularization = 0` as well: the small ridge the package adds for
-conditioning is otherwise the only thing separating the two, and on a collinear
-design it is not negligible. With that, the agreement with an elastic net
+`regularization` must stay at its default of 0: a ridge added for conditioning
+would be the only thing separating the two, and on a collinear design it is not
+negligible. The agreement with an elastic net
 computed directly on $X'X$ and $X'y$ is between $10^{-14}$ and $10^{-11}$ for
 the ridge, the lasso, the elastic net and the unpenalized case alike. With
 `K > 1` the same switches give clusterwise penalized regression, the partition

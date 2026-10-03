@@ -12,7 +12,7 @@ STEM_Estimation(
   flag.Sigmaetadiag = TRUE,
   cov.spat = Sigmastar.exp,
   distance = "euclidean",
-  regularization = 0.01,
+  regularization = 0,
   verbose = FALSE,
   alpha = 0,
   lambda = 0,
@@ -41,7 +41,14 @@ parameter. Kept for the code written before \code{control} existed.}
 
 \item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 
-\item{regularization}{a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01}
+\item{regularization}{a non-negative number added to the diagonal of the
+matrices the EM algorithm inverts (the smoother gains at the first and last
+time point, \eqn{\Sigma^*} in the update of \eqn{\sigma^2_\omega},
+\eqn{\Sigma_e} in the update of \eqn{\beta}, the blocks of the missing
+values and the Hessian of the Newton step). Default 0. With a positive value
+the iterations no longer converge to the maximum of the likelihood the
+filter computes; versions before 2.0.0 used 0.01, which biased the variance
+parameters by several percent.}
 
 \item{verbose}{logical. If TRUE, the progress of the EM and Newton-Raphson iterations is reported through message(). Default is FALSE.}
 
@@ -60,8 +67,8 @@ parameter. Kept for the code written before \code{control} existed.}
 \item{control}{the computational settings, an object returned by
 \code{\link{STEM_control}} or a list of some of its settings. Default
 \code{NULL}, the defaults of \code{STEM_control()}. This function uses
-\code{em_tol_par}, \code{em_tol_loglik}, \code{em_maxit}, \code{nr_maxit}
-and \code{nr_hess_maxit}.}
+\code{algorithm}, \code{em_tol_par}, \code{em_tol_loglik},
+\code{em_maxit}, \code{em_stop}, \code{nr_maxit} and \code{nr_hess_maxit}.}
 }
 \value{
 The function returns an object of class \dQuote{STEM_Model} which is a list given by:
@@ -70,16 +77,16 @@ The function returns an object of class \dQuote{STEM_Model} which is a list give
 \item{data} As the \code{data} component of the \code{StemModel} object given in input.
 \item{estimates}A list of four objects: \code{phi.hat}, \code{y.smoothed}, \code{loglik}, \code{convergence.par} here described.
 \code{phi.hat} is a list with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}).
-\code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) which is the output of the Kalman filtering procedure. \code{loglik} is the log-likehood value.
+\code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) with the smoothed latent states at the estimates. \code{loglik} is the log-likelihood at the estimates.
 \code{convergence.par} is a list with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
 for the two convergence criteria described below, and \code{converged} says whether the stopping rule was met (either criterion with
 \code{em_stop = "any"}, both with \code{em_stop = "all"}) rather than the limit on the iterations reached; \code{max.rel.par} and \code{delta.loglik} are the values
-of the two criteria at the last iteration; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
-Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds the settings used.
+of the two criteria at the last check; \code{iterEM} is the number of iterations (EM or ECME steps, those of the extrapolations of SQUAREM included), \code{iterNR} the number of
+Newton-Raphson iterations within each, \code{algorithm} the algorithm used and \code{control} the settings.
 }
 }
 \description{
-The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
+The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and the EM algorithm, by default accelerated by SQUAREM (see \code{algorithm} in \code{\link{STEM_control}}).
 
 This is one of the two estimation engines of the package. The entry point is
 \code{\link{STEM_Fit}}, which calls this function when \code{K = 1} and
@@ -144,6 +151,37 @@ of a matrix product is evaluated as \eqn{tr(AB) = \sum_{ij} A_{ij} B_{ji}},
 which costs \eqn{O(d^2)} instead of forming the product.
 The algorithm details and formulas are given in Fasso' and Cameletti (2007, 2009). Note that some parameters (\code{beta}, \code{sigma2omega},
   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
+}
+
+\section{Algorithms}{
+
+Four algorithms are available, through \code{algorithm} in
+\code{\link{STEM_control}}. They reach the same maximum of the likelihood
+and differ in the number of iterations they take and in how close to the
+maximum a given stopping rule leaves them.
+\describe{
+  \item{\code{"EM"}}{the EM algorithm: the E-step is the Kalman smoother, the
+    M-step the sequence of conditional updates above.}
+  \item{\code{"ECME"}}{the ECME algorithm (Liu and Rubin 1994): the same, but
+    \eqn{\beta} and \eqn{m_0} maximize the observed log-likelihood given the
+    other parameters, a generalized least-squares step computed by the Kalman
+    filter run on the columns of the covariates. It removes the slow
+    direction in which the intercept and \eqn{m_0} move together, at about
+    25\% more time per iteration.}
+  \item{\code{"SQUAREM"}}{(the default) the EM iterations accelerated by
+    SQUAREM (Varadhan and Roland 2008): two EM steps are extrapolated along
+    the direction of slowest convergence, and the extrapolation is kept only
+    if it does not lower the log-likelihood. The steplength follows the R
+    package SQUAREM (Du and Varadhan 2020).}
+  \item{\code{"SQUAREM-ECME"}}{the ECME iterations accelerated by SQUAREM.}
+}
+With a penalty on \eqn{\beta} (\code{lambda > 0}) the safeguard of SQUAREM
+has no fixed objective to rely on, since the scale of the penalty is
+re-measured at every iteration, and the fit runs the plain iterations of EM
+or ECME.
+}
+
+\section{Starting values and stopping rule}{
 
   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
   The algorithm stops when either of the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) is met, or, with \code{em_stop = "all"} in \code{control}, when both are
@@ -163,7 +201,10 @@ log-likelihood grows with the size of the data. Earlier versions of the
 package stopped when the relative change of the whole parameter vector,
 fixed loadings included, and the relative change of the log-likelihood were
 both below \code{precision}; with large log-likelihoods that rule stopped
-while several units could still be gained.
+while several units could still be gained. With SQUAREM the criteria are
+checked at the start of every cycle, on the EM step taken from there. The
+estimates returned are the last iterate, and the log-likelihood and the
+smoothed states are computed at them.
 }
 
 \examples{
@@ -214,6 +255,20 @@ Environmental Statistics. The reference that introduces this package.
 Fasso, A., Cameletti, M. (2010) \emph{A unified statistical approach for
 simulation, modeling, analysis and mapping of environmental data}.
 Simulation, 86, 139--153. \doi{10.1177/0037549709102150}
+
+The algorithms:
+
+Du, Y., Varadhan, R. (2020) \emph{SQUAREM: An R package for off-the-shelf
+acceleration of EM, MM and other EM-like monotone algorithms}. Journal of
+Statistical Software, 92(7), 1--41. \doi{10.18637/jss.v092.i07}
+
+Liu, C., Rubin, D.B. (1994) \emph{The ECME algorithm: a simple extension of
+EM and ECM with faster monotone convergence}. Biometrika, 81, 633--648.
+\doi{10.1093/biomet/81.4.633}
+
+Varadhan, R., Roland, C. (2008) \emph{Simple and globally convergent methods
+for accelerating the convergence of any EM algorithm}. Scandinavian Journal
+of Statistics, 35, 335--353. \doi{10.1111/j.1467-9469.2007.00585.x}
 
 Further background:
 

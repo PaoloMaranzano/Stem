@@ -1,7 +1,7 @@
 #' ML Estimation
 #'
 #'
-#' @description The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and EM algorithm.
+#' @description The function \code{STEM_Estimation} computes the maximum likelihood estimates of the unknown parameters of a hierarchical spatio-temporal model of class \dQuote{STEM_Model}. The estimates are obtained using Kalman filtering and the EM algorithm, by default accelerated by SQUAREM (see \code{algorithm} in \code{\link{STEM_control}}).
 #'
 #' This is one of the two estimation engines of the package. The entry point is
 #' \code{\link{STEM_Fit}}, which calls this function when \code{K = 1} and
@@ -19,13 +19,20 @@
 #' @param control the computational settings, an object returned by
 #'   \code{\link{STEM_control}} or a list of some of its settings. Default
 #'   \code{NULL}, the defaults of \code{STEM_control()}. This function uses
-#'   \code{em_tol_par}, \code{em_tol_loglik}, \code{em_maxit}, \code{nr_maxit}
-#'   and \code{nr_hess_maxit}.
+#'   \code{algorithm}, \code{em_tol_par}, \code{em_tol_loglik},
+#'   \code{em_maxit}, \code{em_stop}, \code{nr_maxit} and \code{nr_hess_maxit}.
 #' @param flag.Gdiag logical, indicating whether the transition matrix \eqn{G} is diagonal.
 #' @param flag.Sigmaetadiag logical, indicating whether the variance-covariance matrix of the state equation \eqn{\Sigma_\eta} is diagonal.
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
 #' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
-#' @param regularization a small positive number to be added to the digonal of the matrices matrices that need to be inverted . Default is set to 0.01
+#' @param regularization a non-negative number added to the diagonal of the
+#'   matrices the EM algorithm inverts (the smoother gains at the first and last
+#'   time point, \eqn{\Sigma^*} in the update of \eqn{\sigma^2_\omega},
+#'   \eqn{\Sigma_e} in the update of \eqn{\beta}, the blocks of the missing
+#'   values and the Hessian of the Newton step). Default 0. With a positive value
+#'   the iterations no longer converge to the maximum of the likelihood the
+#'   filter computes; versions before 2.0.0 used 0.01, which biased the variance
+#'   parameters by several percent.
 #' @param verbose logical. If TRUE, the progress of the EM and Newton-Raphson iterations is reported through message(). Default is FALSE.
 #' @param alpha the elastic-net mixing parameter for the regression coefficients, in \eqn{[0,1]}: \code{0} is ridge, \code{1} is the lasso, anything in between is the elastic net. Ignored when \code{lambda} is zero. Default is 0.
 #' @param lambda the strength of the penalty on the regression coefficients. \code{0}, the default, gives the ordinary maximum likelihood estimator. See \code{\link{STEM_Fit}} for the interface that selects it.
@@ -41,12 +48,12 @@
 #' \item{data} As the \code{data} component of the \code{StemModel} object given in input.
 #' \item{estimates}A list of four objects: \code{phi.hat}, \code{y.smoothed}, \code{loglik}, \code{convergence.par} here described.
 #' \code{phi.hat} is a list with the parameter ML estimates (\code{sigma2omega}, \code{beta}, \code{G}, \code{Sigmaeta}, \code{m0}, \code{C0}, \code{theta}, \code{sigma2eps}).
-#' \code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) which is the output of the Kalman filtering procedure. \code{loglik} is the log-likehood value.
+#' \code{y.smoothed} is a \code{ts} object (\eqn{n} by \eqn{p}) with the smoothed latent states at the estimates. \code{loglik} is the log-likelihood at the estimates.
 #' \code{convergence.par} is a list with some information about the convergence of the algorithm: \code{conv.log} and \code{conv.par} are logical values
 #' for the two convergence criteria described below, and \code{converged} says whether the stopping rule was met (either criterion with
 #' \code{em_stop = "any"}, both with \code{em_stop = "all"}) rather than the limit on the iterations reached; \code{max.rel.par} and \code{delta.loglik} are the values
-#' of the two criteria at the last iteration; \code{iterEM} is the number of iterations for the EM algorithm and \code{iterNR} is the number of
-#' Newton-Raphson iterations for each EM algorithm iteration; \code{control} holds the settings used.
+#' of the two criteria at the last check; \code{iterEM} is the number of iterations (EM or ECME steps, those of the extrapolations of SQUAREM included), \code{iterNR} the number of
+#' Newton-Raphson iterations within each, \code{algorithm} the algorithm used and \code{control} the settings.
 #' }
 #'
 #'
@@ -103,6 +110,33 @@
 #' The algorithm details and formulas are given in Fasso' and Cameletti (2007, 2009). Note that some parameters (\code{beta}, \code{sigma2omega},
 #'   \code{G}, \code{Sigmaeta} and \code{m0}) are updated using closed form solutions while \code{theta} and \code{sigma2epsilon} using the Newton-Raphson algorithm.
 #'
+#' @section Algorithms:
+#' Four algorithms are available, through \code{algorithm} in
+#' \code{\link{STEM_control}}. They reach the same maximum of the likelihood
+#' and differ in the number of iterations they take and in how close to the
+#' maximum a given stopping rule leaves them.
+#' \describe{
+#'   \item{\code{"EM"}}{the EM algorithm: the E-step is the Kalman smoother, the
+#'     M-step the sequence of conditional updates above.}
+#'   \item{\code{"ECME"}}{the ECME algorithm (Liu and Rubin 1994): the same, but
+#'     \eqn{\beta} and \eqn{m_0} maximize the observed log-likelihood given the
+#'     other parameters, a generalized least-squares step computed by the Kalman
+#'     filter run on the columns of the covariates. It removes the slow
+#'     direction in which the intercept and \eqn{m_0} move together, at about
+#'     25\% more time per iteration.}
+#'   \item{\code{"SQUAREM"}}{(the default) the EM iterations accelerated by
+#'     SQUAREM (Varadhan and Roland 2008): two EM steps are extrapolated along
+#'     the direction of slowest convergence, and the extrapolation is kept only
+#'     if it does not lower the log-likelihood. The steplength follows the R
+#'     package SQUAREM (Du and Varadhan 2020).}
+#'   \item{\code{"SQUAREM-ECME"}}{the ECME iterations accelerated by SQUAREM.}
+#' }
+#' With a penalty on \eqn{\beta} (\code{lambda > 0}) the safeguard of SQUAREM
+#' has no fixed objective to rely on, since the scale of the penalty is
+#' re-measured at every iteration, and the fit runs the plain iterations of EM
+#' or ECME.
+#'
+#' @section Starting values and stopping rule:
 #'   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
 #'   The algorithm stops when either of the following two criteria (named in the output as \code{conv.par} and \code{conv.log} respectively) is met, or, with \code{em_stop = "all"} in \code{control}, when both are
 #'
@@ -121,7 +155,10 @@
 #' package stopped when the relative change of the whole parameter vector,
 #' fixed loadings included, and the relative change of the log-likelihood were
 #' both below \code{precision}; with large log-likelihoods that rule stopped
-#' while several units could still be gained.
+#' while several units could still be gained. With SQUAREM the criteria are
+#' checked at the start of every cycle, on the EM step taken from there. The
+#' estimates returned are the last iterate, and the log-likelihood and the
+#' smoothed states are computed at them.
 #'
 #'
 #'
@@ -142,6 +179,20 @@
 #' Fasso, A., Cameletti, M. (2010) \emph{A unified statistical approach for
 #' simulation, modeling, analysis and mapping of environmental data}.
 #' Simulation, 86, 139--153. \doi{10.1177/0037549709102150}
+#'
+#' The algorithms:
+#'
+#' Du, Y., Varadhan, R. (2020) \emph{SQUAREM: An R package for off-the-shelf
+#' acceleration of EM, MM and other EM-like monotone algorithms}. Journal of
+#' Statistical Software, 92(7), 1--41. \doi{10.18637/jss.v092.i07}
+#'
+#' Liu, C., Rubin, D.B. (1994) \emph{The ECME algorithm: a simple extension of
+#' EM and ECM with faster monotone convergence}. Biometrika, 81, 633--648.
+#' \doi{10.1093/biomet/81.4.633}
+#'
+#' Varadhan, R., Roland, C. (2008) \emph{Simple and globally convergent methods
+#' for accelerating the convergence of any EM algorithm}. Scandinavian Journal
+#' of Statistics, 35, 335--353. \doi{10.1111/j.1467-9469.2007.00585.x}
 #'
 #' Further background:
 #'
@@ -201,184 +252,75 @@
 
 
 STEM_Estimation <-
-function(StemModel, precision=NULL, max.iter=NULL,flag.Gdiag=TRUE,flag.Sigmaetadiag=TRUE,cov.spat=Sigmastar.exp,distance="euclidean",regularization=0.01, verbose = FALSE, alpha = 0, lambda = 0, penalize = NULL, lambda_scale = c("relative","absolute"), latent = TRUE, spatial = TRUE, control = NULL)
+function(StemModel, precision = NULL, max.iter = NULL, flag.Gdiag = TRUE, flag.Sigmaetadiag = TRUE,
+         cov.spat = Sigmastar.exp, distance = "euclidean", regularization = 0, verbose = FALSE,
+         alpha = 0, lambda = 0, penalize = NULL, lambda_scale = c("relative", "absolute"),
+         latent = TRUE, spatial = TRUE, control = NULL)
 {
+  lambda_scale <- match.arg(lambda_scale)
 
-lambda_scale <- match.arg(lambda_scale)
+  ### The computational settings: those of `control`, with the two historical
+  ### arguments, when given, in place of the corresponding settings.
+  control <- stem_control_resolve(control)
+  if (!is.null(precision)) control$em_tol_par <- stem_control_resolve(list(em_tol_par = precision))$em_tol_par
+  if (!is.null(max.iter)) control$em_maxit <- stem_control_resolve(list(em_maxit = max.iter))$em_maxit
 
-### The computational settings: those of `control`, with the two historical
-### arguments, when given, in place of the corresponding settings.
-control <- stem_control_resolve(control)
-if (!is.null(precision)) control$em_tol_par <- stem_control_resolve(list(em_tol_par = precision))$em_tol_par
-if (!is.null(max.iter)) control$em_maxit <- stem_control_resolve(list(em_maxit = max.iter))$em_maxit
-tol_par    <- control$em_tol_par
-tol_loglik <- control$em_tol_loglik
-max.iter   <- control$em_maxit
-### when the algorithm stops: as soon as either criterion is met ("any", the
-### default), or only when both are ("all")
-em_done    <- if (identical(control$em_stop, "all")) function(a, b) a && b else function(a, b) a || b
+  ### With no spatial correlation the exponential function is replaced by the
+  ### identity, so that Sigma_e is a single variance and the Newton-Raphson step,
+  ### which would be estimating a range that has nothing to estimate, is skipped.
+  ### Only the SUM sigma2eps + sigma2omega is then identified: the split reported
+  ### is whatever the starting value made it.
+  if (!spatial && missing(cov.spat)) cov.spat <- Sigmastar.nugget
 
-### With no spatial correlation the exponential function is replaced by the
-### identity, so that Sigma_e is a single variance and the Newton-Raphson step,
-### which would be estimating a range that has nothing to estimate, is skipped.
-### Only the SUM sigma2eps + sigma2omega is then identified: the split reported
-### is whatever the starting value made it.
-if (!spatial && missing(cov.spat)) cov.spat <- Sigmastar.nugget
+  dat <- stem_em_data(StemModel, distance = distance, cov.spat = cov.spat)
+  opt <- list(Gdiag = flag.Gdiag, Sigmaetadiag = flag.Sigmaetadiag,
+              regularization = regularization, latent = latent, spatial = spatial,
+              alpha = alpha, lambda = lambda, pen_w = stem_penalized_index(dat$r, penalize),
+              lambda_scale = lambda_scale, nr_maxit = control$nr_maxit,
+              nr_hess_maxit = control$nr_hess_maxit, nr_tol = control$em_tol_par,
+              verbose = verbose)
 
-z 		=  StemModel$data$z
+  ### The starting values, on the scale of the algorithm: the range and the
+  ### ratio of the two variances on the log scale. Switching off the latent
+  ### process sets the loading matrix to zero: the state then contributes
+  ### nothing, and G, Sigmaeta and m0 are held at their starting values.
+  sk <- StemModel$skeleton$phi
+  phi <- list(A = if (latent) t(StemModel$skeleton$A) else matrix(0, dat$p, dat$d),
+              sigma2omega = sk$sigma2omega,
+              logtheta = log(sk$theta),
+              logb = log(sk$sigma2eps / sk$sigma2omega),
+              beta = sk$beta, G = sk$G, Sigmaeta = sk$Sigmaeta,
+              m0 = matrix(sk$m0, dat$p, 1), C0 = sk$C0)
 
-p 		= StemModel$skeleton$p
-n 		= StemModel$data$n
-d 		= StemModel$data$d
-r 		= StemModel$data$r
+  fit <- stem_em_fit(phi, dat, opt, control)
 
-covariates 	= StemModel$data$covariates
-covariates  = changedimension_covariates(covariates,d=d,r=r,n=n)
-coordinates = StemModel$data$coordinates
-
-phi_start 	= StemModel$skeleton$phi
-phi_start$A = t(StemModel$skeleton$A)
-n_par     	= length(unlist(phi_start))
-
-phi_start$logb 		= log(phi_start$sigma2eps/phi_start$sigma2omega)
-phi_start$logtheta	= log(phi_start$theta)
-
-
-####################
-###EM algorithm while loop
-####################
-#output matrices (two columns are added for number of iteration and -2loglik)
-parameters_mat   = matrix(0,nrow=max.iter,ncol=n_par+2)
-#colnames(parameters_mat) = c("n_iter","-2loglik",rep("k",dd*pp),"sigma2omega", "theta","logb",rep("beta",6),rep("G",pp*pp),rep("Sigmaeta",pp*pp),rep("m0",pp),rep("C0",pp*pp))
-distance_mat    	= matrix(0,nrow=max.iter,ncol=1)
-distancelog_mat	= c()
-Q_mat       	= matrix(0,nrow=max.iter,ncol=2)
-iterNR 		= c()
-
-converged_EM_1 	= FALSE
-converged_EM_2 	= FALSE
-n_iter_EM     	= 1
-step_last     	= NULL
-
-	if (isTRUE(verbose)) message("**** EM Algorithm - iteration n. ", n_iter_EM)
-max_rel_par  = Inf
-delta_loglik = Inf
-free_par     = NULL
-while (!em_done(converged_EM_1, converged_EM_2) && n_iter_EM <= max.iter){
-	step = kalman(	z            		= z,
-			coordinates  	= coordinates,
-         		p           		= p,
-			n			= n,
-			d			= d,
-			r			= r,
-			phi_j        		= phi_start,
-			max.iter     	= max.iter,
-			precision       	= tol_par,
-			covariates   	= covariates,
-			Gdiag        		= flag.Gdiag,
-			Sigmaetadiag 	= flag.Sigmaetadiag,
-			cov.spat		= cov.spat,
-			distance = distance,
-			regularization=regularization,
-			alpha = alpha,
-			lambda = lambda,
-			penalize = penalize,
-			lambda_scale = lambda_scale,
-			latent = latent,
-			spatial = spatial,
-			verbose = verbose,
-			nr_maxit = control$nr_maxit,
-			nr_hess_maxit = control$nr_hess_maxit
-	)
-
-	iterNR[n_iter_EM] 	= step$n_iter_NR
-	step$phi$loglik 		= -2*step$phi$loglik
-	par           		= t(matrix(unlist(step$phi)))
-
-	### Robustness: an EM step that returns non-finite parameters (which the
-	### inner Newton-Raphson can produce on small or nearly collinear subsets of
-	### locations) used to propagate NaN into the convergence tests and abort
-	### the fit with "missing value where TRUE/FALSE needed". The iteration is
-	### now discarded and the last valid iterate is returned instead, so that a
-	### clusterwise algorithm calling this function on many candidate subsets
-	### degrades gracefully rather than failing.
-	if(!all(is.finite(par))) {
-		if(n_iter_EM == 1) {
-			stop("The EM algorithm produced non-finite parameters at the first iteration: check the starting values in 'phi' and the conditioning of the data.", call. = FALSE)
-		}
-		warning("The EM algorithm produced non-finite parameters at iteration ", n_iter_EM,
-			"; the last valid iterate is returned.", call. = FALSE)
-		break
-	}
-
-	parameters_mat[n_iter_EM,] = cbind(n_iter_EM, par)
-	step_last = step
-
-	### The free parameters: everything the EM step returns but the loading
-	### matrix and C0, which it does not estimate (with the loadings among them,
-	### a relative criterion would loosen with the number of locations).
-	if (is.null(free_par)) free_par = !grepl("^(A|C0)[0-9]*$", names(unlist(step$phi))[-1])
-
-	###Check the convergence! Both criteria are undefined at the first
-	### iteration, which has no predecessor.
-	###   conv.par: the largest relative change of a free parameter, with a
-	###             floor of 1e-3 on the denominator for parameters near zero;
-	###   conv.log: the absolute change of the log-likelihood (the second
-	###             column of parameters_mat holds -2 log L).
-	if (n_iter_EM > 1) {
-		cur = parameters_mat[n_iter_EM, -c(1,2)][free_par]
-		prv = parameters_mat[n_iter_EM-1, -c(1,2)][free_par]
-		max_rel_par  = max(abs(cur - prv) / pmax(abs(prv), 1e-3))
-		delta_loglik = abs(parameters_mat[n_iter_EM, 2] - parameters_mat[n_iter_EM-1, 2]) / 2
-	}
-	distance_mat[n_iter_EM,] = max_rel_par
-	distancelog_mat[n_iter_EM] = delta_loglik
-
-	### isTRUE() so that a non-finite criterion counts as "not converged"
-	### instead of turning the loop condition into NA.
-	converged_EM_1 = isTRUE(as.logical(delta_loglik < tol_loglik))
-	converged_EM_2 = isTRUE(as.logical(max_rel_par < tol_par))
-
-	Q_mat[n_iter_EM,] = c(unlist(step$Q_prev),unlist(step$Q_new))
-
-	###Updating the iteration number and the parameter vector
-	phi_start 	= step$phi[-1]
-	n_iter_EM 	= n_iter_EM + 1
-	if (isTRUE(verbose)) message("**** EM Algorithm - iteration n. ", n_iter_EM)
-
-} # here the while loop ends
-
-phi_start$theta = exp(phi_start$logtheta)
-phi_start$sigma2eps = exp(phi_start$logb) * phi_start$sigma2omega
-phi_start = phi_start[-which(names(phi_start) == "logtheta")]
-phi_start = phi_start[-which(names(phi_start) == "A")]
-phi_start = phi_start[-which(names(phi_start) == "logb")]
-phi.estimated= phi_start
-
-StemModel$estimates$phi.hat = phi.estimated
-### the last VALID Kalman step, which differs from the last attempted one when
-### the loop broke out on a non-finite iterate
-StemModel$estimates$y.smoothed = step_last$m.smoother
-StemModel$estimates$loglik = (parameters_mat[(n_iter_EM-1),2])*(-2)
-convergence.par 			= list(conv.log = converged_EM_1,
-						conv.par = converged_EM_2,
-						converged = em_done(converged_EM_1, converged_EM_2),
-						max.rel.par = max_rel_par,
-						delta.loglik = delta_loglik,
-						iterEM   = n_iter_EM-1,
-						iterNR   = iterNR,
-						control  = control)
-StemModel$estimates$convergence.par = convergence.par
-### The penalty in force and the effective number of regression coefficients it
-### leaves. With lambda = 0 the second is simply r, and everything downstream --
-### the information criteria in particular -- behaves as it always has.
-StemModel$estimates$penalty = list(alpha = alpha, lambda = lambda,
-                                   lambda_scale = lambda_scale,
-                                   penalize = penalize,
-                                   beta.df = step_last$beta_df,
-                                   lambda.ref = step_last$lambda_ref,
-                                   lambda.eff = step_last$lambda_eff)
-StemModel$estimates$scope = list(latent = latent, spatial = spatial)
-return (StemModel)
+  ### the log-likelihood and the smoothed latent states at the estimates
+  fin <- stem_filter_smooth(fit$phi, dat)
+  ph <- fit$phi
+  StemModel$estimates$phi.hat <- list(sigma2omega = ph$sigma2omega, beta = ph$beta, G = ph$G,
+                                      Sigmaeta = ph$Sigmaeta, m0 = ph$m0, C0 = ph$C0,
+                                      theta = exp(ph$logtheta),
+                                      sigma2eps = exp(ph$logb) * ph$sigma2omega)
+  StemModel$estimates$y.smoothed <- fin$smo$m
+  StemModel$estimates$loglik <- fin$loglik
+  StemModel$estimates$convergence.par <- list(conv.log = fit$crit$conv_log,
+                                              conv.par = fit$crit$conv_par,
+                                              converged = fit$crit$done,
+                                              max.rel.par = fit$crit$max_rel_par,
+                                              delta.loglik = fit$crit$delta_loglik,
+                                              iterEM = fit$iter,
+                                              iterNR = fit$iterNR,
+                                              algorithm = control$algorithm,
+                                              control = control)
+  ### The penalty in force and the effective number of regression coefficients
+  ### it leaves. With lambda = 0 the second is simply r, and everything
+  ### downstream -- the information criteria in particular -- behaves as it
+  ### always has.
+  StemModel$estimates$penalty <- list(alpha = alpha, lambda = lambda,
+                                      lambda_scale = lambda_scale, penalize = penalize,
+                                      beta.df = fit$last$beta_df,
+                                      lambda.ref = fit$last$lambda_ref,
+                                      lambda.eff = fit$last$lambda_eff)
+  StemModel$estimates$scope <- list(latent = latent, spatial = spatial)
+  StemModel
 }
-

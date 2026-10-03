@@ -16,7 +16,7 @@ SCSTEM_Estimation(
   label_update = c("ICM", "simultaneous"),
   precision = NULL,
   precision_full_dataset = NULL,
-  regularization = 0.01,
+  regularization = 0,
   max_iter = NULL,
   abs_tol = NULL,
   rel_tol = NULL,
@@ -101,8 +101,9 @@ refit), \code{max_iter} replaces \code{alt_maxit}, and \code{abs_tol},
 \code{rel_tol} replace \code{alt_abs_tol}, \code{alt_rel_tol}. Default
 \code{NULL} for all.}
 
-\item{regularization}{small positive number added to the diagonal of the
-matrices that have to be inverted. Default is 0.01.}
+\item{regularization}{a non-negative number added to the diagonal of the
+matrices inverted by the EM algorithm; see \code{\link{STEM_Estimation}}.
+Default is 0.}
 
 \item{min_cluster_size}{integer or \code{NULL}. Minimum number of locations
 required to estimate a cluster-wise model. When \code{NULL} (default) it is
@@ -348,11 +349,14 @@ reported in \code{obj_trace}.
 \strong{Starting values of the regimes.} The first time a regime is fitted,
 its EM algorithm starts from the starting values of \code{StemModel} with
 the regression coefficients replaced by the least-squares fit on the
-locations of the regime. At every later iteration of the alternation a
-regime starts from its own estimates of the previous iteration, so that the
-EM algorithm resumes rather than restarts, and the final refit starts from
-the estimates of the last iteration. A regime that has no estimates yet
-starts from its least-squares fit.
+locations of the regime. A penalized fit, which starts from the partition of
+the unpenalized fit at the same \eqn{K}, starts its regimes from the final
+refit of that partition instead, when the refit is at hand (see "Shared
+refits"). At every later iteration of the alternation a regime starts from
+its own estimates of the previous iteration, so that the EM algorithm
+resumes rather than restarts, and the final refit starts from the estimates
+of the last iteration. A regime that has no estimates yet starts from its
+least-squares fit.
 
 \strong{Final refit and information criteria.} On convergence the
 cluster-wise STEM models are re-estimated once on the final partition, with

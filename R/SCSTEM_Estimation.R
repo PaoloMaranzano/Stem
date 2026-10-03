@@ -146,11 +146,14 @@
 #' \strong{Starting values of the regimes.} The first time a regime is fitted,
 #' its EM algorithm starts from the starting values of \code{StemModel} with
 #' the regression coefficients replaced by the least-squares fit on the
-#' locations of the regime. At every later iteration of the alternation a
-#' regime starts from its own estimates of the previous iteration, so that the
-#' EM algorithm resumes rather than restarts, and the final refit starts from
-#' the estimates of the last iteration. A regime that has no estimates yet
-#' starts from its least-squares fit.
+#' locations of the regime. A penalized fit, which starts from the partition of
+#' the unpenalized fit at the same \eqn{K}, starts its regimes from the final
+#' refit of that partition instead, when the refit is at hand (see "Shared
+#' refits"). At every later iteration of the alternation a regime starts from
+#' its own estimates of the previous iteration, so that the EM algorithm
+#' resumes rather than restarts, and the final refit starts from the estimates
+#' of the last iteration. A regime that has no estimates yet starts from its
+#' least-squares fit.
 #'
 #' \strong{Final refit and information criteria.} On convergence the
 #' cluster-wise STEM models are re-estimated once on the final partition, with
@@ -273,8 +276,9 @@
 #'   \code{NULL}, the defaults of \code{STEM_control()}. The pooled fit and the
 #'   final refit run with its \code{em_*} settings, the EM algorithm inside the
 #'   alternation with its \code{alt_em_*} settings; see \code{Details}.
-#' @param regularization small positive number added to the diagonal of the
-#'   matrices that have to be inverted. Default is 0.01.
+#' @param regularization a non-negative number added to the diagonal of the
+#'   matrices inverted by the EM algorithm; see \code{\link{STEM_Estimation}}.
+#'   Default is 0.
 #' @param min_cluster_size integer or \code{NULL}. Minimum number of locations
 #'   required to estimate a cluster-wise model. When \code{NULL} (default) it is
 #'   set to \code{ncov + 2}.
@@ -430,7 +434,7 @@ SCSTEM_Estimation <- function(StemModel,
                          label_update = c("ICM", "simultaneous"),
                          precision = NULL,
                          precision_full_dataset = NULL,
-                         regularization = 0.01,
+                         regularization = 0,
                          max_iter = NULL,
                          abs_tol = NULL,
                          rel_tol = NULL,
@@ -717,6 +721,17 @@ SCSTEM_Estimation <- function(StemModel,
   has_valid <- rep(FALSE, K)
   stale_warned <- FALSE
 
+  ### A starting partition that has been refitted already (the solution of the
+  ### unpenalized fit, which starts a penalized one) starts its regimes from
+  ### those refits rather than from least squares.
+  init_fits <- NULL
+  if (!is.null(refit_cache)) {
+    key0 <- paste0(K, ":", paste(as.integer(labels), collapse = ","))
+    if (exists(key0, envir = refit_cache, inherits = FALSE)) {
+      init_fits <- get(key0, envir = refit_cache, inherits = FALSE)$fit_final
+    }
+  }
+
   obj_prev <- -Inf
   best_obj <- -Inf
   best_labels <- labels
@@ -735,11 +750,17 @@ SCSTEM_Estimation <- function(StemModel,
     for (g in seq_len(K)) {
       idx <- which(labels == g)
       if (length(idx) >= min_cluster_size) {
-        ### start: the regime's estimates of the previous iteration, or, the
-        ### first time, its least-squares coefficients (see scstem_phi_ols())
+        ### start: the regime's estimates of the previous iteration; the first
+        ### time, the refit of the starting partition when there is one, or
+        ### the least-squares coefficients (see scstem_phi_ols())
         X_g <- covariates[scstem_rows(idx, Tobs), , drop = FALSE]
-        start_g <- if (has_valid[g] && !is.null(fit[[g]])) scstem_phi_from_fit(fit[[g]], phi0) else
+        start_g <- if (has_valid[g] && !is.null(fit[[g]])) {
+          scstem_phi_from_fit(fit[[g]], phi0)
+        } else if (it == 1L && !is.null(init_fits[[g]])) {
+          scstem_phi_from_fit(init_fits[[g]], phi0)
+        } else {
           scstem_phi_ols(phi0, z[, idx, drop = FALSE], X_g)
+        }
         mod_g <- try(
           STEM_Model(z = z[, idx, drop = FALSE],
                      covariates = X_g,

@@ -145,13 +145,16 @@ test_that("the Adjusted Rand Index behaves at its boundaries", {
 
 test_that("a penalized fit starts from the unpenalized solution", {
   mod <- po_model(Tn = 60L)
+  cache <- new.env(parent = emptyenv())
   f0 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0, distance = "geo",
-                          precision = 0.05)
+                          precision = 0.05, refit_cache = cache)
   f1 <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = "geo",
                           precision = 0.05)
-  ## the same as starting it explicitly from the unpenalized partition
+  ## the same as starting it explicitly from the unpenalized partition, with
+  ## its regimes started from the refits of that partition
   f1b <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.05, distance = "geo",
-                           precision = 0.05, init_partition = f0$group)
+                           precision = 0.05, init_partition = f0$group,
+                           refit_cache = cache)
   expect_equal(f1$group, f1b$group)
   expect_equal(f1$phi_multiplier, f1b$phi_multiplier)
   ## and the same as the member of a grid, which passes that partition on

@@ -42,8 +42,13 @@ Two datasets ship with the package: `pm10`, the small 22-station example, and
 
 ### 2. The estimation engine
 
-`STEM_Estimation()` is the entry point and runs the EM loop. Each iteration
-calls `kalman()`, which does the real work:
+`STEM_Estimation()` is the entry point. It hands the fit to `stem_em_fit()`
+(`R/em-fit.R`), which runs the algorithm chosen in `STEM_control()`: the
+iterations of the EM or of the ECME algorithm, plain or accelerated by SQUAREM
+(`R/squarem.R`). One iteration is an E-step, `stem_estep()` (`R/estep.R`),
+followed by an M-step, `stem_mstep_em()` (`R/mstep-em.R`) or
+`stem_mstep_ecme()` (`R/mstep-ecme.R`), both built from the conditional updates
+of `R/mstep-updates.R`. Underneath:
 
 * `filtering()` / `filterstep()` - the forward Kalman recursions, which also
   accumulate the log-likelihood. They never form the $d \times d$ predictive
@@ -56,13 +61,14 @@ calls `kalman()`, which does the real work:
   and the Gaussian conditioning blocks that complete the sufficient statistics;
 * `smoothing()` / `smootherstep()` / `smootherstep.uni()` - the backward
   recursions producing the smoothed latent states;
-* `Q_function_addendo1/2/3()` - the three pieces of the expected complete-data
-  log-likelihood;
+* `stem_gls_mean()` - the augmented Kalman filter of the ECME step, which
+  updates $\beta$ and $m_0$ on the observed likelihood;
+* `Q_function_addendo1()` - the part of the expected complete-data
+  log-likelihood that depends on the spatial parameters;
 * `d1_Q()`, `d2_Q()`, `d12_Q()` and the `d1/d2_Sigmastar_*()` derivatives - the
   gradient and Hessian of the Newton-Raphson step that updates $\theta$ and
   $\log b = \log(\sigma^2_\varepsilon / \sigma^2_\omega)$;
-* `Sigmastar.exp()`, `B_function()`, `cov_lagone()` and
-  `changedimension_covariates()` - matrix utilities.
+* `Sigmastar.exp()` and `changedimension_covariates()` - matrix utilities.
 
 Closed-form M-steps update $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and
 $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.

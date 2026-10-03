@@ -16,6 +16,107 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-03
+
+**Four estimation algorithms, `regularization = 0`, tolerances 1e-3, and the
+EM code split by role.** The second run of the simulation study (main2) was
+2.8 times as costly as the first, and the user asked why and what Fasso and
+Finazzi use. D-STEM v2 stops when the relative change of the parameters or of
+the log-likelihood is below 1e-4 (at most 100 iterations); its criterion on the
+log-likelihood is relative, about 0.4 to 1.5 units on our fits, hence much
+looser than our absolute 1e-3. The user asked to apply it as well: it is kept
+absolute for now and the question is put back to the user, because an earlier
+check showed it stopping several units short and the differences that matter
+(between fits, in the criteria) are absolute.
+
+What makes the EM algorithm slow was measured by tracing it parameter by
+parameter on a regime of the reference cell. Two directions are slow: the split
+of the common variation between the latent process and the spatial field (rate
+about 0.93, which sets the number of iterations), and the joint move of the
+intercept and m0 (rate 0.988, little likelihood, where the stopping rule leaves
+the error; with G near 0 it becomes a G-m0 ridge). An earlier statement that
+the 100-200 iterations of the refits came from the intercept-latent ridge was
+imprecise, and was corrected with the user.
+
+The same comparison found that the iterations did not converge to the maximum
+of the likelihood: `kalman()` added `regularization = 0.01` to every matrix it
+inverted, the filter that computes the likelihood did not, and the fixed point
+moved along the slow directions (variance parameters off by 3-13% on the
+regimes, Sigmaeta of a pooled fit by 84%, the fit at the true K of the larger
+cells 3-41 log-likelihood units short). With 0 the same iterations reach the
+BFGS maximum of the exact likelihood. Every matrix inverted is positive
+definite at admissible parameters, so the default is now 0.
+
+Tolerance test (scratch `tol-test*.R`: 6 cells from n40/T60 to n400 and
+n200/T365, omega 0 included, 2 replications, whole grid): 1e-3 on both criteria
+left the estimates within 1-2% of those at the previous defaults and the
+selection unchanged; 1e-2 lost up to 33 log-likelihood units at the true K and
+moved theta by up to seven times. Defaults: 1e-3 and 1e-3.
+
+ECME and SQUAREM were prototyped in scratch (`ecme-proto.R`, `em-accel.R`) and
+written up for the user in an internal note (`em-algorithm-notes.tex` in the
+Overleaf project). The user then asked for both in the package, with SQUAREM
+as the default, the choice as a setting, and clean code: separate E-step and
+M-step files per algorithm and a wrapper. So:
+
+- `R/estep.R` (E-step, shared), `R/mstep-updates.R` (the conditional
+  updates), `R/mstep-em.R` and `R/mstep-ecme.R` (the two M-steps, with the
+  augmented Kalman filter of the ECME step), `R/squarem.R`, `R/em-fit.R` (the
+  wrapper, the plain iterations, the stopping rule, the data of a fit).
+  `kalman()`, `B_function()`, `cov_lagone()` and `Q_function_addendo2/3()` are
+  gone; the Q values they computed were never used.
+- Equivalence (scratch `equiv-test.R`): with `algorithm = "EM"` and the old
+  regularization the new iterations reproduce `kalman()` to 1e-13, step by step
+  and over whole fits, on complete and missing data, `latent`/`spatial` off,
+  ridge and elastic net, p = 2. One deliberate difference: the smoother gain of
+  the initial state uses t(G) (it used G, which matters only when G is not
+  symmetric).
+- SQUAREM: a first driver with repeated backtracking took 246 steps on the
+  G-m0 ridge of a regime where the prototype took 82; the scheme of the R
+  package SQUAREM (Du and Varadhan 2020: steplength capped by an adaptive
+  bound, one extrapolation per cycle, fallback to the two plain steps) took
+  66, and 45 instead of 258 on a pooled fit with its maximum on the boundary.
+  That scheme is the one implemented.
+- Penalized fits run the plain iterations: the scale of the penalty is
+  re-measured at every iteration, so there is no fixed objective for the
+  safeguard of SQUAREM.
+- `STEM_Estimation()` now returns the log-likelihood and the smoothed states at
+  the estimates (one filter and smoother pass after the iterations); they used
+  to be those of the last-but-one iteration.
+- The user had asked that fits start from estimates, never from distant
+  values. The alternation and the final refit already did; the penalized fits
+  did not (only the partition of the unpenalized fit was passed on). They now
+  start their regimes from the refit of that partition, read from the shared
+  refit cache, so no new argument was needed. The test of the start of a
+  penalized fit passes the cache explicitly.
+
+Comparison of the four algorithms (scratch `alg-compare-*.R`). Single fits of
+the regimes and the pooled model of the reference cell, 10 replications, at
+three tolerances: at 1e-3 SQUAREM took 4.5 s per replication against 11.9 s
+for EM, 14.4 s for ECME and 5.1 s for SQUAREM-ECME. It was the only one whose
+estimates had the statistical accuracy of the exact maximum (relative RMSE of
+theta 18.8% against 18.5%; EM 24.5%). In one regime EM, ECME and SQUAREM-ECME
+stopped on a plateau where the field takes the place of the latent process
+(theta 0.21 against 2.45, 4 units short), which SQUAREM crossed.
+
+The whole grid (6 cells, 2 replications) first showed SQUAREM changing the
+partitions of a weak scenario at n = 40 (K = 1 selected where EM selected 2,
+the fit at the true K 15 units lower): its extrapolations inside the
+alternation, from fits stopped at a log-likelihood tolerance of 1, moved the
+path of the labels. The alternation now runs the plain iterations of the map
+(`stem_control_em()`), and with that the partitions and the selections are
+those of EM in all 12 jobs. Wall times across processes were not comparable
+on this machine (cores of different speed, 10 workers), so the final
+comparison runs the four algorithms in the same process, order rotated, and
+estimates the ratio to EM net of the position (the first algorithm of a
+process runs slower): SQUAREM 0.75 (0.54 on the large cells, 1.20 on the
+small), SQUAREM-ECME 0.86, ECME 1.09; at the true K SQUAREM is at most 0.10
+log-likelihood units from the best fit, EM up to 1.29. The cost on the small
+cells comes from regimes whose range runs to the boundary (theta to infinity,
+field indistinguishable from the nugget): SQUAREM follows that direction until
+`em_maxit`, and every step pays repeated grid searches in the Newton-Raphson
+step. It is the boundary problem the user put aside for a separate study.
+
 ### 2026-10-02 (sixth entry)
 
 **Names: the number of regimes `K`, the loading matrix `A`, the parameter

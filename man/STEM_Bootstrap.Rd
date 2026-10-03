@@ -9,7 +9,7 @@ STEM_Bootstrap(
   B,
   distance = "euclidean",
   precision = NULL,
-  regularization = 0.01,
+  regularization = 0,
   verbose = FALSE,
   control = NULL
 )
@@ -23,7 +23,7 @@ STEM_Bootstrap(
 
 \item{precision}{optional; when given, it replaces \code{em_tol_par} of \code{control} in every refit (see \code{\link{STEM_Estimation}}). Default \code{NULL}.}
 
-\item{regularization}{a small positive number used for the STEM_Estimation algorithm. It is the value to be added to the digonal of the hessian matrix to avoid quasi-singularity problem. Default is set to 0.01}
+\item{regularization}{a non-negative number added to the diagonal of the matrices inverted by the EM algorithm of every refit; see \code{\link{STEM_Estimation}}. Default is 0.}
 
 \item{verbose}{logical. If TRUE, the progress of each bootstrap iteration is reported through message(). Default is FALSE.}
 
