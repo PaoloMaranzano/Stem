@@ -70,7 +70,8 @@
   }
   phi$sigma2omega <- exp(take(1L))
   phi$logb <- take(1L)
-  phi$logtheta <- take(1L)
+  ### the range stays within the limits the distances can identify
+  phi$logtheta <- min(max(take(1L), opt$logtheta_lim[1]), opt$logtheta_lim[2])
   phi
 }
 

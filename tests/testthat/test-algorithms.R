@@ -94,3 +94,34 @@ test_that("a penalized fit runs the plain iterations under SQUAREM", {
   expect_identical(a$estimates$convergence.par$iterEM, b$estimates$convergence.par$iterEM)
   expect_equal(a$estimates$phi.hat, b$estimates$phi.hat)
 })
+
+test_that("the range stays within the limits the distances identify", {
+  ### three locations on a line, at distances 1, 2 and 3
+  D <- as.matrix(stats::dist(cbind(c(0, 1, 3), 0)))
+  expect_equal(exp(Stem:::stem_theta_limits(D)), c(-log(0.95) / 3, -log(0.05) / 1))
+  expect_identical(Stem:::stem_theta_limits(matrix(0, 1, 1)), c(-Inf, Inf))
+
+  ### a field with no spatial correlation, on a few locations: the range is
+  ### free to run off, and has to stop at a limit or within the limits
+  set.seed(5)
+  d <- 8L; n <- 40L
+  co <- matrix(stats::runif(2 * d), d)
+  y <- stats::filter(stats::rnorm(n, sd = 0.5), 0.7, method = "recursive")
+  x <- matrix(stats::rnorm(n * d), n, d)
+  z <- 1 + 0.5 * x + matrix(y, n, d) + matrix(stats::rnorm(n * d, sd = 0.6), n, d)
+  mod <- STEM_Model(z = z, covariates = cbind(1, as.vector(x)), coordinates = co,
+                    phi = list(beta = matrix(c(0.8, 0.4), 2, 1), sigma2eps = 0.2, sigma2omega = 0.2,
+                               theta = 1, G = matrix(0.5), Sigmaeta = matrix(0.5), m0 = as.matrix(0),
+                               C0 = as.matrix(1)),
+                    A = matrix(1, d, 1))
+  for (a in c("EM", "SQUAREM")) {
+    f <- STEM_Estimation(mod, control = list(algorithm = a))
+    cp <- f$estimates$convergence.par
+    th <- f$estimates$phi.hat$theta
+    expect_true(th >= cp$theta.limits[1] * (1 - 1e-8) && th <= cp$theta.limits[2] * (1 + 1e-8))
+    expect_identical(cp$theta.bound,
+                     if (abs(log(th / cp$theta.limits[1])) < 1e-6) "lower" else
+                       if (abs(log(th / cp$theta.limits[2])) < 1e-6) "upper" else "none")
+    expect_true(cp$converged)
+  }
+})

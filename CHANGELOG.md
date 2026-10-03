@@ -16,6 +16,43 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-03 (third entry)
+
+**The range kept within what the distances identify, and a safer
+Newton-Raphson step.** The comparison of the algorithms had left SQUAREM 20%
+slower than EM on the small cells. The cause was in the M-step, not in
+SQUAREM: on the few locations of a small regime the likelihood is flat in
+theta beyond two limits (the range shorter than the closest pair, where the
+field cannot be told from the nugget; much longer than the farthest pair,
+where it cannot be told from an effect common to the locations). There the
+Newton-Raphson step took steps of any size (theta from 0.02 to e^-700 in one
+M-step was seen), every later step paid up to 30 grid searches of 100
+evaluations each, and SQUAREM, extrapolating along the flat direction, ran to
+`em_maxit`. The user asked for the fix proposed (implement, then verify):
+
+- theta is kept between -log(0.95)/h_max and -log(0.05)/h_min
+  (`stem_theta_limits()`), in the Newton-Raphson step and in the
+  extrapolation of SQUAREM; a range at a limit is reported in
+  `convergence.par$theta.bound` and in `theta_bound` of SC-STEM, and the
+  runner records it in the params file;
+- a Newton step is accepted only if it does not increase the objective, and
+  is halved otherwise (the M-step is now a generalized M-step, which it was
+  not: a step with a Hessian that was not positive definite could worsen it);
+- one grid search per step, within the limits, after which a second Hessian
+  that is not positive definite ends the step; `nr_hess_maxit` is removed.
+
+Verification (scratch `theta-v1.R`, `sq-diag-A.R`, `alg-compare-grid3.R`):
+on the 24 fits of the reference cell, where nothing binds, the results are
+those of the previous commit to 1e-9, iterations included; on the small cell
+that cost most, EM went from 362 to 29 s and SQUAREM from 1416 to 25 s, no fit
+reaching `em_maxit`; on the paired grid (6 cells, 2 replications) the fits at
+the true K are unchanged in 40 of 48 and better in the 8 others (all in the
+weak scenario at n = 40, by 0.3 to 16.5 log-likelihood units), the selections
+unchanged, and the time relative to EM is SQUAREM 0.53 (0.58 on the small
+cells, 0.46 on the large), SQUAREM-ECME 0.62, ECME 1.17. Over the grid,
+SQUAREM takes 1057 s against 1747 s before the fix and EM 2102 s against
+2585 s.
+
 ### 2026-10-03 (second entry)
 
 **`kalman()` restored, and the simulation study re-pinned as `main3`.** The

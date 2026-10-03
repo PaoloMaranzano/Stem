@@ -20,7 +20,7 @@
 #'   \code{\link{STEM_control}} or a list of some of its settings. Default
 #'   \code{NULL}, the defaults of \code{STEM_control()}. This function uses
 #'   \code{algorithm}, \code{em_tol_par}, \code{em_tol_loglik},
-#'   \code{em_maxit}, \code{em_stop}, \code{nr_maxit} and \code{nr_hess_maxit}.
+#'   \code{em_maxit}, \code{em_stop} and \code{nr_maxit}.
 #' @param flag.Gdiag logical, indicating whether the transition matrix \eqn{G} is diagonal.
 #' @param flag.Sigmaetadiag logical, indicating whether the variance-covariance matrix of the state equation \eqn{\Sigma_\eta} is diagonal.
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
@@ -53,7 +53,7 @@
 #' for the two convergence criteria described below, and \code{converged} says whether the stopping rule was met (either criterion with
 #' \code{em_stop = "any"}, both with \code{em_stop = "all"}) rather than the limit on the iterations reached; \code{max.rel.par} and \code{delta.loglik} are the values
 #' of the two criteria at the last check; \code{iterEM} is the number of iterations (EM or ECME steps, those of the extrapolations of SQUAREM included), \code{iterNR} the number of
-#' Newton-Raphson iterations within each, \code{algorithm} the algorithm used and \code{control} the settings.
+#' Newton-Raphson iterations within each, \code{algorithm} the algorithm used, \code{theta.limits} and \code{theta.bound} the limits of the range and whether the estimate sits at one of them (see the section on the range), and \code{control} the settings.
 #' }
 #'
 #'
@@ -135,6 +135,26 @@
 #' has no fixed objective to rely on, since the scale of the penalty is
 #' re-measured at every iteration, and the fit runs the plain iterations of EM
 #' or ECME.
+#'
+#' @section The range parameter:
+#' The distances between the locations identify the range only within limits.
+#' When the correlation between the two closest locations falls below 0.05,
+#' the spatial field is white within the set of locations and cannot be told
+#' from the nugget; when the correlation between the two farthest exceeds 0.95,
+#' the field is constant over the locations at every time and cannot be told
+#' from an effect common to them. Beyond either limit the likelihood is flat in
+#' \eqn{\theta}, and on a small set of locations -- a regime of SC-STEM, for
+#' instance -- the iterations, left free, ran along it towards 0 or infinity.
+#' \eqn{\theta} is therefore kept within
+#' \deqn{-\log(0.95) / h_{\max} \le \theta \le -\log(0.05) / h_{\min},}
+#' with \eqn{h_{\min}} and \eqn{h_{\max}} the smallest and largest distance
+#' between two locations. A fit whose range ends at a limit reports it in
+#' \code{convergence.par$theta.bound} (\code{"lower"} or \code{"upper"}; it is
+#' \code{"none"} otherwise), with the limits in
+#' \code{convergence.par$theta.limits}. The Newton-Raphson step of the spatial
+#' parameters accepts a step only if it does not worsen the objective, halving
+#' it otherwise; when the Hessian is not positive definite the point moves once
+#' to the best of a grid, and a second such Hessian ends the iterations.
 #'
 #' @section Starting values and stopping rule:
 #'   For initializing the algorithm the values contained in \code{StemModel$skeleton$phi} are used as initial values.
@@ -277,8 +297,8 @@ function(StemModel, precision = NULL, max.iter = NULL, flag.Gdiag = TRUE, flag.S
               regularization = regularization, latent = latent, spatial = spatial,
               alpha = alpha, lambda = lambda, pen_w = stem_penalized_index(dat$r, penalize),
               lambda_scale = lambda_scale, nr_maxit = control$nr_maxit,
-              nr_hess_maxit = control$nr_hess_maxit, nr_tol = control$em_tol_par,
-              verbose = verbose)
+              nr_tol = control$em_tol_par, verbose = verbose,
+              logtheta_lim = if (spatial) stem_theta_limits(dat$dist) else c(-Inf, Inf))
 
   ### The starting values, on the scale of the algorithm: the range and the
   ### ratio of the two variances on the log scale. Switching off the latent
@@ -312,6 +332,8 @@ function(StemModel, precision = NULL, max.iter = NULL, flag.Gdiag = TRUE, flag.S
                                               iterEM = fit$iter,
                                               iterNR = fit$iterNR,
                                               algorithm = control$algorithm,
+                                              theta.limits = exp(opt$logtheta_lim),
+                                              theta.bound = stem_theta_bound(ph$logtheta, opt),
                                               control = control)
   ### The penalty in force and the effective number of regression coefficients
   ### it leaves. With lambda = 0 the second is simply r, and everything

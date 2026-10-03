@@ -193,6 +193,11 @@ An object of class \dQuote{SCSTEM_Estimation}, a list with components:
   \item \code{em_converged}: logical vector, whether the EM algorithm of each
     re-estimated cluster met its stopping rule within \code{em_maxit}
     iterations (\code{NA} for a cluster not re-estimated).
+  \item \code{theta_bound}: character vector, for each re-estimated cluster
+    whether its range parameter ended at one of the limits that the
+    distances between its locations can identify (\code{"lower"},
+    \code{"upper"}) or within them (\code{"none"}); see the section on the
+    range in \code{\link{STEM_Estimation}}.
   \item \code{refit_reused}: logical, whether the final refit was shared
     with an earlier fit of the same partition.
   \item \code{obj_trace}: data frame tracing the penalized objective, the

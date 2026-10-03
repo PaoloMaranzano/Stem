@@ -77,13 +77,27 @@
 ### The spatial parameters (log theta, log b) given sigma2omega, by
 ### Newton-Raphson on the part of Q that depends on them,
 ###
-###   n log|sigma2omega Sigma*| + tr((sigma2omega Sigma*)^{-1} BB) .
+###   Q_e = n log|sigma2omega Sigma*| + tr((sigma2omega Sigma*)^{-1} BB) ,
 ###
-### When the Hessian is not negative definite enough, a grid search over the
-### two parameters, from 1/100 to 10 times their current values, moves the
-### point before the step is tried again. A step that is singular or not
-### finite ends the iterations at the last valid point. With spatial = FALSE
-### the correlation is the identity and nothing is estimated.
+### which is minimized.
+###
+### The range is kept within the limits that the distances between the
+### locations can identify, `opt$logtheta_lim` (see stem_theta_limits()).
+### Beyond the upper limit the correlation between the two closest locations
+### is below 0.05: the field is white within the set of locations and cannot be
+### told from the nugget. Below the lower limit the correlation between the two
+### farthest is above 0.95: the field is constant over the locations at every
+### time and cannot be told from an effect common to them. Q_e is flat in theta
+### beyond either limit, and the iterations, left free, ran along it towards 0
+### or infinity.
+###
+### Each Newton step is accepted only if it does not increase Q_e, halving it
+### otherwise, so that the update is a generalized M-step. When the Hessian is
+### not positive definite, the point moves to the best of a grid over the two
+### parameters, from 1/100 to 10 times their current values within the limits
+### of theta, and the iterations resume from there; a second Hessian that is
+### not positive definite ends them, since the objective is then flat. With
+### spatial = FALSE the correlation is the identity and nothing is estimated.
 `stem_update_spatial` <- function(est, phi, dat, sigma2omega, opt) {
   logtheta <- phi$logtheta
   logb <- phi$logb
@@ -92,74 +106,106 @@
   n <- dat$n; d <- dat$d; dist <- dat$dist; BB <- est$BB
   cov.spat <- dat$cov.spat
   takes_E <- "E" %in% names(formals(cov.spat))
+  lim <- opt$logtheta_lim
+  clamp <- function(lt) min(max(lt, lim[1]), lim[2])
   Qpart <- function(lt, lb) {
     Q_function_addendo1(sigma2omega = sigma2omega, n = n,
                         Sigmastar = cov.spat(d = d, logb = lb, logtheta = lt, dist = dist), B = BB)
   }
 
+  logtheta <- clamp(logtheta)          # a start outside the limits moves to them
+  q_cur <- Qpart(logtheta, logb)
   it <- 0L
-  converged <- FALSE
-  while (!converged && it < opt$nr_maxit) {
+  searched <- FALSE
+  while (it < opt$nr_maxit) {
     it <- it + 1L
 
-    hess_ok <- FALSE
-    attempt <- 0L
-    while (!hess_ok && attempt < opt$nr_hess_maxit) {
-      attempt <- attempt + 1L
-      ### the kernel exp(-theta h), shared by the correlation and its two
-      ### derivatives in log(theta); the derivatives in log(b) are multiples of
-      ### the identity, carried as single numbers (see stem_xprod())
-      Ker <- exp(-exp(logtheta) * dist)
-      cs_args <- list(logb = logb, d = d, logtheta = logtheta, dist = dist)
-      if (takes_E) cs_args$E <- Ker
-      X   <- do.call(cov.spat, cs_args)
-      Xi  <- solve(X)
-      XiB <- Xi %*% BB
-      d1t <- d1_Sigmastar_logtheta.exp(logtheta = logtheta, dist = dist, E = Ker)
-      d2t <- d2_Sigmastar_logtheta.exp(logtheta = logtheta, dist = dist, E = Ker)
-      d1b <- d1_Sigmastar_logb.exp(logb = logb, d = d)
-      d2b <- d2_Sigmastar_logb.exp(logb = logb, d = d)
-      Pt  <- Xi %*% d1t
-      Pb  <- d1b * Xi
+    ### the gradient and the Hessian of Q_e at the current point. The kernel
+    ### exp(-theta h) is shared by the correlation and its two derivatives in
+    ### log(theta); the derivatives in log(b) are multiples of the identity,
+    ### carried as single numbers (see stem_xprod())
+    Ker <- exp(-exp(logtheta) * dist)
+    cs_args <- list(logb = logb, d = d, logtheta = logtheta, dist = dist)
+    if (takes_E) cs_args$E <- Ker
+    X   <- do.call(cov.spat, cs_args)
+    Xi  <- solve(X)
+    XiB <- Xi %*% BB
+    d1t <- d1_Sigmastar_logtheta.exp(logtheta = logtheta, dist = dist, E = Ker)
+    d2t <- d2_Sigmastar_logtheta.exp(logtheta = logtheta, dist = dist, E = Ker)
+    d1b <- d1_Sigmastar_logb.exp(logb = logb, d = d)
+    d2b <- d2_Sigmastar_logb.exp(logb = logb, d = d)
+    Pt  <- Xi %*% d1t
+    Pb  <- d1b * Xi
+    g <- c(d1_Q(n = n, X = X, d1_X = d1t, sigma2omega = sigma2omega, B = BB,
+                Xi = Xi, XiB = XiB, P = Pt),
+           d1_Q(n = n, X = X, d1_X = d1b, sigma2omega = sigma2omega, B = BB,
+                Xi = Xi, XiB = XiB, P = Pb))
+    h_tt <- d2_Q(n = n, X = X, d1_X = d1t, d2_X = d2t, sigma2omega = sigma2omega, B = BB,
+                 Xi = Xi, XiB = XiB, P = Pt, P2 = Xi %*% d2t)
+    h_bb <- d2_Q(n = n, X = X, d1_X = d1b, d2_X = d2b, sigma2omega = sigma2omega, B = BB,
+                 Xi = Xi, XiB = XiB, P = Pb, P2 = Pb)
+    h_tb <- d12_Q(n = n, X = X, d1_X_theta = d1t, d1_X_logb = d1b, sigma2omega = sigma2omega,
+                  B = BB, Xi = Xi, XiB = XiB, Pt = Pt, Pb = Pb)
+    H <- matrix(c(h_tt, h_tb, h_tb, h_bb), 2, 2)
+    if (!all(is.finite(c(g, H)))) break
 
-      g_t  <- d1_Q(n = n, X = X, d1_X = d1t, sigma2omega = sigma2omega, B = BB,
-                   Xi = Xi, XiB = XiB, P = Pt)
-      g_b  <- d1_Q(n = n, X = X, d1_X = d1b, sigma2omega = sigma2omega, B = BB,
-                   Xi = Xi, XiB = XiB, P = Pb)
-      h_tt <- d2_Q(n = n, X = X, d1_X = d1t, d2_X = d2t, sigma2omega = sigma2omega, B = BB,
-                   Xi = Xi, XiB = XiB, P = Pt, P2 = Xi %*% d2t)
-      h_bb <- d2_Q(n = n, X = X, d1_X = d1b, d2_X = d2b, sigma2omega = sigma2omega, B = BB,
-                   Xi = Xi, XiB = XiB, P = Pb, P2 = Pb)
-      h_tb <- d12_Q(n = n, X = X, d1_X_theta = d1t, d1_X_logb = d1b, sigma2omega = sigma2omega,
-                    B = BB, Xi = Xi, XiB = XiB, Pt = Pt, Pb = Pb)
-      H <- matrix(c(h_tt, h_tb, h_tb, h_bb), 2, 2)
-
-      hess_ok <- isTRUE(det(H) > 1e-3)
-      if (!all(is.finite(H))) break
-      if (!hess_ok) {
-        ### the grid search: the point of the grid where the objective is
-        ### lowest becomes the new current point
-        lt_grid <- log(seq(0.01, 10, length = 10) * max(exp(logtheta), .Machine$double.xmin))
-        lb_grid <- log(seq(0.01, 10, length = 10) * max(exp(logb), .Machine$double.xmin))
-        QQ <- outer(seq_along(lt_grid), seq_along(lb_grid),
-                    Vectorize(function(i, j) Qpart(lt_grid[i], lb_grid[j])))
-        col <- which.min(apply(QQ, 2, min))
-        logtheta <- lt_grid[apply(QQ, 2, which.min)[col]]
-        logb <- lb_grid[col]
+    if (isTRUE(H[1, 1] > 0 && det(H) > 1e-3)) {
+      ### the Newton step, halved until it does not increase Q_e
+      delta <- try(solve(H + diag(opt$regularization, 2), g), silent = TRUE)
+      if (inherits(delta, "try-error") || !all(is.finite(delta))) break
+      old <- c(logtheta, logb)
+      accepted <- FALSE
+      s <- 1
+      for (halving in 0:10) {
+        new <- c(clamp(old[1] - s * delta[1]), old[2] - s * delta[2])
+        q_new <- Qpart(new[1], new[2])
+        if (is.finite(q_new) && q_new <= q_cur) {
+          accepted <- TRUE
+          break
+        }
+        s <- s / 2
       }
+      if (!accepted) break
+      logtheta <- new[1]
+      logb <- new[2]
+      q_cur <- q_new
+      if (isTRUE(opt$verbose)) message("*** NR Algorithm - iteration n. ", it)
+      if (sqrt(sum((new - old)^2)) / max(sqrt(sum(old^2)), .Machine$double.eps) < opt$nr_tol) break
+    } else {
+      ### not positive definite: once, the best point of a grid within the
+      ### limits; a second time, the iterations stop
+      if (searched) break
+      searched <- TRUE
+      lt_grid <- unique(vapply(log(seq(0.01, 10, length = 10)) + logtheta, clamp, 1))
+      lb_grid <- log(seq(0.01, 10, length = 10)) + logb
+      QQ <- outer(seq_along(lt_grid), seq_along(lb_grid),
+                  Vectorize(function(i, j) Qpart(lt_grid[i], lb_grid[j])))
+      if (!any(is.finite(QQ))) break
+      best <- arrayInd(which.min(QQ), dim(QQ))
+      if (!(QQ[best] < q_cur)) break
+      logtheta <- lt_grid[best[1]]
+      logb <- lb_grid[best[2]]
+      q_cur <- QQ[best]
     }
-
-    old <- c(logtheta, logb)
-    delta <- try(solve(H + diag(opt$regularization, 2), c(g_t, g_b)), silent = TRUE)
-    if (inherits(delta, "try-error") || !all(is.finite(delta))) break
-    new <- old - as.numeric(delta)
-    if (!all(is.finite(new))) break
-    converged <- isTRUE(sqrt(sum((new - old)^2)) / max(sqrt(sum(old^2)), .Machine$double.eps) <
-                          opt$nr_tol)
-    logtheta <- new[1]
-    logb <- new[2]
-    if (isTRUE(opt$verbose)) message("*** NR Algorithm - iteration n. ", it)
   }
 
   list(logtheta = logtheta, logb = logb, n_iter = it)
+}
+
+### The limits of log(theta) that the distances between the locations can
+### identify: the correlation between the two closest locations no lower than
+### 0.05, that between the two farthest no higher than 0.95. Without two
+### distinct locations there are no limits.
+`stem_theta_limits` <- function(dist) {
+  h <- dist[upper.tri(dist)]
+  h <- h[is.finite(h) & h > 0]
+  if (!length(h)) return(c(-Inf, Inf))
+  c(log(-log(0.95) / max(h)), log(-log(0.05) / min(h)))
+}
+
+### Whether log(theta) sits at one of its limits: "lower", "upper" or "none".
+`stem_theta_bound` <- function(logtheta, opt) {
+  if (!opt$spatial) return("none")
+  lim <- opt$logtheta_lim
+  if (logtheta <= lim[1] + 1e-8) "lower" else if (logtheta >= lim[2] - 1e-8) "upper" else "none"
 }

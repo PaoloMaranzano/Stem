@@ -200,8 +200,8 @@ information criteria all come from the exact cluster-wise likelihoods.
   accelerated by SQUAREM (Varadhan and Roland 2008). They reach the same
   maximum. The default is `"SQUAREM"`: in the simulation study it fitted the
   regimes in about 40% of the time of the EM algorithm, closer to the maximum,
-  and ran the whole grid of `SCSTEM_Infocrit()` in about half the time on the
-  large cells (20% more on the small ones), with the same selections. The
+  and ran the whole grid of `SCSTEM_Infocrit()` in about half the time, on
+  small and large cells alike, with the same selections. The
   algorithm applies to the pooled fit and to the final refits; inside the
   alternation of SC-STEM, whose fits stop after a few iterations, the
   iterations are not accelerated. Penalized fits (`lambda > 0`) run the plain
@@ -213,6 +213,16 @@ information criteria all come from the exact cluster-wise likelihoods.
   the variance parameters were off by 3 to 13% on the regimes of the
   simulation study, and the variance of the latent innovations of a pooled fit
   by 84%, whatever the tolerance.
+* The range parameter is kept within the limits that the distances between
+  the locations can identify: the correlation between the two closest
+  locations no lower than 0.05, that between the two farthest no higher than
+  0.95. Beyond them the likelihood is flat in theta, and on the few locations
+  of a small regime the iterations ran towards 0 or infinity, each step paying
+  repeated grid searches. `convergence.par$theta.bound` of `STEM_Estimation()`
+  and `theta_bound` of `SCSTEM_Estimation()` report a range at a limit. The
+  Newton-Raphson step of the spatial parameters accepts a step only if it does
+  not worsen the objective, and allows one grid search where it used to
+  allow 30; `nr_hess_maxit` is removed from `STEM_control()`.
 * The estimates, the log-likelihood and the smoothed states returned by
   `STEM_Estimation()` refer to the same parameters: the log-likelihood and the
   smoothed states used to be those of the last-but-one iteration.
@@ -259,8 +269,8 @@ information criteria all come from the exact cluster-wise likelihoods.
   not a setting to tune.
 * The historical arguments (`precision`, `max.iter`, `precision_full_dataset`,
   `max_iter`, `abs_tol`, `rel_tol`) still work, as overrides of `control`.
-* The limits of the Newton-Raphson step of the spatial parameters are settings
-  of `control` (`nr_maxit`, `nr_hess_maxit`).
+* The limit on the Newton-Raphson iterations of the spatial parameters is a
+  setting of `control` (`nr_maxit`).
 
 ## Numerical robustness of the STEM core
 

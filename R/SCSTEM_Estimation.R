@@ -347,6 +347,11 @@
 #'   \item \code{em_converged}: logical vector, whether the EM algorithm of each
 #'     re-estimated cluster met its stopping rule within \code{em_maxit}
 #'     iterations (\code{NA} for a cluster not re-estimated).
+#'   \item \code{theta_bound}: character vector, for each re-estimated cluster
+#'     whether its range parameter ended at one of the limits that the
+#'     distances between its locations can identify (\code{"lower"},
+#'     \code{"upper"}) or within them (\code{"none"}); see the section on the
+#'     range in \code{\link{STEM_Estimation}}.
 #'   \item \code{refit_reused}: logical, whether the final refit was shared
 #'     with an earlier fit of the same partition.
 #'   \item \code{obj_trace}: data frame tracing the penalized objective, the
@@ -591,6 +596,7 @@ SCSTEM_Estimation <- function(StemModel,
       loglik_g = loglik,
       final_refit = TRUE,
       em_converged = isTRUE(pooled$estimates$convergence.par$converged),
+      theta_bound = pooled$estimates$convergence.par$theta.bound,
       refit_reused = FALSE,
       obj_trace = data.frame(iter = integer(0), objective = numeric(0),
                              label_changes = integer(0)),
@@ -1099,6 +1105,8 @@ SCSTEM_Estimation <- function(StemModel,
     loglik_g = loglik_g,
     final_refit = final_refit,
     em_converged = em_converged,
+    theta_bound = vapply(fit_final, function(f) if (is.null(f)) NA_character_ else
+      f$estimates$convergence.par$theta.bound, ""),
     refit_reused = refit_reused,
     obj_trace = obj_trace,
     convergence = convergence,

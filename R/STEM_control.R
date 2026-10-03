@@ -88,8 +88,6 @@
 #'   \code{1e-5} and \code{1e-6}.
 #' @param nr_maxit maximum number of Newton-Raphson iterations of the spatial
 #'   parameters within one EM iteration. Default \code{50}.
-#' @param nr_hess_maxit maximum number of attempts at a negative-definite
-#'   Hessian within one Newton-Raphson iteration. Default \code{30}.
 #'
 #' @return An object of class \dQuote{STEM_control}: a named list of the
 #'   settings.
@@ -112,7 +110,7 @@ STEM_control <- function(algorithm = c("SQUAREM", "EM", "ECME", "SQUAREM-ECME"),
                          em_stop = c("any", "all"),
                          alt_em_tol_par = 1e-2, alt_em_tol_loglik = 1, alt_em_maxit = 50L,
                          alt_maxit = 10L, alt_abs_tol = 1e-5, alt_rel_tol = 1e-6,
-                         nr_maxit = 50L, nr_hess_maxit = 30L) {
+                         nr_maxit = 50L) {
   pos <- function(x, nm) {
     if (length(x) != 1L || !is.numeric(x) || is.na(x) || x <= 0) {
       stop("'", nm, "' must be a single positive number.", call. = FALSE)
@@ -139,8 +137,7 @@ STEM_control <- function(algorithm = c("SQUAREM", "EM", "ECME", "SQUAREM-ECME"),
               alt_maxit = nonneg(alt_maxit, "alt_maxit"),
               alt_abs_tol = pos(alt_abs_tol, "alt_abs_tol"),
               alt_rel_tol = pos(alt_rel_tol, "alt_rel_tol"),
-              nr_maxit = int(nr_maxit, "nr_maxit"),
-              nr_hess_maxit = int(nr_hess_maxit, "nr_hess_maxit"))
+              nr_maxit = int(nr_maxit, "nr_maxit"))
   class(out) <- c("STEM_control", "list")
   out
 }
@@ -194,7 +191,6 @@ print.STEM_control <- function(x, ...) {
       ", tol_loglik = ", x$alt_em_tol_loglik, ", maxit = ", x$alt_em_maxit, "\n", sep = "")
   cat("  alternation                     : maxit = ", x$alt_maxit,
       ", abs_tol = ", x$alt_abs_tol, ", rel_tol = ", x$alt_rel_tol, "\n", sep = "")
-  cat("  Newton-Raphson (spatial)        : maxit = ", x$nr_maxit,
-      ", Hessian attempts = ", x$nr_hess_maxit, "\n", sep = "")
+  cat("  Newton-Raphson (spatial)        : maxit = ", x$nr_maxit, "\n", sep = "")
   invisible(x)
 }

@@ -16,8 +16,7 @@ STEM_control(
   alt_maxit = 10L,
   alt_abs_tol = 1e-05,
   alt_rel_tol = 1e-06,
-  nr_maxit = 50L,
-  nr_hess_maxit = 30L
+  nr_maxit = 50L
 )
 }
 \arguments{
@@ -55,9 +54,6 @@ penalized objective, below which the alternation stops. Defaults
 
 \item{nr_maxit}{maximum number of Newton-Raphson iterations of the spatial
 parameters within one EM iteration. Default \code{50}.}
-
-\item{nr_hess_maxit}{maximum number of attempts at a negative-definite
-Hessian within one Newton-Raphson iteration. Default \code{30}.}
 }
 \value{
 An object of class \dQuote{STEM_control}: a named list of the
