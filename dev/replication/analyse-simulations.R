@@ -431,6 +431,18 @@ if (!is.null(rob) && length(unique(rob$arm)) > 1) {
 ## R5. The parameters: bias and RMSE at the reference, the estimated regimes
 ## aligned on the true ones
 ## ===========================================================================
+## how often the range of a regime ends at a limit of what its distances
+## identify, by number of locations and length of the series (all cells)
+if (!is.null(P) && "theta_bound" %in% names(P)) {
+  tb <- P[P$parameter == "theta" & !is.na(P$theta_bound), , drop = FALSE]
+  if (nrow(tb)) {
+    tbs <- agg(tb, c("n", "TN"), function(s) data.frame(
+      regimes = nrow(s), lower = mean(s$theta_bound == "lower"), upper = mean(s$theta_bound == "upper")))
+    csv_write(tbs, "tab_sim_theta_bound.csv")
+    cat("R5. RANGES AT A LIMIT (share of the regimes, by n and T): see tab_sim_theta_bound.csv\n")
+    print(tbs, row.names = FALSE, digits = 3)
+  }
+}
 if (!is.null(P)) {
   P <- P[P$cell %in% S$cell[at_ref(S)] & P$K_true > 1, , drop = FALSE]
   P$err <- P$estimate - P$truth

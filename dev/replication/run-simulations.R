@@ -81,7 +81,9 @@
 ##   <tag>-params.csv    one row per replication, regime and parameter: the
 ##                       truth beside the estimate at the true number of
 ##                       regimes, after aligning the estimated regimes on the
-##                       true ones
+##                       true ones, and whether the range of the regime ended
+##                       at a limit of what its distances identify
+##                       (theta_bound: "lower", "upper" or "none")
 ##   <tag>-stations.csv  one row per replication and location
 ##   <tag>-grid.csv      one row per replication and (K, phi) of the fitted
 ##                       grid: log-likelihood, parameters, criteria, and the
@@ -141,13 +143,14 @@ sim_require <- function(pkgs) {
   }
 }
 
-## Pinned to the commit of 2026-10-03: the commit of 2026-10-02 (STEM_control,
+## Pinned to the commit of 2026-10-03 (third): the commit of 2026-10-02 (STEM_control,
 ## the stopping rule with em_stop = "any", the regimes started from their own
 ## least squares and then warm, the final refits shared across the grid, the
 ## names K and A) plus the four estimation algorithms with SQUAREM as the
-## default, tolerances 1e-3 on both criteria, regularization 0, and the
-## penalized fits started from the refits of the unpenalized solution
-SIM_STEM_REF <- "PaoloMaranzano/Stem@6808cfeb5a1b3fff9258e38945b93d8e1b495e51"
+## default, tolerances 1e-3 on both criteria, regularization 0, the penalized
+## fits started from the refits of the unpenalized solution, and the range kept
+## within the limits that the distances identify
+SIM_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
 
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
@@ -885,6 +888,7 @@ sim_one <- function(cell, rep, attempt = 1L) {
     scstem_align_labels(reference = dat$labels, refit = fit_true$group, K = K)
   tru <- dgp_truth(dat$psi)
   est <- rep(NA_real_, nrow(tru))
+  bound <- rep(NA_character_, nrow(tru))
   if (!is.null(fit_true) && !is.null(fit_true$phi_hat) && !is.null(map)) {
     ph  <- fit_true$phi_hat
     est <- vapply(seq_len(nrow(tru)), function(i) {
@@ -892,8 +896,16 @@ sim_one <- function(cell, rep, attempt = 1L) {
       p <- tru$parameter[i]
       if (!length(g_fit) || !(p %in% colnames(ph))) NA_real_ else ph[g_fit[1], p]
     }, numeric(1))
+    ## whether the range of the regime ended at a limit of what its distances
+    ## identify ("lower", "upper") or within them ("none")
+    if (!is.null(fit_true$theta_bound)) {
+      bound <- vapply(seq_len(nrow(tru)), function(i) {
+        g_fit <- which(map == tru$regime[i])
+        if (!length(g_fit)) NA_character_ else fit_true$theta_bound[g_fit[1]]
+      }, "")
+    }
   }
-  params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est)
+  params <- cbind(key[rep(1L, nrow(tru)), ], tru, estimate = est, theta_bound = bound)
   rownames(params) <- NULL
 
   ## the fitted grid, one row per (K, phi), with the ARI of every partition, so
