@@ -137,12 +137,13 @@ FA_SETTING <- c("1" = "Y major, X independent", "2" = "Y independent, X major",
 
 
 ## ===========================================================================
-## Stem, pinned to the commit of the simulation study (main3: the four
+## Stem, pinned to ddf90a8: the code of the simulation study (0f7b744, main3: the four
 ## estimation algorithms with SQUAREM as the default, tolerances 1e-3,
-## regularization 0, the range within the limits the distances identify);
+## regularization 0, the range within the limits the distances identify) with
+## the BIC on the observed values, which differs only when the response has gaps;
 ## installed from GitHub when the installed copy is another commit
 ## ===========================================================================
-FA_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
+FA_STEM_REF <- "PaoloMaranzano/Stem@ddf90a80d14b579aac805dd15fbf18c3c6f9f9a7"
 fa_stem_ok <- function() {
   if (!nzchar(system.file(package = "Stem"))) return(FALSE)
   identical(utils::packageDescription("Stem")$RemoteSha, sub("^.*@", "", FA_STEM_REF))

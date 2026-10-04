@@ -36,12 +36,16 @@ read from the installed DESCRIPTION file, without loading the package. Restart
 R before the first run on a machine where Stem is already loaded in the
 session. Offline, an installed Stem that carries what the script uses is
 accepted as it is. `run-application.R` (`APP_STEM_REF`) and
-`run-fuels-application.R` (`FA_STEM_REF`) are pinned to the same commit, and
-keep their caches in a folder named after it (`application/0f7b744/`,
-`<out>/cache/0f7b744/`), so that fits of an earlier Stem are never reused. All
-three run the computational settings of the package (`STEM_control()`: SQUAREM,
-tolerances 1e-3), passed explicitly so that a session option cannot change
-them.
+`run-fuels-application.R` (`FA_STEM_REF`) are pinned to ddf90a8, the code of
+0f7b744 with the BIC counting the observed values of the response instead of
+`d * T`: the two commits give identical results on complete data, which the
+simulated data and the fuel prices are, and differ only when the response
+has gaps (the Po Valley data). The applications keep their caches in a
+folder named after the commit (`application/ddf90a8/`,
+`<out>/cache/ddf90a8/`), so that fits of an earlier Stem are never reused. All
+three run the computational settings of the package (`STEM_control()`:
+SQUAREM, tolerances 1e-3), passed explicitly so that a session option cannot
+change them.
 
 ## Running the simulations from RStudio
 

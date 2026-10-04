@@ -49,15 +49,16 @@ app_here <- local({
 })
 
 ## ---------------------------------------------------------------------------
-## The only prerequisite: Stem, installed from GitHub at the commit of the
-## simulation study (main3: the four estimation algorithms with SQUAREM as the
+## The only prerequisite: Stem, installed from GitHub at ddf90a8, the code of the
+## simulation study (0f7b744, main3: the four estimation algorithms with SQUAREM as the
 ## default, tolerances 1e-3, regularization 0, the range within the limits the
-## distances identify), and again whenever the installed copy is another
+## distances identify) with the BIC on the observed values, which differs only
+## when the response has gaps, and again whenever the installed copy is another
 ## commit. Offline, an installed Stem that carries what is used here is
 ## accepted as it is. The development builds all say 2.0.0, so the check is on
 ## the features and on the commit.
 ## ---------------------------------------------------------------------------
-APP_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
+APP_STEM_REF <- "PaoloMaranzano/Stem@ddf90a80d14b579aac805dd15fbf18c3c6f9f9a7"
 
 app_github_sha <- function(ref = APP_STEM_REF) {
   repo <- sub("@.*$", "", ref)

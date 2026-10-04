@@ -77,6 +77,12 @@ Fixed:
   log-likelihood units, measured on the old returned value; on the
   log-likelihood they are about 0.75-10 and 8.
 
+Replication: `run-application.R` and `run-fuels-application.R` are pinned to
+ddf90a8, the commit of the fixes above (their caches move to folders named
+after it). `run-simulations.R` stays on 0f7b744, on which `main3` is running:
+the two commits give identical results on complete data, and the simulated
+data are complete. Nothing was launched.
+
 ### 2026-10-03 (fourth entry)
 
 **Documentation split by topic, and the Computational Supplement shipped with
