@@ -26,12 +26,20 @@
 #' Given the observation matrix and using the multivariate Normal distribution standard theory, the predictor in the new generic spatial location
 #' \eqn{s_0} at time \eqn{t} is an univariate Gaussian distribution with mean \eqn{z(s_0,t)} and variance \eqn{\sigma^2(s_0)} given by:
 #'
-#'   \deqn{z(s_0,t) = X(s_0,t)\beta+A(s_0)y_t+\Omega^{\prime} \Sigma_e^{-1} (z_t-X_t\beta+A y_t)}{z(s_0,t) = X(s_0,t)*\beta+A(s_0)*y_t+\Omega '*\Sigma_e^{-1}*(z_t-X_t*\beta+A*y_t)}
+#'   \deqn{z(s_0,t) = X(s_0,t)\beta+A(s_0)y_t+\Omega^{\prime} \Sigma_e^{-1} (z_t-X_t\beta-A y_t)}{z(s_0,t) = X(s_0,t)*\beta+A(s_0)*y_t+\Omega '*\Sigma_e^{-1}*(z_t-X_t*\beta-A*y_t)}
 #'   \deqn{\sigma^2(s_0)=\sigma^2{\omega}-\Omega^{\prime}\Sigma_e^{-1} \Omega }{\sigma^2(s_0)=\sigma^2{\omega}-\Omega '*\Sigma_e^{-1}*\Omega }
 #'
 #' where \eqn{\Omega} is the \eqn{d \times 1}{d*1} constant in time covariance vector, whose \eqn{i}-th generic element (\eqn{i=1,...,d}) is
 #' \eqn{Cov(z(s_i,t),z(s_0,t))}. Moreover,  \eqn{X(s_0,t)}{X(s_0,t)} is the \eqn{1 \times r}{1*r} vector of covariates for the new site \eqn{s_0}{s_0} and \eqn{A(s_0)}{A(s_0)} is the \eqn{1 \times p}{1*p} loading vector. Note that all the parameters in the previous formula are ML estimates and the latent process \eqn{y_t} is the output of the
 #' Kalman filtering procedures for each time point \eqn{t}.
+#'
+#' The predictor is the conditional mean of the response at \eqn{s_0} given
+#' the data observed at time \eqn{t}, with the latent state at its smoothed
+#' value. The standard error \code{se.pred} is \eqn{\sigma(s_0)} above, the
+#' formula of Fasso and Cameletti (2010): it is the standard error of the
+#' spatially structured component at \eqn{s_0}, and it leaves out the nugget
+#' \eqn{\sigma^2_\epsilon} and the uncertainty of the smoothed state, so it
+#' understates the standard error of a new observation at \eqn{s_0}.
 #'
 #'
 #'
@@ -165,8 +173,8 @@ colnames(coord.newlocations) = colnames(StemModel$data$coordinates)
 m = nrow(coord.newlocations)
 
 if(time.point<1 | time.point>StemModel$data$n) stop(paste("time.point must be between 1 and",StemModel$data$n))
-if(!ncol(coord.newlocations==2)) stop("coord.newlocations must have 2 columns")
-if(!ncol(covariates.newlocations==r)) stop(paste("covariates.newlocations must have",StemModel$data$r,"columns"))
+if(ncol(coord.newlocations) != 2) stop("coord.newlocations must have 2 columns")
+if(ncol(covariates.newlocations) != r) stop(paste("covariates.newlocations must have",StemModel$data$r,"columns"))
 if(!(m==nrow(covariates.newlocations))) stop("coord.newlocations and covariates.newlocations must have the same number or rows")
 
 

@@ -12,11 +12,11 @@
 #' For each pair \eqn{(K, \phi)} the function calls \code{\link{SCSTEM_Estimation}}
 #' and records the exact total log-likelihood of the final refit, the number of
 #' free parameters \eqn{\mathrm{df} = K_{eff}(r + 3 + 3p)}, and
-#' \deqn{AIC = -2\ell + 2\,\mathrm{df}, \qquad BIC = -2\ell + \log(dT)\,\mathrm{df}, \qquad
+#' \deqn{AIC = -2\ell + 2\,\mathrm{df}, \qquad BIC = -2\ell + \log(N)\,\mathrm{df}, \qquad
 #'       KIC = -2\ell + 3\,\mathrm{df},}
-#' where \eqn{d} is the number of locations and \eqn{T} the number of time
-#' points, so that \eqn{dT} is the number of observations entering the
-#' likelihood.
+#' where \eqn{N} is the number of observations entering the likelihood, the
+#' observed values of the response: \eqn{N = dT}, with \eqn{d} locations and
+#' \eqn{T} time points, when the panel is complete.
 #'
 #' \strong{Admissibility.} A configuration is admissible when all its \eqn{K}
 #' regimes could be re-estimated on the final partition, that is when

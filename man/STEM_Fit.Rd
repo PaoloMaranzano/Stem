@@ -219,10 +219,15 @@ of freedom.
 \donttest{
 data(povalley)
 Tn <- 120L
+Tfull <- nrow(povalley$z)
 d  <- nrow(povalley$coords)
 z  <- povalley$z[seq_len(Tn), ]
-X  <- cbind(1, as.vector(povalley$altitude_std[seq_len(Tn), ]))
-ols <- stats::lm.fit(x = X, y = as.vector(z))
+# rows of the stacked covariate matrix belonging to the first Tn days:
+# the intercept, the station altitude and the daily PM10 concentration
+keep <- as.vector(outer(seq_len(Tn), (seq_len(d) - 1L) * Tfull, '+'))
+X  <- povalley$covariates[keep, ]
+ok  <- !is.na(as.vector(z))
+ols <- stats::lm.fit(x = X[ok, ], y = as.vector(z)[ok])
 s2  <- stats::var(ols$residuals)
 mod <- STEM_Model(z = z, covariates = X, coordinates = povalley$coords,
   phi = list(beta = matrix(ols$coefficients, ncol = 1),

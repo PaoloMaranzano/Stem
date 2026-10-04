@@ -545,7 +545,9 @@ SCSTEM_Estimation <- function(StemModel,
   d <- ncol(z)
   Tobs <- nrow(z)
   ncov <- ncol(covariates)
-  Nobs <- d * Tobs
+  ### the number of observations entering the likelihood, for the BIC: the
+  ### observed values, d * Tobs when the panel is complete
+  Nobs <- sum(!is.na(z))
 
   if (is.null(min_cluster_size)) min_cluster_size <- ncov + 2L
   min_cluster_size <- max(2L, as.integer(min_cluster_size))

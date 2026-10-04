@@ -16,6 +16,67 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-04
+
+**A general check of the package, the replication scripts and the paper,
+after the defect of the log-likelihood.** Comparing the first replications
+of `main3` with `main2` showed log-likelihoods four times smaller on the same
+data. The cause: `STEM_Estimation()`, in every version since Stem 1.0
+(checked on the tarball of 1.0), stored -2 loglik in its iteration matrix
+and returned that value multiplied by -2, that is 4 loglik. The rewrite of
+2026-10-03 (ea73a9b) returns the log-likelihood of `kalman()` and so fixed it,
+but the change went unnoticed and undocumented, because the tests checked
+only that the value returned was that of the filter. Consequences: the AIC,
+BIC and KIC of SC-STEM in `main`, `main2` and every earlier run weighted the
+likelihood four times against the penalty. The two-step rule re-implemented
+on the grid files reproduces the recorded selection in all 951 replications
+of `main2` and all 48 of `main3` checked; on the 951 of `main2`, the BIC on
+the true log-likelihood selects fewer regimes in 40 (correct K 81.2% ->
+77.8%, mostly S1w-shr, S3beta-shr, S3theta-shr, S3error-shr). The partitions
+were not affected: the label step and the automatic penalty scale use the
+location-wise scores, which were always right. `main3` (0f7b744) runs on the
+correct log-likelihood. The user asked for a check of everything before the
+launch that has to be the last one. Checked, against independent computations
+(scratch `audit-*.R`):
+
+- the log-likelihood equals the Gaussian log-likelihood of the observed values
+  on the full covariance of the data, gaps included (1e-14), for EM, ECME and
+  SQUAREM; the estimates equal the maximum found by `optim()` on that
+  likelihood (largest relative difference 2e-5); the smoothed states and
+  `STEM_Signal()` equal the conditional means (3e-15);
+- `STEM_Simulation()`, which both bootstraps use: mean and covariance of
+  20000 simulated data sets against the exact ones, within Monte Carlo error;
+- the whole replication of the simulation study, end to end: two
+  replications of `main3` reproduced here from the pinned code (same data,
+  same selection, same ARI and RMSE, grid log-likelihoods to 4e-12);
+- `analyse-simulations.R` runs on the partial results of `main3`;
+- the application scripts (design, Granger test on the bootstrap covariance,
+  diagnostics), the bootstrap and the cross-validation predictor against
+  what the paper states.
+
+Fixed:
+
+- the BIC of SC-STEM counted `d * T` observations also when the response
+  has gaps; it now counts the observed values. Nothing changes on complete
+  data, which is the case of the simulation study and of the fuel
+  application (gaps carried forward), so `main3` and its pin are unaffected;
+- `STEM_Kriging()`: argument checks that never fired, a sign in the
+  documented formula, and what `se.pred` measures;
+- `tests/testthat/test-exact.R`: the log-likelihood, the smoothed states, the
+  maximum and the BIC against dense computations;
+- the example of `STEM_Fit()`, inside `\donttest{}` and so never run by an
+  ordinary check, used `povalley$altitude_std`, which does not exist; it now
+  takes the covariates of `povalley` as the other examples do, and
+  `R CMD check --run-donttest` passes;
+- the paper: the minimum regime size (r + 2, as in the code), the functions
+  of Appendix B (`STEM_Data()` and `STEM_Skeleton()` are internal), the
+  sample size of the BIC, the settings of Supplement B (the stopping rule of
+  1e-4 and the experiments on the old estimator are replaced by the current
+  settings and Supplement A);
+- this file: the entry of 2026-10-03 (first) gave "3-41" and "up to 33"
+  log-likelihood units, measured on the old returned value; on the
+  log-likelihood they are about 0.75-10 and 8.
+
 ### 2026-10-03 (fourth entry)
 
 **Documentation split by topic, and the Computational Supplement shipped with
@@ -133,15 +194,18 @@ of the likelihood: `kalman()` added `regularization = 0.01` to every matrix it
 inverted, the filter that computes the likelihood did not, and the fixed point
 moved along the slow directions (variance parameters off by 3-13% on the
 regimes, Sigmaeta of a pooled fit by 84%, the fit at the true K of the larger
-cells 3-41 log-likelihood units short). With 0 the same iterations reach the
-BFGS maximum of the exact likelihood. Every matrix inverted is positive
-definite at admissible parameters, so the default is now 0.
+cells about 0.75-10 log-likelihood units short; measured as 3-41 on the value
+then returned, four times the log-likelihood, see 2026-10-04). With 0 the same
+iterations reach the BFGS maximum of the exact likelihood. Every matrix
+inverted is positive definite at admissible parameters, so the default is now
+0.
 
 Tolerance test (scratch `tol-test*.R`: 6 cells from n40/T60 to n400 and
 n200/T365, omega 0 included, 2 replications, whole grid): 1e-3 on both criteria
 left the estimates within 1-2% of those at the previous defaults and the
-selection unchanged; 1e-2 lost up to 33 log-likelihood units at the true K and
-moved theta by up to seven times. Defaults: 1e-3 and 1e-3.
+selection unchanged; 1e-2 lost up to about 8 log-likelihood units (33 on the
+old returned value) at the true K and moved theta by up to seven times.
+Defaults: 1e-3 and 1e-3.
 
 ECME and SQUAREM were prototyped in scratch (`ecme-proto.R`, `em-accel.R`) and
 written up for the user in an internal note (`em-algorithm-notes.tex` in the

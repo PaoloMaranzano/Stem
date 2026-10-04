@@ -183,9 +183,26 @@ information criteria all come from the exact cluster-wise likelihoods.
 ### Information criteria
 
 * AIC, BIC and KIC are computed on the exact total log-likelihood of the final
-  refit, with `k_eff * (ncov + 3 + 3p)` free parameters and `n = d * T`
-  observations. The previous implementation used the *number of clusters* as the
-  number of parameters and the number of locations as the sample size.
+  refit, with `k_eff * (ncov + 3 + 3p)` free parameters and, in the BIC, the
+  number of observed values of the response as the sample size (`d * T` when
+  the panel is complete). The previous implementation used the *number of
+  clusters* as the number of parameters and the number of locations as the
+  sample size.
+
+### The log-likelihood returned by `STEM_Estimation()`
+
+* `estimates$loglik` is now the log-likelihood. Every earlier version,
+  1.0 included, returned four times it: the EM loop stored -2 times the
+  log-likelihood and the value returned multiplied that by -2 again. The
+  iterations were not affected (the stopping rule used differences of the
+  stored value, halved), but everything computed from the returned value was:
+  the AIC, BIC and KIC of SC-STEM weighted the likelihood four times against
+  the penalty, which favoured more regimes. On the 951 replications of an
+  earlier run of the simulation study, the BIC on the true log-likelihood
+  selects fewer regimes in 40, mostly in the weakly separated scenarios. The
+  log-likelihood, the smoothed states and the maximum are now tested against
+  dense computations on the full covariance of the data
+  (`tests/testthat/test-exact.R`).
 
 ### Convergence of the EM algorithm and computational settings
 
@@ -294,6 +311,12 @@ draws out of 12 to 12 out of 12.
 
 * `STEM_Simulation()` called `mvrnorm()` unqualified, relying on a `NAMESPACE`
   import; it now calls `MASS::mvrnorm()`.
+* `STEM_Kriging()`: the checks on the number of columns of
+  `coord.newlocations` and `covariates.newlocations` never fired; they do now.
+  The documented predictor had the wrong sign on the latent term of the
+  residual (the code was right), and the documentation now states what
+  `se.pred` measures: the standard error of the spatially structured
+  component, without the nugget and the uncertainty of the smoothed state.
 
 ## Larger networks
 

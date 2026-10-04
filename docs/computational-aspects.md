@@ -314,6 +314,25 @@ reproduces the GLS estimator on the explicit $dT \times dT$ covariance to
 $10^{-10}$. Without the ridge, the iterations converge to the BFGS maximum of
 the exact log-likelihood.
 
+**Exactness.** Against computations on the full covariance of the data, with
+gaps in the response: the log-likelihood returned is the Gaussian
+log-likelihood of the observed values to $10^{-14}$, for EM, ECME and SQUAREM;
+the estimates are the maximum that `optim()` finds on it (largest relative
+difference $2 \cdot 10^{-5}$); the smoothed states and `STEM_Signal()` are the
+conditional means to $3 \cdot 10^{-15}$. `STEM_Simulation()`, which the
+bootstraps use, reproduces the mean and the covariance of the model within
+Monte Carlo error over 20000 data sets. The first four checks are tests of the
+package (`tests/testthat/test-exact.R`). Every version up to 2.0.0, 1.0
+included, returned four times the log-likelihood in `estimates$loglik` (the
+EM loop stored $-2\ell$ and multiplied it by $-2$ again), so the information
+criteria of SC-STEM weighted the likelihood four times against the penalty;
+the value returned is now $\ell$.
+
+**Information criteria.** AIC, BIC and KIC use the exact total log-likelihood
+of the final refit and $K_{\mathrm{eff}}(r + 3 + 3p)$ parameters; the sample
+size of the BIC is the number of observed values of the response, $dT$ when
+the panel is complete.
+
 **The same maximum.** Run to a tolerance of $10^{-7}$, the four algorithms stop
 at the same log-likelihood to $10^{-9}$, after 177 (EM), 178 (ECME), 39
 (SQUAREM) and 30 (SQUAREM-ECME) iterations.

@@ -6,7 +6,7 @@
 ## scenario-variants, the reference levels and the blocks), so that the two
 ## cannot disagree about it. It runs from whatever folder it sits in.
 ##
-##     Rscript analyse-simulations.R                  the results of tag "main"
+##     Rscript analyse-simulations.R                  the results of tag "main3"
 ##     Rscript analyse-simulations.R --tag=main,ref   several tags, stacked
 ##     Rscript analyse-simulations.R --out=D:/paper/Figures
 ##
