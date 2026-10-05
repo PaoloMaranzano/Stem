@@ -213,8 +213,17 @@ extrapolation, which is kept only if $\ell(\psi') \ge \ell(\psi_0)$ (otherwise
 the cycle ends at $\psi_2$); the safeguard costs nothing, since every iteration
 evaluates $\ell$ at its input. $\alpha_{\max}$ starts at 1, grows by a factor 4
 when it binds and shrinks after a rejection. SQUAREM is not used inside the
-alternation of SC-STEM, whose fits stop after a few iterations, nor with a
-penalty on $\beta$, whose objective is re-scaled at every iteration.
+alternation of SC-STEM, whose fits stop after a few iterations.
+
+With a ridge on $\beta$ the objective is the penalized log-likelihood
+$\ell(\psi) - \tfrac{\lambda}{2}\sum_j w_j s_j(\psi)^2 \beta_j^2$, whose scale
+$s_j^2 = [\sum_t X_t'\Sigma_e^{-1}X_t]_{jj}$ moves with $\Sigma_e$: there is no
+fixed objective, and the safeguard compares this one with the scale measured
+at each point. Along the plain iterations it decreases by at most $10^{-5}$,
+and on dynamic designs with collinear lags (five seeds, three penalties) the
+accelerated iterations reach the fixed point of the plain ones to $10^{-7}$ in
+about half the time. With the lasso or the elastic net the fits run the
+plain iterations.
 
 ## 8. The four algorithms at a glance
 

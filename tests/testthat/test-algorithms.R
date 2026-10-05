@@ -86,11 +86,21 @@ test_that("the ECME step is the GLS of beta and m0 under the covariance of the m
   expect_equal(as.numeric(got), as.numeric(want), tolerance = 1e-10)
 })
 
-test_that("a penalized fit runs the plain iterations under SQUAREM", {
+test_that("a ridge fit under SQUAREM reaches the fixed point of the plain iterations", {
+  mod <- sim_small()
+  tight <- list(em_tol_par = 1e-9, em_tol_loglik = 1e-9, em_stop = "all", em_maxit = 5000)
+  a <- STEM_Estimation(mod, alpha = 0, lambda = 0.5, control = c(tight, algorithm = "EM"))
+  b <- STEM_Estimation(mod, alpha = 0, lambda = 0.5, control = c(tight, algorithm = "SQUAREM"))
+  pa <- unlist(a$estimates$phi.hat); pb <- unlist(b$estimates$phi.hat)
+  expect_lt(max(abs(pa - pb) / pmax(abs(pa), 1e-3)), 1e-5)
+  expect_lt(b$estimates$convergence.par$iterEM, a$estimates$convergence.par$iterEM / 2)
+})
+
+test_that("a lasso fit runs the plain iterations under SQUAREM", {
   mod <- sim_small(d = 8L, n = 40L)
   ctl <- list(em_tol_par = 1e-6, em_tol_loglik = 1e-6, em_maxit = 40)
-  a <- STEM_Estimation(mod, alpha = 0, lambda = 0.2, control = c(ctl, algorithm = "EM"))
-  b <- STEM_Estimation(mod, alpha = 0, lambda = 0.2, control = c(ctl, algorithm = "SQUAREM"))
+  a <- STEM_Estimation(mod, alpha = 1, lambda = 0.2, control = c(ctl, algorithm = "EM"))
+  b <- STEM_Estimation(mod, alpha = 1, lambda = 0.2, control = c(ctl, algorithm = "SQUAREM"))
   expect_identical(a$estimates$convergence.par$iterEM, b$estimates$convergence.par$iterEM)
   expect_equal(a$estimates$phi.hat, b$estimates$phi.hat)
 })

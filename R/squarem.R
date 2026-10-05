@@ -26,7 +26,9 @@
 ### cycle and accepted only if the log-likelihood at psi' is not below that at
 ### psi; otherwise the cycle ends at F(F(psi)), whose increase the EM algorithm
 ### guarantees, and step_max shrinks. Every call of the iteration evaluates the
-### log-likelihood at its input, so the safeguard costs nothing. The
+### log-likelihood at its input, so the safeguard costs nothing. With a ridge
+### the map also returns the penalized log-likelihood, `merit`
+### (stem_ridge_merit() in em-fit.R), and the safeguard compares that. The
 ### extrapolation is done on a scale on which every value is admissible: the
 ### logarithm of the variances (the Cholesky factor of a full Sigmaeta) and of
 ### the range.
@@ -74,6 +76,10 @@
   phi$logtheta <- min(max(take(1L), opt$logtheta_lim[1]), opt$logtheta_lim[2])
   phi
 }
+
+### What the safeguard compares: the penalized log-likelihood of a ridge when
+### the map returns it, the log-likelihood otherwise.
+`stem_merit` <- function(o) if (is.null(o$merit)) o$loglik else o$merit
 
 ### The accelerated iterations. Same arguments and value as stem_iterate_plain().
 `stem_iterate_squarem` <- function(map, phi, dat, opt, ctl) {
@@ -133,7 +139,7 @@
     alpha <- max(1, min(step_max, alpha))
     if (abs(alpha - 1) > 0.01) {
       o3 <- step(stem_par_unvec(v[[1]] + 2 * alpha * r + alpha^2 * w, phi0, opt))
-      if (!is.null(o3) && o3$loglik >= o1$loglik - 1e-6) {
+      if (!is.null(o3) && stem_merit(o3) >= stem_merit(o1) - 1e-6) {
         phi <- o3$phi
         last <- o3
       } else {

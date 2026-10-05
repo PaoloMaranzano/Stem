@@ -20,17 +20,49 @@
 ### the parameters in. The drivers below run a map until the stopping rule.
 ###
 ### SQUAREM needs an objective that the iterations increase, to safeguard its
-### extrapolation. With a penalty on beta (lambda > 0) the objective is the
-### penalized likelihood, whose scale is re-measured at every iteration, so the
-### penalized fits run the plain iterations of their map.
+### extrapolation. Without a penalty it is the log-likelihood. With a ridge on
+### beta (lambda > 0, alpha = 0) it is the penalized log-likelihood,
+###
+###   loglik(psi) - lambda/2 sum_j w_j s_j(psi)^2 beta_j^2 ,
+###
+### with the scale of the penalty, s_j^2 = [sum_t X_t' Sigma_e^{-1} X_t]_jj,
+### measured at the point psi itself (stem_ridge_merit()): the scale moves with
+### Sigma_e, so there is no fixed objective, but along the plain iterations this
+### one decreases by at most 1e-5, and the accelerated iterations reach the
+### fixed point of the plain ones (to 1e-7 on dynamic designs with collinear
+### lags, in about half the time; CHANGELOG, 2026-10-05). With the lasso or the
+### elastic net (alpha > 0) the fits run the plain iterations of their map.
 
 `stem_em_fit` <- function(phi, dat, opt, ctl) {
   map <- switch(ctl$algorithm,
                 "EM" = , "SQUAREM" = stem_map_em,
                 "ECME" = , "SQUAREM-ECME" = stem_map_ecme)
-  accelerate <- ctl$algorithm %in% c("SQUAREM", "SQUAREM-ECME") && opt$lambda <= 0
-  if (accelerate) stem_iterate_squarem(map, phi, dat, opt, ctl)
-  else stem_iterate_plain(map, phi, dat, opt, ctl)
+  penalized <- opt$lambda > 0
+  accelerate <- ctl$algorithm %in% c("SQUAREM", "SQUAREM-ECME") && (!penalized || opt$alpha <= 0)
+  if (accelerate && penalized) {
+    stem_iterate_squarem(stem_ridge_merit(map), phi, dat, opt, ctl)
+  } else if (accelerate) {
+    stem_iterate_squarem(map, phi, dat, opt, ctl)
+  } else {
+    stem_iterate_plain(map, phi, dat, opt, ctl)
+  }
+}
+
+### A map whose value also carries the penalized log-likelihood of a ridge at
+### its input, `merit`, which the safeguard of SQUAREM compares. The scale of
+### the penalty is the GLS one of the M-step (stem_beta_update(), standardize =
+### TRUE), here at the input parameters.
+`stem_ridge_merit` <- function(map) {
+  function(phi, dat, opt) {
+    out <- map(phi, dat, opt)
+    Sstar <- dat$cov.spat(d = dat$d, logb = phi$logb, logtheta = phi$logtheta, dist = dat$dist)
+    Sei <- tryCatch(chol2inv(chol(phi$sigma2omega * Sstar)), error = function(e) NULL)
+    if (is.null(Sei)) return(out)
+    Xm <- matrix(dat$covariates, nrow = dat$d)                   # d x (r n): r fastest
+    s2 <- rowSums(matrix(colSums(Xm * (Sei %*% Xm)), nrow = dat$r))
+    out$merit <- out$loglik - opt$lambda / 2 * sum(opt$pen_w * s2 * as.numeric(phi$beta)^2)
+    out
+  }
 }
 
 ### One iteration of each algorithm.

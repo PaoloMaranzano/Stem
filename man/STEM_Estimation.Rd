@@ -175,10 +175,12 @@ maximum a given stopping rule leaves them.
     package SQUAREM (Du and Varadhan 2020).}
   \item{\code{"SQUAREM-ECME"}}{the ECME iterations accelerated by SQUAREM.}
 }
-With a penalty on \eqn{\beta} (\code{lambda > 0}) the safeguard of SQUAREM
-has no fixed objective to rely on, since the scale of the penalty is
-re-measured at every iteration, and the fit runs the plain iterations of EM
-or ECME.
+With a ridge on \eqn{\beta} (\code{lambda > 0}, \code{alpha = 0}) the
+safeguard of SQUAREM compares the penalized log-likelihood, with the scale of
+the penalty measured at each point: the scale moves with
+\eqn{\Sigma_e}, so there is no fixed objective, but the accelerated iterations
+reach the fixed point of the plain ones. With the lasso or the elastic net
+(\code{alpha > 0}) the fit runs the plain iterations of EM or ECME.
 }
 
 \section{The range parameter}{

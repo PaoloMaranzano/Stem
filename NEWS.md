@@ -221,7 +221,11 @@ information criteria all come from the exact cluster-wise likelihoods.
   small and large cells alike, with the same selections. The
   algorithm applies to the pooled fit and to the final refits; inside the
   alternation of SC-STEM, whose fits stop after a few iterations, the
-  iterations are not accelerated. Penalized fits (`lambda > 0`) run the plain
+  iterations are not accelerated. With a ridge on the coefficients
+  (`lambda > 0`, `alpha = 0`) the safeguard of SQUAREM compares the penalized
+  log-likelihood, the scale of the penalty measured at each point: the
+  accelerated iterations reach the fixed point of the plain ones, in about
+  half the time. Lasso and elastic-net fits (`alpha > 0`) run the plain
   iterations.
 * `regularization` defaults to 0 (it was 0.01) in `STEM_Estimation()`,
   `SCSTEM_Estimation()` and `STEM_Bootstrap()`. The constant was added to every

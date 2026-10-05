@@ -16,6 +16,45 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-05
+
+**SQUAREM with a ridge, and the scripts of the fuel application.** The user
+decided the application: local leaders and followers among the pumps of the
+eleven metropolitan cities, the three settings of the exploration, with a
+multi-product model (four blocks of lags: own price on the fuel, own price on
+the other fuel, the neighbour's price on the fuel, the neighbour's on the other
+fuel), a ridge on the lags, the missing weeks handled by the Kalman filter
+instead of carrying the last price forward, and both F and Wald tests. The ridge
+made every fit run the plain EM iterations, so the user asked whether SQUAREM
+could be extended to it safely, and to keep EM if not.
+
+The obstacle: the ridge penalizes lambda/2 sum_j w_j s_j^2 beta_j^2 with
+s_j^2 the GLS scale of column j, which moves with Sigma_e at every iteration,
+so the safeguard of SQUAREM has no fixed objective. The candidate merit, the
+penalized log-likelihood with the scale measured at the point itself, was
+checked in scratch (`squarem-ridge-check.R`) on a dynamic design like the fuel
+models (60 locations, 150 periods, six collinear lags, latent AR(1), spatial
+error; 5 seeds x lambda 0.1, 1, 5): along the plain iterations the merit
+decreases by at most 1e-5; SQUAREM with it reaches the fixed point of the plain
+iterations to 1.1e-7 at a tight tolerance, never fails, and takes 0.38 of the
+time at the default tolerances, as close to the fixed point. In the package
+the stopping rule stays on the log-likelihood, as in the plain iterations, and
+the same check on the implementation (`squarem-ridge-package.R`) gives the
+fixed point to 1.4e-7 and 0.47 of the time. Implemented:
+`stem_ridge_merit()` wraps the map when lambda > 0 and alpha = 0, and the
+safeguard of `stem_iterate_squarem()` compares `merit` when the map returns it
+(`stem_merit()`); without a penalty the code path is the previous one (the two
+main3 replications reproduced to 4e-12). Lasso and elastic net stay plain. The
+test "a penalized fit runs the plain iterations" becomes "a ridge fit reaches
+the fixed point of the plain iterations" (and a lasso one stays plain).
+
+The fuel application, `dev/replication/`: `fuels-functions.R` (auxiliary),
+`fuels-data.R` (data management, five cached stages, one data.frame per case in
+`fuels/<case>/data.RData`), `fuels-main-setting1.R`, `-2`, `-3` (stages lags,
+select, fit). Not run on the data, as asked; the functions were exercised once
+on synthetic data in scratch (`fuels-smoke.R`). The first scripts are archived
+in `dev/archive/fuels-first-scripts/`.
+
 ### 2026-10-04
 
 **A general check of the package, the replication scripts and the paper,
