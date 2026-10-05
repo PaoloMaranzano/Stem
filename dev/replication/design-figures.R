@@ -312,7 +312,9 @@ sep_D <- function(p, rho, g, h) {
   c(D = 0.5 * ((s2[g] + mn + lat) / s2[h] - 1 - log(s2[g] / s2[h])), mean = mn, latent = lat,
     rk = rho * kap)
 }
-SEP <- do.call(rbind, lapply(setdiff(SIM_SCEN$id, "S2"), function(id) {
+## the nine scenario-variants of the study; the additional ones defined in
+## SIM_SCEN are not run, and not described
+SEP <- do.call(rbind, lapply(setdiff(SIM_SCENARIOS, "S2"), function(id) {
   row <- SIM_SCEN[SIM_SCEN$id == id, , drop = FALSE]
   p <- dgp_psi(row)
   pr <- list(c(1, 2), c(2, 1), c(2, 3), c(3, 2))
@@ -321,18 +323,16 @@ SEP <- do.call(rbind, lapply(setdiff(SIM_SCEN$id, "S2"), function(id) {
   j <- which.min(Ds)
   data.frame(id = id, rho = row$rho, D12 = Ds[1], D21 = Ds[2], D23 = Ds[3], D32 = Ds[4],
              minD = Ds[j], mean = v[[j]][["mean"]], latent = v[[j]][["latent"]],
-             T60 = 60 * Ds[j], T120 = 120 * Ds[j], T365 = 365 * Ds[j], paper = id %in% SIM_SCENARIOS,
+             T60 = 60 * Ds[j], T120 = 120 * Ds[j], T365 = 365 * Ds[j],
              stringsAsFactors = FALSE)
 }))
-SEP <- SEP[order(!SEP$paper, match(SEP$id, SIM_SCENARIOS)), ]
 tex_write(c("\\begin{tabular}{lc rrrr r rr rrr}", "\\toprule",
             "scenario-variant & $\\rho$ & $D_{12}$ & $D_{21}$ & $D_{23}$ & $D_{32}$ & $\\min D$ & mean & latent & $60\\min D$ & $120\\min D$ & $365\\min D$ \\\\",
             "\\midrule",
-            sprintf("%s & %d & %s & %s & %s & %s & %s & %s & %s & %s & %s & %s \\\\%s",
+            sprintf("%s & %d & %s & %s & %s & %s & %s & %s & %s & %s & %s & %s \\\\",
                     sprintf("\\texttt{%s}", SEP$id), as.integer(SEP$rho), fmt(SEP$D12, 3), fmt(SEP$D21, 3),
                     fmt(SEP$D23, 3), fmt(SEP$D32, 3), fmt(SEP$minD, 3), fmt(SEP$mean), fmt(SEP$latent, 3),
-                    fmt(SEP$T60, 1), fmt(SEP$T120, 1), fmt(SEP$T365, 1),
-                    ifelse(seq_len(nrow(SEP)) == sum(SEP$paper), " \\midrule", "")),
+                    fmt(SEP$T60, 1), fmt(SEP$T120, 1), fmt(SEP$T365, 1)),
             "\\bottomrule", "\\end{tabular}"), "tab_sim_separation.tex")
 
 
