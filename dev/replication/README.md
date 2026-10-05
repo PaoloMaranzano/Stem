@@ -10,9 +10,25 @@ disconnected from its sources.
 | `run-simulations.R` | runs the simulation study |
 | `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `design-figures.R` | the figures and tables that describe the design (geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into Supplementary Material B of the paper |
-| `run-application.R` | runs the application, staged and cached |
-| `run-fuels-application.R` | the fuel-price application of the paper: Granger causality between gasoline and diesel at the pump, and leaders and followers, city by city; grid, selection, bootstrap and tests, staged and cached. Reads the outputs of `fuels-pretreatment.R` and `fuels-leader-follower.R` |
-| `run-fuels.R` | first version of the fuel-price application: Granger causality between gasoline and diesel at the pump, by province, on weekly changes; pooled STEM against SC-STEM and a pump-by-pump benchmark. Reads `App_FuelsITA/station_level.zip` beside it, writes to `fuels/` |
+| `run-application.R` | runs an application on the Po Valley data of the package, staged and cached |
+
+The fuel-price application of the paper: local leaders and followers among the
+pumps of the eleven metropolitan cities, in three settings (Y a major-brand pump
+and X its independent neighbour; Y independent and X a major; Y a major and X a
+major of another brand), on the weekly relative prices of the two fuels, with
+the pass-through of the excise duties by regime and the behaviour on small
+samples from the same fits.
+
+| script | what it does |
+|---|---|
+| `fuels-functions.R` | the auxiliary functions, sourced by the others |
+| `fuels-data.R` | data management, in five cached stages: the pre-treatment of the station-level file (the register of the notes), the weekly relative prices with their gaps, the Kalman completion of the gaps (for the lags), the radius r* and the pairs, and one data.frame per case, `fuels/<case>/data.RData` |
+| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour: the pre-analysis of the lags (`--stage=lags`), the choice of the lags and of the ridge penalty by the BIC of the pooled model (`--stage=select`), the SC-STEM grid, the selection, the bootstrap and the tests (`--stage=fit`); outputs in the folder of the case |
+| `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
+| `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
+
+Run `fuels-data.R` once, then each main script stage by stage. The first
+scripts of the application are archived in `dev/archive/fuels-first-scripts/`.
 
 The design of the simulation study is described in full in
 `supplement-simulations.tex` (Supplementary Material B), in the Overleaf
@@ -35,14 +51,14 @@ reinstalls it whenever the installed Stem is a different commit; the commit is
 read from the installed DESCRIPTION file, without loading the package. Restart
 R before the first run on a machine where Stem is already loaded in the
 session. Offline, an installed Stem that carries what the script uses is
-accepted as it is. `run-application.R` (`APP_STEM_REF`) and
-`run-fuels-application.R` (`FA_STEM_REF`) are pinned to ddf90a8, the code of
-0f7b744 with the BIC counting the observed values of the response instead of
-`d * T`: the two commits give identical results on complete data, which the
-simulated data and the fuel prices are, and differ only when the response
-has gaps (the Po Valley data). The applications keep their caches in a
-folder named after the commit (`application/ddf90a8/`,
-`<out>/cache/ddf90a8/`), so that fits of an earlier Stem are never reused. All
+accepted as it is. `run-application.R` (`APP_STEM_REF`) is pinned to ddf90a8,
+the code of 0f7b744 with the BIC counting the observed values of the response
+instead of `d * T`; the scripts of the fuel application (`FU_STEM_REF` in
+`fuels-functions.R`) to 989790b, which adds SQUAREM for the fits with a ridge.
+On the simulated data, complete and without penalty, the three commits give
+identical results. The applications keep their caches in a folder named after
+the commit (`application/ddf90a8/`, `<case>/<xdef>/cache/989790b/`), so that
+fits of an earlier Stem are never reused. All
 three run the computational settings of the package (`STEM_control()`:
 SQUAREM, tolerances 1e-3), passed explicitly so that a session option cannot
 change them.
