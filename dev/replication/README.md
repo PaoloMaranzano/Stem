@@ -11,6 +11,7 @@ disconnected from its sources.
 | `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `design-figures.R` | the figures and tables that describe the design (geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into Supplementary Material B of the paper |
 | `run-application.R` | runs an application on the Po Valley data of the package, staged and cached |
+| `run-ridge-experiment.R` | the experiment on the ridge in SC-STEM: data with the collinear lags of the fuel application, MLE against the ridge chosen by the BIC, against the truth, the oracle partition and the oracle lambda; results in `ridge-experiment/` (Supplementary Material A) |
 
 The fuel-price application of the paper: local leaders and followers among the
 pumps of the eleven metropolitan cities, in three settings (Y a major-brand pump

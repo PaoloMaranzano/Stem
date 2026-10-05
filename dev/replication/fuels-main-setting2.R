@@ -100,10 +100,10 @@ CFG <- fu_config(list(
 ## The candidate sets of lags of stage "select", one list per candidate with
 ## the lags of each of the four blocks (FU_BLOCKS: own, own_other, nb,
 ## nb_other). Lags may be non-contiguous; integer(0) leaves a block out. EDIT
-## after reading the output of stage "lags". Note: a candidate with lag 52
-## loses the first 52 weeks of the window, and with them the excise events of
-## 2022 (see fu_design()); every candidate is compared on the weeks after the
-## largest lag of all of them.
+## after reading the output of stage "lags". The 52 weeks of 2021 are a
+## presample: lags up to 52 cost no week of the window, and every candidate is
+## fitted on the weeks of the window (2022-01 to 2026-06), so their BIC are
+## comparable.
 LAG_CANDIDATES <- list(
   short = list(own = 1:2, own_other = 1:2, nb = 1:2, nb_other = 1:2),
   own4  = list(own = 1:4, own_other = 1:2, nb = 1:2, nb_other = 1:2),

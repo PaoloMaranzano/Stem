@@ -165,11 +165,13 @@ fu_sundays <- function(days) which(format(days, "%u") == "7")
 ## The Sunday price is taken as it is: a Sunday without a report stays NA, and
 ## the Kalman filter of the package fills it (Section 2), instead of carrying
 ## the last reported price forward. The pump mean is the mean over the weeks
-## the pump reported.
-fu_weekly_relative <- function(P, days, ref) {
+## of the WINDOW the pump reported (`in_window`: a logical over the Sundays;
+## by default every Sunday), and it is subtracted from the presample weeks too.
+fu_weekly_relative <- function(P, days, ref, in_window = NULL) {
   sun <- fu_sundays(days)
   C <- 100 * sweep(P[, sun, drop = FALSE], 2, ref[sun])
-  C - rowMeans(C, na.rm = TRUE)
+  if (is.null(in_window)) in_window <- rep(TRUE, length(sun))
+  C - rowMeans(C[, in_window, drop = FALSE], na.rm = TRUE)
 }
 
 ## The fiscal pulses, weeks x (2 x events): 1 in the week that contains the
@@ -308,6 +310,8 @@ fu_pairs <- function(meta, Dkm, rstar, setting) {
 ##   y_site, y_brand, y_group, y_type,      the pump Y and its attributes
 ##   y_municipality, y_lon, y_lat
 ##   week, t                                the Sunday of the week, its index 1..W
+##   presample                              TRUE in the 52 weeks before the window,
+##                                          which give lags only
 ##   yg, yd                                 Y's relative prices: the RESPONSE,
 ##                                          NA where the Sunday price is missing
 ##   yg_c, yd_c                             the same, completed (for the lags)
@@ -320,7 +324,7 @@ fu_pairs <- function(meta, Dkm, rstar, setting) {
 ##   pulse_*                                the fiscal pulses
 ## Yrel and Ycomp: lists by fuel ("g", "d") of sites x weeks matrices of the
 ## city (relative and completed); meta: the kept sites; pairs: fu_pairs().
-fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses) {
+fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses, presample = rep(FALSE, length(weeks))) {
   W <- length(weeks)
   pt <- pairs$table
   one <- function(k) {
@@ -330,7 +334,7 @@ fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses
       city = city, city_name = unname(FU_CITY[city]), setting = setting,
       y_site = meta$site[i], y_brand = meta$brand_end[i], y_group = meta$group[i],
       y_type = meta$type[i], y_municipality = meta$city[i], y_lon = meta$lon[i], y_lat = meta$lat[i],
-      week = weeks, t = seq_len(W),
+      week = weeks, t = seq_len(W), presample = presample,
       yg = Yrel$g[i, ], yd = Yrel$d[i, ],
       yg_c = Ycomp$g[i, ], yd_c = Ycomp$d[i, ],
       xg_nn = Ycomp$g[nn, ], xd_nn = Ycomp$d[nn, ],
@@ -445,20 +449,22 @@ fu_lag_plots <- function(dfc, fuel, xdef, st) {
 ## lags: a named list with one integer vector per block of FU_BLOCKS, the lags
 ## of that block; lags may be non-contiguous (for instance c(1, 2, 4, 52)), and
 ## integer(0) leaves a block out. t_start: the first week of the response; by
-## default the largest lag plus one, so that every lag exists. The selection of
-## the lags passes a common t_start, so that the candidates are compared on the
-## same weeks.
+## default the first week of the window (the weeks before it are the presample,
+## which gives lags only), or the largest lag plus one if that is later. The
+## selection of the lags passes a common t_start, so that the candidates are
+## compared on the same weeks.
 ##
-## NOTE on the annual lag. Lag 52 costs the first 52 weeks of the window, and
-## with them the fiscal events of 2022 (the excise cut of March and its
-## reduction of December), whose pulses then drop out: the pass-through of the
-## excise duties would be measured on the events of 2023, 2025 and 2026 only.
+## NOTE on the annual lag. The presample of 52 weeks (2021) gives every lag up
+## to 52 to the first week of the window: lag 52 costs no week of the window,
+## and the pulses of the excise events of 2022 stay in. A lag beyond 52 would
+## move the start of the response into the window.
 fu_design <- function(dfc, fuel, xdef, lags, t_start = NULL) {
   S <- fu_series(dfc, fuel, xdef)
   W <- nrow(S$own); d <- ncol(S$own)
   lags <- lags[FU_BLOCKS]
   maxlag <- max(c(0L, unlist(lags)))
-  t0 <- if (is.null(t_start)) maxlag + 1L else t_start
+  first <- if (is.null(dfc$presample)) 1L else min(dfc$t[!dfc$presample])
+  t0 <- if (is.null(t_start)) max(maxlag + 1L, first) else t_start
   if (t0 <= maxlag) stop("t_start must exceed the largest lag", call. = FALSE)
   tt <- t0:W
   pul <- as.matrix(dfc[dfc$y_site == S$sites[1], grep("^pulse_", names(dfc)), drop = FALSE])
@@ -517,13 +523,14 @@ fu_kmax <- function(n, m, k_cap) max(1L, min(as.integer(k_cap), n %/% m))
 ## candidate set of lags is crossed with every value of the ridge penalty, and
 ## the BIC of each is recorded; the BIC counts the effective number of
 ## coefficients the ridge leaves. All the candidates are fitted on the same
-## weeks (from the largest lag of all the candidates plus one), so that their
+## weeks (the window, or from the largest lag of all the candidates plus one if later), so that their
 ## log-likelihoods are comparable. The ridge acts on the four blocks of lags
 ## only, never on the intercept and the fiscal pulses. lambda is on the
 ## relative scale of the package: on an orthogonal design a coefficient is
 ## multiplied by 1 / (1 + lambda).
 fu_select <- function(dfc, fuel, xdef, candidates, lambdas, verbose = FALSE) {
-  t0 <- max(unlist(candidates)) + 1L
+  first <- if (is.null(dfc$presample)) 1L else min(dfc$t[!dfc$presample])
+  t0 <- max(max(unlist(candidates)) + 1L, first)
   out <- list()
   for (cn in names(candidates)) {
     des <- fu_design(dfc, fuel, xdef, candidates[[cn]], t_start = t0)

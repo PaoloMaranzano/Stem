@@ -66,8 +66,15 @@ CFG <- fu_config(list(
   root        = file.path(HERE, "fuels"),
   redo        = "",              # stages to run again even if their output exists
   ## the pre-treatment (decided; see the notes, Section "Data pre-treatment")
-  from        = "2022-01-03",    # a Monday
-  to          = "2026-06-28",    # a Sunday
+  from        = "2022-01-03",    # a Monday: the start of the window
+  to          = "2026-06-28",    # a Sunday: its end
+  ## the PRESAMPLE: the 52 weeks before the window, read only to give the lags
+  ## of the first weeks of the window (lag 52 included). The filters, the
+  ## register and the weeks the models are estimated on stay those of the
+  ## window; the presample prices of the kept sites enter only as lags, and
+  ## where a site did not report in 2021 they are filled by the Kalman
+  ## completion of stage 3 (stage 2 counts how many).
+  presample_from = "2021-01-04", # a Monday, 52 weeks before `from`
   metros      = names(FU_CITY),  # the eleven cities
   d_link      = 50,              # metres: successive codes closer than this are one site
   overlap     = 7L,              # days two successive codes may overlap
@@ -97,8 +104,12 @@ options(width = 160)
 ## non-highway pumps (means.rds) and the register.
 if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", "pretreatment.rds")))) {
   message("\n== stage 1: pre-treatment")
-  FROM <- as.Date(CFG$from[1]); TO <- as.Date(CFG$to[1])
+  FROM <- as.Date(CFG$from[1]); TO <- as.Date(CFG$to[1]); PFROM <- as.Date(CFG$presample_from[1])
+  ## DAYS: the window, on which every statistic and filter is computed;
+  ## DAYS_ALL: presample and window, for the prices of the kept sites and the
+  ## national and metropolitan means
   DAYS <- seq(FROM, TO, by = "day"); ND <- length(DAYS); YRS <- ND / 365.25
+  DAYS_ALL <- seq(PFROM, TO, by = "day"); NDA <- length(DAYS_ALL)
   SH <- file.path(PRE, "shards")
   dir.create(SH, recursive = TRUE, showWarnings = FALSE)
   bgroup <- function(b) { b <- as.character(b); fifelse(b %in% FU_MAJOR, b, fifelse(b %in% "Pompe Bianche", "independent", "other brands")) }
@@ -135,7 +146,7 @@ if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", 
                lon = stats::median(lon, na.rm = TRUE), brand_first = brand[1], brand_last = brand[.N],
                type = mode_chr(type), city = mode_chr(city), province = mode_chr(province)), by = id_pump]
     ids[[k]] <- s
-    w <- x[date >= FROM & date <= TO]
+    w <- x[date >= PFROM & date <= TO]                         # presample and window
     w[s, on = "id_pump", prov := i.province]
     nat[[k]] <- w[type != "Autostradale", .(sg = sum(g, na.rm = TRUE), ng = sum(!is.na(g)),
                                              sd = sum(d, na.rm = TRUE), nd = sum(!is.na(d))), by = .(prov, date)]
@@ -159,7 +170,8 @@ if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", 
     fl <- list.files(file.path(SH, pv), full.names = TRUE)
     if (!length(fl)) next
     w <- rbindlist(lapply(fl, readRDS))
-    L <- ids[province == pv & id_pump %in% unique(w$id_pump)]
+    ## the codes with data in the WINDOW (the presample does not enter the register)
+    L <- ids[province == pv & id_pump %in% unique(w[date >= FROM]$id_pump)]
     A <- ids[province == pv & is.finite(lat) & is.finite(lon)]
     setorder(A, first)
     ## Step 2: link successive codes at the same point
@@ -191,6 +203,9 @@ if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", 
     w[ids, on = "id_pump", idfirst := i.first]
     setorder(w, site, date, -idfirst)
     w <- w[, .SD[1], by = .(site, date)]                         # overlapping days: the newer code
+    ## every statistic and filter on the window only: wa keeps the presample
+    ## for the prices of the kept sites
+    wa <- w; w <- wa[date >= FROM]
     last_code <- w[, .(last_id = id_pump[which.max(idfirst)], n_codes = uniqueN(id_pump),
                        brand_start = brand[1], brand_end = brand[.N], n_brands = uniqueN(stats::na.omit(brand)),
                        type = type[.N]), by = site]
@@ -234,12 +249,13 @@ if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", 
     st[, kept := keep]
     kept[[pv]] <- st
     if (pv %in% CFG$metros) {
+      ## the daily prices of the kept sites, presample and window
       ks <- st[kept == TRUE]$site
-      wk <- w[site %in% ks]
-      di <- as.integer(wk$date - FROM) + 1L
-      G <- Dm <- matrix(NA_real_, length(ks), ND, dimnames = list(ks, NULL))
+      wk <- wa[site %in% ks]
+      di <- as.integer(wk$date - PFROM) + 1L
+      G <- Dm <- matrix(NA_real_, length(ks), NDA, dimnames = list(ks, NULL))
       G[cbind(match(wk$site, ks), di)] <- wk$g; Dm[cbind(match(wk$site, ks), di)] <- wk$d
-      series[[pv]] <- list(G = G, D = Dm, meta = st[kept == TRUE], days = DAYS)
+      series[[pv]] <- list(G = G, D = Dm, meta = st[kept == TRUE], days = DAYS_ALL, window_from = FROM)
     }
     message("pass 2: ", pv, " ", sum(keep), " kept of ", nrow(st), " sites")
   }
@@ -268,19 +284,23 @@ if (run_stage("pretreatment", file.path(PRE, c("metro_series.rds", "means.rds", 
 ser <- readRDS(file.path(PRE, "metro_series.rds"))
 mn  <- readRDS(file.path(PRE, "means.rds"))
 CITIES <- intersect(names(FU_CITY), names(ser))
-days <- ser[[1]]$days
+days <- ser[[1]]$days                                   # presample and window
+if (is.null(ser[[1]]$window_from) || min(days) > as.Date(CFG$presample_from[1]))
+  stop("the pre-treatment output has no presample: run again with --redo=pretreatment", call. = FALSE)
 WEEKS <- days[fu_sundays(days)]
+IN_WINDOW <- WEEKS >= as.Date(CFG$from[1])              # FALSE in the presample
 PULSES <- fu_pulses(WEEKS)
 
 
 ## ===========================================================================
 ## Stage 2. Weekly relative prices
 ## ===========================================================================
-## For each city and fuel, sites x weeks in cents per litre: the Sunday price
-## minus the NATIONAL mean of that Sunday, minus the pump mean (decided: the
-## national centring leaves to the latent process the movement common to the
-## city). A Sunday without a report stays NA. The same prices centred on the
-## METROPOLITAN mean are kept for the radius r* only.
+## For each city and fuel, sites x weeks in cents per litre, presample and
+## window: the Sunday price minus the NATIONAL mean of that Sunday, minus the
+## pump mean over the window (decided: the national centring leaves to the
+## latent process the movement common to the city). A Sunday without a report
+## stays NA. The same prices centred on the METROPOLITAN mean are kept for the
+## radius r* only.
 F_WEEKLY <- file.path(COM, "weekly.rds")
 if (run_stage("weekly", F_WEEKLY)) {
   message("\n== stage 2: weekly relative prices")
@@ -289,15 +309,26 @@ if (run_stage("weekly", F_WEEKLY)) {
     s <- ser[[cc]]
     mm <- mn$metro[prov == cc]; mm <- mm[match(days, mm$date)]
     list(meta = as.data.frame(s$meta),
-         rel = list(g = fu_weekly_relative(s$G, days, nat$g), d = fu_weekly_relative(s$D, days, nat$d)),
-         rel_metro = list(g = fu_weekly_relative(s$G, days, mm$g), d = fu_weekly_relative(s$D, days, mm$d)))
+         rel = list(g = fu_weekly_relative(s$G, days, nat$g, IN_WINDOW),
+                    d = fu_weekly_relative(s$D, days, nat$d, IN_WINDOW)),
+         rel_metro = list(g = fu_weekly_relative(s$G, days, mm$g, IN_WINDOW),
+                          d = fu_weekly_relative(s$D, days, mm$d, IN_WINDOW)))
   })
-  saveRDS(list(weekly = weekly, weeks = WEEKS, pulses = PULSES), F_WEEKLY)
-  miss <- rbindlist(lapply(CITIES, function(cc) data.table(
-    city = cc, sites = nrow(weekly[[cc]]$meta),
-    missing_g_pct = round(100 * mean(is.na(weekly[[cc]]$rel$g)), 3),
-    missing_d_pct = round(100 * mean(is.na(weekly[[cc]]$rel$d)), 3))))
-  cat("\nMISSING SUNDAY PRICES, % of pump-weeks\n"); print(miss)
+  saveRDS(list(weekly = weekly, weeks = WEEKS, in_window = IN_WINDOW, pulses = PULSES), F_WEEKLY)
+  ## the gaps of the window (the response) and of the presample (lags only):
+  ## a site with little of 2021 gets most of its presample lags from the
+  ## Kalman completion
+  miss <- rbindlist(lapply(CITIES, function(cc) {
+    R <- weekly[[cc]]$rel
+    pre_obs <- rowMeans(!is.na(R$g[, !IN_WINDOW, drop = FALSE]) & !is.na(R$d[, !IN_WINDOW, drop = FALSE]))
+    data.table(city = cc, sites = nrow(weekly[[cc]]$meta),
+               window_missing_g_pct = round(100 * mean(is.na(R$g[, IN_WINDOW])), 3),
+               window_missing_d_pct = round(100 * mean(is.na(R$d[, IN_WINDOW])), 3),
+               presample_observed_median_pct = round(100 * stats::median(pre_obs), 1),
+               sites_presample_below_50pct = sum(pre_obs < 0.5),
+               sites_presample_none = sum(pre_obs == 0))
+  }))
+  cat("\nMISSING SUNDAY PRICES: % of pump-weeks in the window; presample coverage of the sites\n"); print(miss)
   fwrite(miss, file.path(COM, "weekly_missing.csv"))
 }
 WK <- readRDS(F_WEEKLY)
@@ -348,8 +379,9 @@ if (run_stage("pairs", F_PAIRS)) {
   for (cc in CITIES) {
     meta <- WK$weekly[[cc]]$meta
     Dkm <- geodist::geodist(meta[, c("lon", "lat")], measure = "geodesic") / 1000
-    cg <- rbind(cbind(fuel = "g", fu_correlogram(WK$weekly[[cc]]$rel_metro$g, Dkm)),
-                cbind(fuel = "d", fu_correlogram(WK$weekly[[cc]]$rel_metro$d, Dkm)))
+    ## on the weeks of the window, as decided
+    cg <- rbind(cbind(fuel = "g", fu_correlogram(WK$weekly[[cc]]$rel_metro$g[, WK$in_window], Dkm)),
+                cbind(fuel = "d", fu_correlogram(WK$weekly[[cc]]$rel_metro$d[, WK$in_window], Dkm)))
     rs <- fu_rstar(as.data.table(cg))
     radius[[cc]] <- data.frame(city = cc, city_name = FU_CITY[[cc]], r_star_km = rs$r_star,
                                plateau = rs$plateau, excess_0 = rs$excess_0)
@@ -391,7 +423,7 @@ for (s in 1:3) {
     pr <- PR$pairs[[cc]][[as.character(s)]]
     if (is.null(pr$table) || !nrow(pr$table)) return(NULL)
     fu_case_frame(cc, s, WK$weekly[[cc]]$meta, WK$weekly[[cc]]$rel, CP$completed[[cc]],
-                  WK$weeks, pr, WK$pulses)
+                  WK$weeks, pr, WK$pulses, presample = !WK$in_window)
   }))
   rownames(fuels_data) <- NULL
   attr(fuels_data, "setting") <- FU_CASES[s, ]
