@@ -11,7 +11,7 @@ disconnected from its sources.
 | `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
 | `design-figures.R` | the figures and tables that describe the design (geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into Supplementary Material B of the paper |
 | `run-application.R` | runs an application on the Po Valley data of the package, staged and cached |
-| `run-ridge-experiment.R` | the experiment on the ridge in SC-STEM: data with the collinear lags of the fuel application, MLE against the ridge chosen by the BIC, against the truth, the oracle partition and the oracle lambda; results in `ridge-experiment/` (Supplementary Material A) |
+| `run-ridge-experiment.R` | the experiment on the ridge in SC-STEM: data with the collinear lags of the fuel application and some values blanked; the procedure of the paper (regimes selected at lambda = 0, then a path in lambda on that partition), lambda chosen by seven information criteria, against the MLE, the truth, the oracle partition and the oracle lambda, for the coefficients and for the interpolation of the blanked values; results in `ridge-experiment/` (Supplementary Material A) |
 
 The fuel-price application of the paper: local leaders and followers among the
 pumps of the eleven metropolitan cities, in three settings (Y a major-brand pump
@@ -24,7 +24,7 @@ samples from the same fits.
 |---|---|
 | `fuels-functions.R` | the auxiliary functions, sourced by the others |
 | `fuels-data.R` | data management, in five cached stages: the pre-treatment of the station-level file (the register of the notes), the weekly relative prices with their gaps, the Kalman completion of the gaps (for the lags), the radius r* and the pairs, and one data.frame per case, `fuels/<case>/data.RData` |
-| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`), the choice of the ridge penalty by the BIC of the pooled model, city by city and fuel by fuel (`--stage=select`), the SC-STEM grid, the selection, the bootstrap and the tests (`--stage=fit`); outputs in the folder of the case |
+| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour, in four stages: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`); at lambda = 0, the grid of (K, phi) and the two-step rule on the BIC (`--stage=grid`); on that partition, the ridge penalty chosen by the AIC (`--stage=lambda`); the bootstrap at lambda = 0, at lambda* and of the pooled model, the tests (all at lambda = 0), the ridge estimates beside the MLE and the completed response (`--stage=final`); outputs in the folder of the case |
 | `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
 | `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
 

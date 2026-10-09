@@ -36,6 +36,28 @@ draws now get the control of the fit at lambda = 0. Smoke-tested end to end on
 synthetic data. `run-ridge-experiment.R` is being adapted and is blocked from
 running meanwhile.
 
+**The ridge experiment and the criteria for K and phi.** `run-ridge-experiment.R`
+now runs the procedure of the paper: the grid of (K, phi) at lambda = 0 and the
+two-step rule, then a path in lambda on the selected partition and on the true
+one, recording the log-likelihood and the effective degrees of freedom of
+every fit so that the analysis lets seven criteria choose lambda (AIC, AICc,
+GCV, HQ, KIC, BIC, EBIC); the error of the coefficients is measured location
+by location (the regime a location was assigned to against its true one), so
+that it is defined for any number of regimes selected; 5% of the cells and
+every 20th week are blanked and their interpolation is scored; and the grid is
+run a second time at the lambda of the AIC, to measure whether the order of
+the steps changes (K, phi). Supplementary Material A had recommended choosing
+lambda for every (K, phi) and called the reverse sequence wrong in the
+direction of a cheaper regime under the ridge; that section now states the
+sequence the paper uses, why its cost is the smaller one (both couplings are
+of the order of the effective coefficients the penalty removes: 0.05-0.5 of 8
+per regime at moderate collinearity, 0.9-2 of 16 at strong, in preliminary
+runs) and that the experiment measures it. `analyse-simulations.R` gets a
+part R9: the two-step rule applied again from the stored grids with each of
+the seven criteria (N recovered as log N = (BIC - AIC)/df + 2); with the BIC it
+reproduces the recorded K in all 3,320 replications of the first ten of
+stream 1. The blocking stop() in the experiment is removed; smoke-tested.
+
 **The lags of the fuel application, fixed by the pre-analysis.** Stage `lags`
 of the three main scripts was run on the data of `fuels-data.R` (no model). The
 PACF of the own price is beyond the band 2/sqrt(T) for 100% of the pumps at

@@ -15,6 +15,9 @@
 ##      parameters, so that the analysis can let any information criterion
 ##      choose lambda (AIC, AICc, GCV, HQ, KIC, BIC, EBIC; the paper uses the
 ##      AIC);
+##   3. the grid of step 1 again, with the ridge at the lambda the AIC chose:
+##      would (K, phi) have been selected differently with the ridge in force?
+##      The check of the order of the steps (Supplementary Material A);
 ##
 ## and compares the fit at the lambda each criterion chooses with the MLE
 ## (lambda = 0) against three references that only a simulation has:
@@ -232,7 +235,8 @@ rx_ari <- function(a, b) {
   e <- si * sj / tot; mx <- (si + sj) / 2; if (isTRUE(all.equal(mx, e))) 1 else (sij - e) / (mx - e)
 }
 
-## the lag coefficients of a fit, by true regime, against the truth
+## the lag coefficients of a fit with three regimes, by true regime, against
+## the truth (used by the checks in scratch; the experiment uses rx_loc_err)
 rx_coefs <- function(fit, labels, truth) {
   if (is.null(fit) || is.null(fit$phi_hat)) return(NULL)
   K <- nrow(fit$phi_hat)
@@ -245,54 +249,99 @@ rx_coefs <- function(fit, labels, truth) {
   do.call(rbind, out)
 }
 
+## The error of the lag coefficients of a fit against the truth, location by
+## location: every location takes the coefficients of the regime it was
+## assigned to and is compared with those of its true regime, so that the
+## error is defined for any number of regimes selected. RMSE over the
+## locations and the lags, in total ("all") and by block.
+rx_loc_err <- function(fit, labels, truth) {
+  pc <- paste0("beta", seq_len(ncol(truth)) + 1L)
+  E <- fit$phi_hat[fit$group, pc, drop = FALSE] - truth[labels, , drop = FALSE]
+  blk <- sub("_l[0-9]+$", "", colnames(truth))
+  c(all = sqrt(mean(E^2)),
+    vapply(stats::setNames(unique(blk), unique(blk)), function(b) sqrt(mean(E[, blk == b]^2)), 1))
+}
+
+## The path in lambda on a partition held fixed (no alternation): for every
+## lambda, the log-likelihood and the effective number of parameters (for the
+## criteria), the error of the coefficients, and the error of the prediction of
+## the blanked cells, isolated ("cells") and whole weeks ("weeks").
+rx_path <- function(mod, partition, phi, dr, mask, cfg, pen) {
+  K <- length(unique(partition))
+  ctl <- Stem::STEM_control()
+  N <- sum(!(mask$cells | mask$weeks))
+  rows <- lapply(cfg$lambdas, function(l) {
+    fx <- tryCatch(suppressWarnings(if (K == 1L) {
+      Stem::SCSTEM_Estimation(mod, K = 1, distance = "euclidean", alpha = 0, lambda = l, penalize = pen,
+                              control = ctl, verbose = FALSE)
+    } else {
+      Stem::SCSTEM_Estimation(mod, K = K, phi_penalty = phi, init_partition = partition, max_iter = 0,
+                              distance = "euclidean", knn = cfg$knn, min_cluster_size = cfg$m, alpha = 0,
+                              lambda = l, penalize = pen, control = ctl, verbose = FALSE)
+    }), error = function(e) NULL)
+    if (is.null(fx)) return(NULL)
+    zc <- Stem::SCSTEM_Complete(fx)
+    e <- rx_loc_err(fx, dr$labels, dr$truth)
+    as.data.frame(c(list(lambda = l, loglik = unname(fx$info_crit[["loglik"]]), df = unname(fx$info_crit[["df"]]),
+                         N = N, P = K * length(pen)),
+                    as.list(stats::setNames(e, paste0("err_", names(e)))),
+                    list(rmse_cells = sqrt(mean((zc[mask$cells] - dr$z[mask$cells])^2)),
+                         rmse_weeks = sqrt(mean((zc[mask$weeks] - dr$z[mask$weeks])^2)))))
+  })
+  do.call(rbind, rows)
+}
+
 
 ## ---------------------------------------------------------------------------
-## One replication: every estimator and reference
+## One replication: the procedure and the references
 ## ---------------------------------------------------------------------------
 rx_one <- function(task, cfg) {
   f <- file.path(cfg$out, "reps", sprintf("n%d_T%d_%s_rep%03d.rds", task$n, task$TN, task$level, task$rep))
   if (file.exists(f)) return(invisible(NULL))
   t0 <- proc.time()[["elapsed"]]
-  dr <- rx_draw(task$n, task$TN, task$level, seed = 1000L * task$rep + task$n + task$TN + 7L * match(task$level, names(RX_LEVELS)))
-  mod <- rx_model(dr)
+  seed <- 1000L * task$rep + task$n + task$TN + 7L * match(task$level, names(RX_LEVELS))
+  dr <- rx_draw(task$n, task$TN, task$level, seed = seed)
+  ## the holes: every week_every-th week at every location, and a share of the
+  ## other cells at random
+  set.seed(seed + 17L)
+  W <- matrix(FALSE, nrow(dr$z), ncol(dr$z))
+  W[seq(sample.int(cfg$week_every, 1L), nrow(dr$z), by = cfg$week_every), ] <- TRUE
+  C <- matrix(stats::runif(length(dr$z)) < cfg$holes, nrow(dr$z)) & !W
+  mask <- list(cells = C, weeks = W)
+  d2 <- dr; d2$z[C | W] <- NA
+  mod <- rx_model(d2)
   pen <- seq_len(ncol(dr$truth)) + 1L                      # the lags; not the intercept
-  ctl <- Stem::STEM_control()
-  ## the lambda of the BIC: the pooled model over the grid
-  bic <- vapply(cfg$lambdas, function(l) {
-    fx <- tryCatch(Stem::SCSTEM_Estimation(mod, K = 1, distance = "euclidean", alpha = 0, lambda = l,
-                                           penalize = pen, control = ctl), error = function(e) NULL)
-    if (is.null(fx)) NA_real_ else fx$info_crit[["BIC"]]
-  }, 1)
-  lam_bic <- cfg$lambdas[which.min(bic)]
-  ## the grid and the selection, at lambda = 0 and at the lambda of the BIC
-  grid <- function(l) {
-    ic <- Stem::SCSTEM_Infocrit(mod, K_grid = cfg$K_grid, phi_grid = cfg$phi_grid, distance = "euclidean",
-                                knn = cfg$knn, min_cluster_size = cfg$m, alpha = 0, lambda = l, penalize = pen,
-                                control = ctl, verbose = FALSE)
-    sel <- Stem::SCSTEM_Select(ic)
-    tk <- which(ic$table$K == 3 & abs(ic$table$phi - cfg$phi_ref) < 1e-9)[1]
-    ft <- if (is.na(tk)) NULL else ic$fits[[tk]]
-    list(K_hat = sel$K_selected, ari_sel = rx_ari(sel$fit$group, dr$labels),
-         ari_true = if (is.null(ft)) NA_real_ else rx_ari(ft$group, dr$labels), coefs = rx_coefs(ft, dr$labels, dr$truth))
-  }
-  est <- list(mle = grid(0))
-  est$ridge_bic <- if (lam_bic == 0) est$mle else grid(lam_bic)
-  ## the oracle partition: the true regimes, held fixed, every lambda of the grid
-  orc <- lapply(cfg$lambdas, function(l) {
-    fx <- tryCatch(Stem::SCSTEM_Estimation(mod, K = 3, phi_penalty = 0, init_partition = dr$labels, max_iter = 0,
-                                           distance = "euclidean", knn = cfg$knn, min_cluster_size = cfg$m,
-                                           alpha = 0, lambda = l, penalize = pen, control = ctl, verbose = FALSE),
-                   error = function(e) NULL)
-    if (is.null(fx)) return(NULL)
-    cbind(lambda = l, rx_coefs(fx, dr$labels, dr$truth))
-  })
-  res <- list(task = task, lambda_bic = lam_bic, bic = bic,
-              selection = data.frame(estimator = names(est), K_hat = vapply(est, `[[`, 1, "K_hat"),
-                                     ari_sel = vapply(est, `[[`, 1, "ari_sel"),
-                                     ari_true = vapply(est, `[[`, 1, "ari_true")),
-              coefs = do.call(rbind, lapply(names(est), function(e) if (!is.null(est[[e]]$coefs))
-                cbind(estimator = e, est[[e]]$coefs))),
-              oracle = do.call(rbind, orc), secs = proc.time()[["elapsed"]] - t0)
+  ## 1. the regimes, at lambda = 0: the grid and the two-step rule (BIC)
+  ic <- Stem::SCSTEM_Infocrit(mod, K_grid = cfg$K_grid, phi_grid = cfg$phi_grid, distance = "euclidean",
+                              knn = cfg$knn, min_cluster_size = cfg$m, alpha = 0, lambda = 0,
+                              control = Stem::STEM_control(), verbose = FALSE)
+  sel <- Stem::SCSTEM_Select(ic)
+  tk <- which(ic$table$K == 3 & abs(ic$table$phi - cfg$phi_ref) < 1e-9)[1]
+  ## 2. the path in lambda on the selected partition and on the true one
+  sp <- rx_path(mod, sel$fit$group, sel$phi_selected, dr, mask, cfg, pen)
+  paths <- rbind(cbind(partition = "selected", sp),
+                 cbind(partition = "oracle", rx_path(mod, dr$labels, 0, dr, mask, cfg, pen)))
+  ## 3. the order of the steps: the grid again, at the lambda the AIC chose on
+  ##    the selected partition. Would (K, phi) have been selected differently
+  ##    with the ridge in force? (Supplementary Material A, the order of the
+  ##    hyperparameters: the ridge lowers the price of a regime and narrows the
+  ##    scores of the label step.)
+  aic <- -2 * sp$loglik + 2 * sp$df
+  lam_aic <- sp$lambda[which.min(aic)]
+  second <- if (lam_aic > 0) {
+    ic2 <- Stem::SCSTEM_Infocrit(mod, K_grid = cfg$K_grid, phi_grid = cfg$phi_grid, distance = "euclidean",
+                                 knn = cfg$knn, min_cluster_size = cfg$m, alpha = 0, lambda = lam_aic, penalize = pen,
+                                 control = Stem::STEM_control(), verbose = FALSE)
+    s2 <- Stem::SCSTEM_Select(ic2)
+    data.frame(lambda = lam_aic, K_hat = s2$K_selected, phi_hat = s2$phi_selected,
+               ari_sel = rx_ari(s2$fit$group, dr$labels), ari_first = rx_ari(s2$fit$group, sel$fit$group))
+  } else data.frame(lambda = 0, K_hat = sel$K_selected, phi_hat = sel$phi_selected,
+                    ari_sel = rx_ari(sel$fit$group, dr$labels), ari_first = 1)
+  res <- list(task = task, K_hat = sel$K_selected, phi_hat = sel$phi_selected,
+              ari_sel = rx_ari(sel$fit$group, dr$labels),
+              ari_true = if (is.na(tk)) NA_real_ else rx_ari(ic$fits[[tk]]$group, dr$labels),
+              grid = ic$table, paths = paths, second = second, holes = c(cells = sum(C), weeks = sum(W)),
+              secs = proc.time()[["elapsed"]] - t0)
   saveRDS(res, f)
   invisible(NULL)
 }
@@ -301,6 +350,36 @@ rx_one <- function(task, cfg) {
 ## ---------------------------------------------------------------------------
 ## The analysis: the tables
 ## ---------------------------------------------------------------------------
+## The criteria for lambda, from the log-likelihood l, the effective number of
+## parameters df and the number of observed values N of every fit of a path:
+##   AIC  = -2l + 2 df                 AICc = AIC + 2 df (df + 1) / (N - df - 1)
+##   GCV  = -2l - 2 N log(1 - df / N)  (the likelihood form; to first order the AIC)
+##   HQ   = -2l + 2 log(log(N)) df     KIC  = -2l + 3 df
+##   BIC  = -2l + log(N) df
+##   EBIC = BIC + 2 log C(P, df_pen), with P the penalized coefficients of the
+##          regimes and df_pen their effective number: the extended BIC of Chen
+##          and Chen (2008) with a continuous binomial, an ad hoc extension to a
+##          ridge, which selects nothing. The EBIC of the paper, which charges
+##          the partitions, is constant on a fixed partition and chooses as the
+##          BIC.
+RX_CRIT <- c("AIC", "AICc", "GCV", "HQ", "KIC", "BIC", "EBIC")
+rx_criteria <- function(P) {
+  key <- c("cell", "rep", "partition")
+  b0 <- P[P$lambda == 0, c(key, "df", "err_all", "rmse_cells", "rmse_weeks")]
+  names(b0)[4:7] <- c("df0", "e0", "c0", "w0")
+  P <- merge(P, b0, by = key)
+  P$dfpen <- pmax(P$P - (P$df0 - P$df), 1e-6)
+  lch <- function(n, x) lgamma(n + 1) - lgamma(x + 1) - lgamma(n - x + 1)
+  P$AIC  <- -2 * P$loglik + 2 * P$df
+  P$AICc <- P$AIC + 2 * P$df * (P$df + 1) / (P$N - P$df - 1)
+  P$GCV  <- -2 * P$loglik - 2 * P$N * log(1 - P$df / P$N)
+  P$HQ   <- -2 * P$loglik + 2 * log(log(P$N)) * P$df
+  P$KIC  <- -2 * P$loglik + 3 * P$df
+  P$BIC  <- -2 * P$loglik + log(P$N) * P$df
+  P$EBIC <- P$BIC + 2 * lch(P$P, P$dfpen)
+  P
+}
+
 rx_analyse <- function(out) {
   fl <- list.files(file.path(out, "reps"), "^n[0-9].*[.]rds$", full.names = TRUE)
   ne <- length(list.files(file.path(out, "reps"), "^ERROR"))
@@ -308,49 +387,88 @@ rx_analyse <- function(out) {
   if (!length(fl)) stop("no replication done yet", call. = FALSE)
   R <- lapply(fl, readRDS)
   cell <- function(r) sprintf("%s, n = %d, T = %d", r$task$level, r$task$n, r$task$TN)
-  block <- function(cf) sub("_l[0-9]+$", "", cf)
-  ## 1. the coefficients of the two estimators against the truth, by block
-  co <- do.call(rbind, lapply(R, function(r) if (!is.null(r$coefs)) cbind(cell = cell(r), rep = r$task$rep, r$coefs)))
-  co$err <- co$estimate - co$truth; co$block <- block(co$coef)
-  agg <- function(d) data.frame(bias = mean(d$err), sd = stats::sd(d$err), rmse = sqrt(mean(d$err^2)))
-  t1 <- do.call(rbind, lapply(split(co, list(co$cell, co$estimator, co$block), drop = TRUE), function(d)
-    cbind(cell = d$cell[1], estimator = d$estimator[1], block = d$block[1], agg(d))))
-  ## the share of replications where the ridge beats the MLE (RMSE over the lags)
-  rr <- stats::aggregate(err ~ cell + rep + estimator, data = co, FUN = function(e) sqrt(mean(e^2)))
-  w <- stats::reshape(rr, idvar = c("cell", "rep"), timevar = "estimator", direction = "wide")
-  beat <- if (all(c("err.mle", "err.ridge_bic") %in% names(w)))
-    stats::aggregate(cbind(ridge_better = err.ridge_bic < err.mle - 1e-12, ridge_same = abs(err.ridge_bic - err.mle) <= 1e-12) ~ cell,
-                     data = w, FUN = mean) else NULL
-  ## 2. the oracle partition: RMSE against lambda, and the oracle lambda
-  oc <- do.call(rbind, lapply(R, function(r) if (!is.null(r$oracle)) cbind(cell = cell(r), rep = r$task$rep, r$oracle)))
-  oc$err <- oc$estimate - oc$truth; oc$block <- block(oc$coef)
-  t2 <- stats::aggregate(err ~ cell + lambda + block, data = oc, FUN = function(e) sqrt(mean(e^2)))
-  names(t2)[names(t2) == "err"] <- "rmse"
-  tot <- stats::aggregate(err ~ cell + lambda, data = oc, FUN = function(e) sqrt(mean(e^2)))
-  oracle <- do.call(rbind, lapply(split(tot, tot$cell), function(d) data.frame(
-    cell = d$cell[1], oracle_lambda = d$lambda[which.min(d$err)], rmse_oracle = min(d$err),
-    rmse_lambda0 = d$err[d$lambda == 0])))
-  ## 3. the lambda the BIC picks, and the selection and the partition
-  lb <- do.call(rbind, lapply(R, function(r) data.frame(cell = cell(r), lambda_bic = r$lambda_bic)))
-  lam_tab <- as.data.frame.matrix(table(lb$cell, lb$lambda_bic))
-  sel <- do.call(rbind, lapply(R, function(r) cbind(cell = cell(r), r$selection)))
-  t3 <- stats::aggregate(cbind(K_correct = K_hat == 3, ari_sel, ari_true) ~ cell + estimator, data = sel, FUN = mean)
-  secs <- stats::aggregate(secs ~ cell, data = do.call(rbind, lapply(R, function(r) data.frame(cell = cell(r), secs = r$secs))),
-                           FUN = stats::median)
-  utils::write.csv(t1, file.path(out, "coefficients_by_block.csv"), row.names = FALSE)
-  utils::write.csv(t2, file.path(out, "oracle_partition_path.csv"), row.names = FALSE)
-  utils::write.csv(oracle, file.path(out, "oracle_lambda.csv"), row.names = FALSE)
-  utils::write.csv(cbind(cell = rownames(lam_tab), lam_tab), file.path(out, "lambda_bic.csv"), row.names = FALSE)
-  utils::write.csv(t3, file.path(out, "selection_partition.csv"), row.names = FALSE)
-  if (!is.null(beat)) utils::write.csv(beat, file.path(out, "ridge_beats_mle.csv"), row.names = FALSE)
-  options(width = 160)
+  P <- do.call(rbind, lapply(R, function(r) cbind(cell = cell(r), level = r$task$level, rep = r$task$rep, r$paths)))
+  P <- rx_criteria(P)
+  ## the lambda every criterion chooses, replication by replication, and the
+  ## oracle lambda (the smallest error of the coefficients)
+  pick <- do.call(rbind, lapply(split(P, P[, c("cell", "rep", "partition")], drop = TRUE), function(z) {
+    do.call(rbind, lapply(c(RX_CRIT, "oracle"), function(cr) {
+      i <- if (cr == "oracle") which.min(z$err_all) else which.min(z[[cr]])
+      data.frame(cell = z$cell[1], level = z$level[1], rep = z$rep[1], partition = z$partition[1],
+                 criterion = cr, lambda = z$lambda[i],
+                 gain_coef = 100 * (1 - z$err_all[i] / z$e0[i]), better = z$err_all[i] < z$e0[i],
+                 gain_cells = 100 * (1 - z$rmse_cells[i] / z$c0[i]),
+                 gain_weeks = 100 * (1 - z$rmse_weeks[i] / z$w0[i]),
+                 err_own = z$err_own[i], err_oth = z$err_oth[i], err_nb = z$err_nb[i], err_nbo = z$err_nbo[i])
+    }))
+  }))
+  pick$criterion <- factor(pick$criterion, levels = c(RX_CRIT, "oracle"))
+  wide <- function(form, data, FUN, v, digits) {
+    g <- stats::aggregate(form, data = data, FUN = FUN); g[[v]] <- round(g[[v]], digits)
+    idv <- setdiff(names(g), c("criterion", v))
+    w <- stats::reshape(g, idvar = idv, timevar = "criterion", direction = "wide")
+    names(w) <- sub(paste0("^", v, "[.]"), "", names(w)); w
+  }
+  ## 1. the coefficients: mean gain over the MLE, by cell, partition, criterion
+  t1 <- wide(gain_coef ~ cell + partition + criterion, pick, mean, "gain_coef", 1)
+  ## 2. the share of replications in which the chosen lambda beats the MLE,
+  ##    and the worst replication, by level
+  t2 <- wide(better ~ level + partition + criterion, pick, mean, "better", 2)
+  t2w <- wide(gain_coef ~ level + partition + criterion, pick, min, "gain_coef", 1)
+  ## 3. the lambda chosen (median)
+  t3 <- wide(lambda ~ cell + partition + criterion, pick, stats::median, "lambda", 3)
+  ## 4. the interpolation of the blanked cells: mean gain over the MLE
+  t4c <- wide(gain_cells ~ cell + partition + criterion, pick, mean, "gain_cells", 2)
+  t4w <- wide(gain_weeks ~ cell + partition + criterion, pick, mean, "gain_weeks", 2)
+  ## 5. the coefficients by block: mean RMSE at lambda = 0, at the lambda of the
+  ##    AIC and at the oracle lambda, selected partition
+  z0 <- P[P$lambda == 0 & P$partition == "selected", ]
+  b0 <- stats::aggregate(cbind(err_own, err_oth, err_nb, err_nbo) ~ cell, data = z0, FUN = mean)
+  bA <- stats::aggregate(cbind(err_own, err_oth, err_nb, err_nbo) ~ cell,
+                         data = pick[pick$partition == "selected" & pick$criterion == "AIC", ], FUN = mean)
+  bO <- stats::aggregate(cbind(err_own, err_oth, err_nb, err_nbo) ~ cell,
+                         data = pick[pick$partition == "selected" & pick$criterion == "oracle", ], FUN = mean)
+  t5 <- rbind(cbind(estimator = "MLE", b0), cbind(estimator = "ridge, AIC", bA), cbind(estimator = "ridge, oracle lambda", bO))
+  t5 <- t5[order(t5$cell, t5$estimator), ]
+  ## 6. the selection at lambda = 0 and the partition
+  sel <- do.call(rbind, lapply(R, function(r) data.frame(cell = cell(r), K_correct = r$K_hat == 3,
+                                                          ari_sel = r$ari_sel, ari_true = r$ari_true, secs = r$secs)))
+  t6 <- stats::aggregate(cbind(K_correct, ari_sel, ari_true) ~ cell, data = sel, FUN = mean)
+  secs <- stats::aggregate(secs ~ cell, data = sel, FUN = stats::median)
+  ## 7. the order of the steps: (K, phi) selected again at the lambda of the AIC
+  od <- do.call(rbind, lapply(R, function(r) if (!is.null(r$second)) data.frame(
+    cell = cell(r), lambda_aic = r$second$lambda, same_K = r$second$K_hat == r$K_hat,
+    same_phi = r$second$K_hat == r$K_hat & abs(r$second$phi_hat - r$phi_hat) < 1e-9,
+    ari_first = r$second$ari_first, K_correct_first = r$K_hat == 3, K_correct_second = r$second$K_hat == 3,
+    ari_sel_first = r$ari_sel, ari_sel_second = r$second$ari_sel)))
+  t7 <- if (!is.null(od)) stats::aggregate(cbind(same_K, same_phi, ari_first, K_correct_first, K_correct_second,
+                                                 ari_sel_first, ari_sel_second) ~ cell, data = od, FUN = mean) else NULL
+  if (!is.null(t7)) utils::write.csv(t7, file.path(out, "order_of_the_steps.csv"), row.names = FALSE)
+  utils::write.csv(P, file.path(out, "paths.csv"), row.names = FALSE)
+  utils::write.csv(pick, file.path(out, "lambda_by_criterion.csv"), row.names = FALSE)
+  utils::write.csv(t1, file.path(out, "coefficients_gain.csv"), row.names = FALSE)
+  utils::write.csv(cbind(t2, worst = t2w[, -(1:2)]), file.path(out, "coefficients_better_worst.csv"), row.names = FALSE)
+  utils::write.csv(t3, file.path(out, "lambda_chosen.csv"), row.names = FALSE)
+  utils::write.csv(t4c, file.path(out, "interpolation_cells_gain.csv"), row.names = FALSE)
+  utils::write.csv(t4w, file.path(out, "interpolation_weeks_gain.csv"), row.names = FALSE)
+  utils::write.csv(t5, file.path(out, "coefficients_by_block.csv"), row.names = FALSE)
+  utils::write.csv(t6, file.path(out, "selection_partition.csv"), row.names = FALSE)
+  options(width = 180)
   cat(sprintf("\n%d replications\n", length(R)))
-  cat("\n1. coefficients against the truth, by block\n"); print(t1, digits = 3, row.names = FALSE)
-  if (!is.null(beat)) { cat("\n   share of replications where the ridge beats the MLE\n"); print(beat, digits = 3, row.names = FALSE) }
-  cat("\n2. oracle partition: the oracle lambda, and the RMSE at it and at lambda = 0\n"); print(oracle, digits = 3, row.names = FALSE)
-  cat("\n3. the lambda the BIC picks (counts)\n"); print(lam_tab)
-  cat("\n4. selection and partition\n"); print(t3, digits = 3, row.names = FALSE)
-  cat("\n5. seconds per replication (median)\n"); print(secs, row.names = FALSE)
+  cat("\n1. coefficients: mean gain over the MLE (%), by criterion\n"); print(t1, row.names = FALSE)
+  cat("\n2. share of replications in which the chosen lambda beats the MLE\n"); print(t2, row.names = FALSE)
+  cat("   worst replication (gain, %)\n"); print(t2w, row.names = FALSE)
+  cat("\n3. lambda chosen (median)\n"); print(t3, row.names = FALSE)
+  cat("\n4. interpolation, mean gain over the MLE (%): isolated cells\n"); print(t4c, row.names = FALSE)
+  cat("   whole weeks\n"); print(t4w, row.names = FALSE)
+  cat("\n5. coefficients by block, mean RMSE (selected partition)\n"); print(t5, digits = 3, row.names = FALSE)
+  cat("\n6. selection at lambda = 0 and partition\n"); print(t6, digits = 3, row.names = FALSE)
+  if (!is.null(t7)) {
+    cat("\n7. the order of the steps: (K, phi) selected again with the ridge at the lambda of the AIC\n")
+    cat("   (same K, same phi, ARI between the two partitions, K right before and after, ARI with the truth)\n")
+    print(t7, digits = 3, row.names = FALSE)
+  }
+  cat("\n8. seconds per replication (median)\n"); print(secs, row.names = FALSE)
 }
 
 
@@ -360,15 +478,11 @@ rx_analyse <- function(out) {
 ## RX_DEFINE_ONLY <- TRUE before sourcing gives the functions and runs nothing
 if (!exists("RX_DEFINE_ONLY")) RX_DEFINE_ONLY <- FALSE
 if (!RX_DEFINE_ONLY) {
-## IN PROGRESS (2026-10-09): rx_one() and rx_analyse() below still run the
-## previous design (lambda by the BIC of the pooled model); they are being
-## rewritten for the procedure described at the top. Do not launch yet.
-if (CFG$mode[1] != "smoke") stop("run-ridge-experiment.R is being adapted to the new procedure: do not launch yet",
-                                 call. = FALSE)
 if (CFG$mode[1] == "analyse") { rx_analyse(OUT); quit(save = "no", status = 0) }
 rx_stem()
 if (CFG$mode[1] == "smoke") {
-  CFG$n <- 40L; CFG$TN <- 60L; CFG$nrep <- 1L; CFG$lambdas <- c(0, 0.3); CFG$phi_grid <- c(0, 0.05)
+  CFG$n <- 40L; CFG$TN <- 60L; CFG$nrep <- 1L; CFG$lambdas <- c(0, 0.01, 0.1); CFG$phi_grid <- c(0, 0.05, 0.1)
+  CFG$week_every <- 10L
   CFG$out <- file.path(tempdir(), "ridge-smoke"); dir.create(file.path(CFG$out, "reps"), recursive = TRUE, showWarnings = FALSE)
   for (lv in names(RX_LEVELS)) rx_one(list(n = 40L, TN = 60L, level = lv, rep = 1L), CFG)
   rx_analyse(CFG$out); quit(save = "no", status = 0)
@@ -379,7 +493,8 @@ cfg <- CFG; cfg$out <- OUT
 cat(sprintf("ridge experiment: %d replications on %d processes, results in %s\n", length(tasks), CFG$cores[1], OUT))
 cl <- parallel::makeCluster(CFG$cores[1])
 parallel::clusterEvalQ(cl, { Sys.setenv(OPENBLAS_NUM_THREADS = "1"); suppressPackageStartupMessages(library(Stem)) })
-parallel::clusterExport(cl, c("RX_LEVELS", "RX_B", "RX_SCALE", "rx_truth", "rx_draw", "rx_model", "rx_align", "rx_ari", "rx_coefs", "rx_one"))
+parallel::clusterExport(cl, c("RX_LEVELS", "RX_B", "RX_SCALE", "rx_truth", "rx_draw", "rx_model", "rx_align", "rx_ari",
+                              "rx_loc_err", "rx_path", "rx_one"))
 invisible(parallel::parLapplyLB(cl, tasks, function(tk, cfg) tryCatch(rx_one(tk, cfg), error = function(e)
   saveRDS(list(task = tk, error = conditionMessage(e)), file.path(cfg$out, "reps", sprintf("ERROR_n%d_T%d_%s_rep%03d.rds", tk$n, tk$TN, tk$level, tk$rep)))),
   cfg = cfg))

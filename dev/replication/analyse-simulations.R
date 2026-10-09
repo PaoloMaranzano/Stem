@@ -21,6 +21,8 @@
 ##   R6  the penalty: recovery against phi, and the phi selected
 ##   R7  the cost of a replication, by n and T and by geometry
 ##   R8  the replications stopped by the time limit and drawn again
+##   R9  the information criteria in the two-step rule: (K, phi) selected
+##       again with AIC, AICc, GCV, HQ, KIC, BIC and EBIC, from the grids
 ##
 ## Inputs  : <here>/results/<tag>_s<stream>.csv, -params.csv, -grid.csv, -timeouts.csv,
 ##           every stream of the tag stacked; <tag>.csv of the first pass  (--results=)
@@ -605,4 +607,104 @@ if (!is.null(TO) && nrow(TO)) {
               nrow(TO), nrow(redrawn)))
   csv_write(tto, "tab_sim_timeouts.csv")
 } else cat("R8: no timeouts logged\n")
+
+
+## ===========================================================================
+## R9. The information criteria in the two-step rule
+## ===========================================================================
+## The study selects (K, phi) by the two-step rule of SCSTEM_Select() on the
+## BIC. The grid of every replication records, for every configuration, the
+## log-likelihood l, the number of parameters df and the AIC and BIC, from
+## which the number of observed values N follows, log N = (BIC - AIC) / df + 2;
+## the rule is applied again here with every criterion:
+##   AIC  = -2l + 2 df                 AICc = AIC + 2 df (df + 1) / (N - df - 1)
+##   GCV  = -2l - 2 N log(1 - df / N)  HQ   = -2l + 2 log(log(N)) df
+##   KIC  = -2l + 3 df                 BIC  = -2l + log(N) df
+##   EBIC = BIC + 2 log S(d, K), S the Stirling number of the second kind: the
+##          number of partitions of the d locations into K regimes (Chen and
+##          Chen 2008, gamma = 1; the check of the paper for wide networks).
+## With the BIC the rule must return what the study recorded (agreement below).
+AN_CRIT <- c("AIC", "AICc", "GCV", "HQ", "KIC", "BIC", "EBIC")
+## log S(d, K) = d log K - log K! + log sum_j (-1)^j C(K, j) (1 - j / K)^d
+log_stirling2 <- function(d, K) {
+  if (K == 1) return(0)
+  j <- 0:(K - 1)
+  d * log(K) - lfactorial(K) + log(sum((-1)^j * choose(K, j) * (1 - j / K)^d))
+}
+## the two-step rule of SCSTEM_Select() on the column `crit` of one grid
+an_select <- function(tab, crit, band = c(0.025, 0.2)) {
+  ok <- tab$admissible %in% TRUE & is.finite(tab[[crit]])
+  adm <- tab[ok & tab$K > 1, , drop = FALSE]
+  pooled <- tab[ok & tab$K == 1, , drop = FALSE][seq_len(min(1L, sum(ok & tab$K == 1))), , drop = FALSE]
+  phis <- sort(unique(adm$phi))
+  in_band <- phis[phis >= band[1] & phis <= band[2]]
+  if (length(phis) && length(in_band) < 2L) in_band <- phis
+  winners <- vapply(in_band, function(p) {
+    sub <- rbind(adm[adm$phi == p, , drop = FALSE], pooled)
+    sub$K[order(sub[[crit]], sub$K)][1]
+  }, numeric(1))
+  if (!length(winners)) winners <- 1
+  votes <- table(winners)
+  K_sel <- min(as.numeric(names(votes)[votes == max(votes)]))
+  if (K_sel == 1) return(data.frame(K = 1, phi = if (nrow(pooled)) pooled$phi else NA_real_,
+                                    ari = if (nrow(pooled)) pooled$ari else NA_real_))
+  sk <- adm[adm$K == K_sel, , drop = FALSE]
+  b <- order(sk[[crit]], sk$phi)[1]
+  data.frame(K = K_sel, phi = sk$phi[b], ari = sk$ari[b])
+}
+if (!is.null(G) && all(c("loglik", "df", "AIC", "BIC", "admissible") %in% names(G))) {
+  g9 <- G[G$cell %in% S$cell & is.finite(G$loglik) & G$df > 0, , drop = FALSE]
+  g9$N <- exp((g9$BIC - g9$AIC) / g9$df + 2)
+  g9$AICc <- g9$AIC + 2 * g9$df * (g9$df + 1) / (g9$N - g9$df - 1)
+  g9$GCV  <- -2 * g9$loglik - 2 * g9$N * log(1 - g9$df / g9$N)
+  g9$HQ   <- -2 * g9$loglik + 2 * log(log(g9$N)) * g9$df
+  g9$KIC  <- -2 * g9$loglik + 3 * g9$df
+  g9$EBIC <- g9$BIC + 2 * mapply(log_stirling2, g9$n, g9$K)
+  if (!"ari" %in% names(g9)) g9$ari <- NA_real_
+  sp <- split(g9, paste(g9$cell, g9$rep), drop = TRUE)
+  sel9 <- do.call(rbind, lapply(sp, function(tab) {
+    do.call(rbind, lapply(AN_CRIT, function(cr) cbind(tab[1, c("cell", "rep", "scenario", "n", "TN", "K_true")],
+                                                       criterion = cr, an_select(tab, cr))))
+  }))
+  rownames(sel9) <- NULL
+  sel9$criterion <- factor(sel9$criterion, levels = AN_CRIT)
+  ## the check: with the BIC the rule returns the K the study recorded
+  chk <- merge(sel9[sel9$criterion == "BIC", c("cell", "rep", "K")], S[, c("cell", "rep", "K_hat")])
+  cat(sprintf("R9. THE CRITERIA IN THE TWO-STEP RULE (%d replications; with the BIC the rule returns the recorded K in %.1f%% of them)\n",
+              length(sp), 100 * mean(chk$K == chk$K_hat)))
+  sel9$ok <- sel9$K == sel9$K_true
+  sel9$over <- sel9$K > sel9$K_true; sel9$under <- sel9$K < sel9$K_true
+  sel9$ari[sel9$K_true == 1] <- NA_real_
+  wide9 <- function(d, v, by, digits = 2) {
+    a <- stats::aggregate(stats::as.formula(paste(v, "~", paste(c(by, "criterion"), collapse = "+"))),
+                          data = d, FUN = mean, na.action = stats::na.pass)
+    a[[v]] <- round(a[[v]], digits)
+    w <- stats::reshape(a, idvar = by, timevar = "criterion", direction = "wide")
+    names(w) <- sub(paste0("^", v, "[.]"), "", names(w)); w
+  }
+  ## by scenario-variant, over every cell: right, too many, too few regimes
+  t9ok <- wide9(sel9, "ok", "scenario"); t9ok <- t9ok[match(scen_order(t9ok$scenario), t9ok$scenario), ]
+  t9ov <- wide9(sel9, "over", "scenario"); t9ov <- t9ov[match(scen_order(t9ov$scenario), t9ov$scenario), ]
+  t9un <- wide9(sel9, "under", "scenario"); t9un <- t9un[match(scen_order(t9un$scenario), t9un$scenario), ]
+  t9ari <- wide9(sel9[sel9$K_true > 1, ], "ari", "scenario")
+  t9ari <- t9ari[match(scen_order(t9ari$scenario), t9ari$scenario), ]
+  ## the over-selection against the size of the network (AIC: penalty 2 per
+  ## parameter whatever d; BIC: log(dT); EBIC: adds the partitions)
+  t9n <- wide9(sel9, "over", "n")
+  cat("\nShare of replications with K selected = K true, by scenario-variant\n"); print(t9ok, row.names = FALSE)
+  cat("\nToo many regimes\n"); print(t9ov, row.names = FALSE)
+  cat("\nToo few regimes\n"); print(t9un, row.names = FALSE)
+  cat("\nARI of the selected partition (scenarios with regimes)\n"); print(t9ari, row.names = FALSE)
+  cat("\nToo many regimes, by n\n"); print(t9n, row.names = FALSE)
+  csv_write(sel9, "tab_sim_criteria_selections.csv")
+  csv_write(t9ok, "tab_sim_criteria_correct.csv"); csv_write(t9ov, "tab_sim_criteria_over.csv")
+  csv_write(t9un, "tab_sim_criteria_under.csv"); csv_write(t9ari, "tab_sim_criteria_ari.csv")
+  csv_write(t9n, "tab_sim_criteria_over_by_n.csv")
+  tex_write(c(paste0("\\begin{tabular}{l", strrep("r", length(AN_CRIT)), "}"), "\\toprule",
+              paste("scenario-variant &", paste(AN_CRIT, collapse = " & "), "\\\\"), "\\midrule",
+              apply(t9ok, 1, function(r) paste(tt(r[["scenario"]]), "&",
+                                               paste(fmt(as.numeric(r[AN_CRIT])), collapse = " & "), "\\\\")),
+              "\\bottomrule", "\\end{tabular}"), "tab_sim_criteria_correct.tex")
+  cat("\n")
+} else cat("R9: no grid results with the log-likelihood and the criteria\n")
 cat("\ndone\n")
