@@ -24,33 +24,51 @@
 ##              + latent AR(1) of the regime + spatially correlated error
 ##
 ## with y* the weekly relative prices (cents per litre; Sunday price minus the
-## national mean, minus the pump mean). The four blocks of lags carry a ridge
-## penalty; the intercept and the pulses do not. The response keeps its missing
-## weeks, which the Kalman filter handles; the lags come from the completed
-## series (fuels-data.R, stage 3).
+## national mean, minus the pump mean). The response keeps its missing weeks,
+## which the Kalman filter handles; the lags come from the completed series
+## (fuels-data.R, stage 3).
 ##
-## Three stages, run in this order (--stage=):
+## The model is estimated twice on the same regimes. Without penalty
+## (lambda = 0): the regimes are selected and every test is made on this fit.
+## With a ridge on the four blocks of lags (lambda*): the lag coefficients are
+## estimated with less variance, and the response is completed; the intercept
+## and the pulses are never penalized. Why this order: the ridge would make the
+## regimes look more alike, and it is not needed to find them (collinearity
+## spoils the single coefficients, not the fit), so the regimes are selected
+## without it and the penalty is tuned on the regimes found; the ridge
+## corrected for its bias is the estimate at lambda = 0 itself, so the
+## inference is made there (the proposition on the ridge in Section 2 of the
+## paper).
+##
+## Four stages, run in this order (--stage=), each on the output of the one
+## before it:
 ##
 ##   lags    the pre-analysis of the lags, pump by pump: ACF, PACF, cross-
 ##           correlations with the other three series, lag plots. It led to
 ##           the lags LAGS below.                              (no model)
-##   select  for each city and fuel, the pooled STEM model at the lags LAGS for
-##           every ridge penalty in `lambdas`: the BIC chooses the penalty, city
-##           by city and fuel by fuel.                         (pooled fits)
-##   fit     for each city and fuel, at the lags LAGS and the chosen penalty:
-##           the grid of SC-STEM fits over (K, phi), the two-step selection, the
-##           refit-with-clustering bootstrap of the selected model and of the
-##           pooled one, the tests, the diagnostics, the maps.
-##   dry     the plan of stage "fit": the models and their cost, nothing fitted.
+##   grid    for each city and fuel, at lambda = 0: the grid of SC-STEM fits
+##           over (K, phi) and the two-step rule of SCSTEM_Select() on the
+##           BIC, which gives K*, phi* and the partition.
+##   lambda  on that partition, held fixed: one fit for every ridge penalty in
+##           `lambdas`; lambda* minimizes the AIC (`lambda_ic`).
+##   final   the refit-with-clustering bootstrap of the model at lambda = 0,
+##           of the model at lambda* and of the pooled model; the tests, all at
+##           lambda = 0 (bootstrap Wald by regime, likelihood ratio on the
+##           partition, pump by pump F and HC1, Dumitrescu-Hurlin); the lag
+##           coefficients at lambda* beside those at lambda = 0; the completed
+##           response at both; the diagnostics, the pulses, the maps.
+##   dry     the plan: the models and the fits of every stage; nothing fitted.
 ##
 ##     Rscript fuels-main-setting3.R --stage=lags
-##     Rscript fuels-main-setting3.R --stage=select
-##     Rscript fuels-main-setting3.R --stage=fit
-##     Rscript fuels-main-setting3.R --stage=fit --job=1/3      one of three processes
-##     Rscript fuels-main-setting3.R --stage=fit --xdef=rs      X = the mean within r*
+##     Rscript fuels-main-setting3.R --stage=grid
+##     Rscript fuels-main-setting3.R --stage=lambda
+##     Rscript fuels-main-setting3.R --stage=final
+##     Rscript fuels-main-setting3.R --stage=grid --job=1/3      one of three processes
+##     Rscript fuels-main-setting3.R --stage=grid --cities=VE    one city only
+##     Rscript fuels-main-setting3.R --stage=grid --xdef=rs      X = the mean within r*
 ##
 ## Input:  <root>/setting3-Ymajor-Xothermajor/data.RData   (fuels-data.R)
-## Output: <root>/setting3-Ymajor-Xothermajor/<xdef>/     lags/, select/, fit/
+## Output: <root>/setting3-Ymajor-Xothermajor/<xdef>/     lags/, grid/, lambda/, final/
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package.
@@ -75,22 +93,25 @@ source(file.path(HERE, "fuels-functions.R"))
 SETTING <- 3L
 CFG <- fu_config(list(
   root        = file.path(HERE, "fuels"),
-  stage       = "lags",            # "lags", "select", "fit" or "dry"
+  stage       = "lags",            # "lags", "grid", "lambda", "final" or "dry"
   ## The neighbour X: "nn" the nearest pump of the X set; "rs" the mean of the X
-  ## set within r* (the nearest when r* holds none). Proposal: "nn" as the main
-  ## analysis in every setting; "rs" as a check here, where r* holds several X
-  ## for most Y and their mean is a different object from the nearest pump.
+  ## set within r* (the nearest when r* holds none). "nn" is the main analysis
+  ## in every setting, "rs" a check here, where r* often holds several X and
+  ## their mean is a different object from the nearest pump.
   xdef        = "nn",
   cities      = "",                # empty: every city of the case
   fuels       = c("g", "d"),       # the fuel of Y: g gasoline, d diesel
-  lambdas     = c(0, 0.03, 0.1, 0.3, 1),   # ridge penalties tried in stage "select"
   m           = 5L,                # the smallest regime: K_max = min(k_cap, floor(n / m))
   k_cap       = 3L,
   knn         = 5L,                # neighbours of the graph of the Potts penalty
   phi_grid    = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   band        = c(0.025, 0.2),     # the band of the two-step rule
+  ## the ridge penalties of stage "lambda" and the criterion choosing among
+  ## them ("AIC"; "BIC" and "KIC" are also recorded)
+  lambdas     = c(0, 0.001, 0.003, 0.01, 0.02, 0.03, 0.05, 0.1, 0.3, 1),
+  lambda_ic   = "AIC",
   B           = 100L,              # bootstrap draws
-  boot_pooled = TRUE,              # bootstrap the pooled model too, when K > 1 is selected
+  boot_pooled = TRUE,              # bootstrap the pooled model too, when K* > 1
   level       = 0.95,
   seed        = 20261005L,
   job         = "1/1"              # "i/N": this process runs its share of the models
@@ -113,10 +134,10 @@ CFG <- fu_config(list(
 ## window (2022-01 to 2026-06).
 LAGS <- list(own = 1:4, own_other = 1:4, nb = 1:4, nb_other = 1:4)
 
-## The ridge penalty of stage "fit": NULL takes, city by city and fuel by fuel,
-## the one chosen by the BIC in stage "select"; a number imposes that penalty
-## on every model, for instance
-##   FIT_LAMBDA <- 0.1
+## The ridge penalty of stage "final": NULL takes, city by city and fuel by
+## fuel, lambda* of stage "lambda"; a number imposes that penalty on every
+## model (it is then fitted on the partition of stage "grid"), for instance
+##   FIT_LAMBDA <- 0.01
 FIT_LAMBDA <- NULL
 
 
@@ -132,6 +153,8 @@ OUT <- file.path(CASE, XDEF)
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 CITIES <- if (any(nzchar(CFG$cities))) CFG$cities else unique(fuels_data$city)
 STAGE <- CFG$stage[1]
+if (!STAGE %in% c("lags", "grid", "lambda", "final", "dry"))
+  stop("unknown stage: ", STAGE, "; the stages are lags, grid, lambda, final and dry", call. = FALSE)
 options(width = 180)
 message(sprintf("setting %d (%s), X = %s, stage %s, %d cities", SETTING, FU_CASES$folder[SETTING],
                 XDEF, STAGE, length(CITIES)))
@@ -179,63 +202,28 @@ if (STAGE == "lags") {
 
 
 ## ===========================================================================
-## Stem, at the pinned commit (stages "select" and "fit")
+## Stem, at the pinned commit, and the cache of the fits
 ## ===========================================================================
 if (STAGE != "dry") {
   SHA7 <- fu_require_stem()
   suppressPackageStartupMessages(library(Stem))
 } else SHA7 <- substr(sub("^.*@", "", FU_STEM_REF), 1L, 7L)
 CACHE <- file.path(OUT, "cache", SHA7)
-## The lags, and in stage "select" the penalties, enter the names of the cached
-## fits, so that a fit made with other lags is never reused: for LAGS = 1:4 in
-## every block, "L1.2.3.4-1.2.3.4-1.2.3.4-1.2.3.4".
+## The lags enter the names of the cached fits, so that a fit made with other
+## lags is never reused: for LAGS = 1:4 in every block,
+## "L1.2.3.4-1.2.3.4-1.2.3.4-1.2.3.4". Every cached value also carries the
+## settings it was made with (the grid of phi, the penalties, the partition
+## selected before it, B): when they no longer match, fu_cached() runs the
+## stage again.
 LAG_KEY <- paste0("L", paste(vapply(FU_BLOCKS, function(b) paste(LAGS[[b]], collapse = "."), ""),
                              collapse = "-"))
-SEL_KEY <- paste0(LAG_KEY, "_lam", paste(CFG$lambdas, collapse = "-"))
+with_settings <- function(val, s) { attr(val, "fu_settings") <- s; val }
+same_settings <- function(s) function(val) identical(attr(val, "fu_settings"), s)
 
 
 ## ===========================================================================
-## Stage "select": the ridge penalty, by the BIC of the pooled model
+## The models: one per city and fuel
 ## ===========================================================================
-if (STAGE == "select") {
-  SDIR <- file.path(OUT, "select"); dir.create(SDIR, showWarnings = FALSE)
-  units <- expand.grid(city = CITIES, fuel = CFG$fuels, stringsAsFactors = FALSE)
-  sizes <- vapply(units$city, function(cc) length(unique(city_data(cc)$y_site)), 1L)
-  res <- list()
-  for (k in fu_my_share(sizes, CFG$job[1])) {
-    cc <- units$city[k]; fu <- units$fuel[k]
-    message(sprintf("\n== select: %s, %s (%d pumps)", FU_CITY[[cc]], FU_FUEL[[fu]], sizes[k]))
-    res[[length(res) + 1]] <- fu_cached(CACHE, sprintf("select_%s_%s_%s", cc, fu, SEL_KEY),
-      fu_select(city_data(cc), fu, XDEF, list(LAGS = LAGS), CFG$lambdas))
-  }
-  ## every process rewrites the table with all the units finished so far
-  done <- lapply(seq_len(nrow(units)), function(k) {
-    f <- file.path(CACHE, sprintf("select_%s_%s_%s.rds", units$city[k], units$fuel[k], SEL_KEY))
-    if (file.exists(f)) readRDS(f)
-  })
-  tab <- do.call(rbind, done)
-  utils::write.csv(tab, file.path(SDIR, "select_all.csv"), row.names = FALSE)
-  chosen <- tab[tab$selected, c("city", "fuel", "lambda", "BIC", "df", "t_start")]
-  cat("\nCHOSEN BY THE BIC: the ridge penalty, by city and fuel\n"); print(chosen, row.names = FALSE)
-  utils::write.csv(chosen, file.path(SDIR, "selected.csv"), row.names = FALSE)
-  quit(save = "no", status = 0)
-}
-
-
-## ===========================================================================
-## Stage "fit": the plan
-## ===========================================================================
-## The lags (LAGS) and the penalty of every model: imposed (FIT_LAMBDA) or
-## chosen in stage "select".
-spec_of <- function(cc, fu) {
-  if (!is.null(FIT_LAMBDA)) return(list(lags = LAGS, lambda = FIT_LAMBDA, from = "fixed"))
-  f <- file.path(OUT, "select", "selected.csv")
-  if (!file.exists(f)) stop("no selected penalty: run --stage=select first, or set FIT_LAMBDA", call. = FALSE)
-  s <- utils::read.csv(f, stringsAsFactors = FALSE)
-  s <- s[s$city == cc & s$fuel == FU_FUEL[[fu]], ]
-  if (!nrow(s)) stop("no selected penalty for ", cc, ", ", FU_FUEL[[fu]], call. = FALSE)
-  list(lags = LAGS, lambda = s$lambda[1], from = "BIC")
-}
 MODELS <- list()
 for (cc in CITIES) for (fu in CFG$fuels) {
   n <- length(unique(city_data(cc)$y_site))
@@ -244,72 +232,204 @@ for (cc in CITIES) for (fu in CFG$fuels) {
 }
 sizes <- vapply(MODELS, `[[`, 1, "n")
 MINE <- fu_my_share(sizes, CFG$job[1])
+## the seed of a model depends on its city and fuel only, so that a run on some
+## of the cities reproduces the full run
+seed_of <- function(M) CFG$seed[1] + 10L * match(M$city, names(FU_CITY)) + match(M$fuel, names(FU_FUEL))
+design_of <- function(M) fu_design(city_data(M$city), M$fuel, XDEF, LAGS)
+cache_file <- function(name) file.path(CACHE, paste0(name, ".rds"))
+## a stage that needs the output of the one before it stops instead of running
+## that one silently
+need <- function(name, stage) if (!file.exists(cache_file(name)))
+  stop("no output of stage \"", stage, "\" for ", sub("_L.*$", "", name), ": run --stage=", stage, " first",
+       call. = FALSE)
+
+## Stage "grid", one model: the grid of (K, phi) at lambda = 0 and the
+## two-step rule on the BIC.
+grid_name <- function(M) sprintf("%s_%s_grid", M$id, LAG_KEY)
+grid_of <- function(M, des) {
+  s <- list(K_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid, m = CFG$m[1], knn = CFG$knn[1], seed = seed_of(M))
+  ic <- fu_cached(CACHE, grid_name(M), with_settings(
+    Stem::SCSTEM_Infocrit(fu_model(des), K_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid,
+                          knn = min(CFG$knn[1], des$d - 1L), distance = "geo",
+                          min_cluster_size = CFG$m[1], seed = seed_of(M), verbose = TRUE,
+                          alpha = 0, lambda = 0, control = Stem::STEM_control()), s),
+    valid = same_settings(s))
+  list(ic = ic, sel = Stem::SCSTEM_Select(ic, band = CFG$band, criterion = "BIC"))
+}
+
+## Stage "lambda", one model: the fits along lambda on the partition of the
+## grid, lambda* by the criterion lambda_ic.
+lambda_name <- function(M, fixed = FALSE) sprintf("%s_%s_lambda%s", M$id, LAG_KEY, if (fixed) "_fixed" else "")
+lambda_of <- function(M, des, sel, lambdas = CFG$lambdas, fixed = FALSE) {
+  s <- list(lambdas = lambdas, ic = CFG$lambda_ic[1], K = sel$K_selected, phi = sel$phi_selected,
+            partition = sel$fit$group)
+  fu_cached(CACHE, lambda_name(M, fixed),
+    with_settings(fu_lambda(des, sel, lambdas, CFG, seed_of(M), CFG$lambda_ic[1]), s), valid = same_settings(s))
+}
+
+
+## ===========================================================================
+## Stage "dry": the plan
+## ===========================================================================
 plan <- do.call(rbind, lapply(seq_along(MODELS), function(k) with(MODELS[[k]], data.frame(
   model = id, city = FU_CITY[[city]], fuel = FU_FUEL[[fuel]], pumps = n, K_max = kmax,
   grid_fits = 1L + (kmax - 1L) * length(CFG$phi_grid),
-  boot_refits = CFG$B[1] * (1L + (kmax > 1L && isTRUE(CFG$boot_pooled[1]))),
+  lambda_fits = length(CFG$lambdas),
+  boot_refits_max = CFG$B[1] * (2L + (kmax > 1L && isTRUE(CFG$boot_pooled[1]))),
   this_job = k %in% MINE))))
-cat(sprintf("\nTHE PLAN: %d models (%d in this job), B = %d, X = %s\n", nrow(plan), length(MINE), CFG$B[1], XDEF))
-print(plan[order(-plan$pumps), ], row.names = FALSE)
-cat(sprintf("total: %d grid fits, up to %d bootstrap refits\n", sum(plan$grid_fits), sum(plan$boot_refits)))
-FDIR <- file.path(OUT, "fit"); dir.create(FDIR, showWarnings = FALSE)
-utils::write.csv(plan, file.path(FDIR, "plan.csv"), row.names = FALSE)
-if (STAGE == "dry") quit(save = "no", status = 0)
-if (STAGE != "fit") stop("unknown stage: ", STAGE, call. = FALSE)
+if (STAGE == "dry") {
+  cat(sprintf("\nTHE PLAN: %d models (%d in this job), X = %s, B = %d\n", nrow(plan), length(MINE), XDEF, CFG$B[1]))
+  print(plan[order(-plan$pumps), ], row.names = FALSE)
+  cat(sprintf(paste0("stage grid: %d SC-STEM fits; stage lambda: %d fits on a fixed partition; ",
+                     "stage final: up to %d bootstrap refits\n"),
+              sum(plan$grid_fits), sum(plan$lambda_fits), sum(plan$boot_refits_max)))
+  utils::write.csv(plan, file.path(OUT, "plan.csv"), row.names = FALSE)
+  quit(save = "no", status = 0)
+}
 
 
 ## ===========================================================================
-## Stage "fit": one model, from the grid to the tables
+## Stage "grid": the regimes, at lambda = 0
 ## ===========================================================================
-fit_one <- function(M, seed) {
-  message(sprintf("\n== %s: %d pumps, K_max = %d", M$id, M$n, M$kmax))
+if (STAGE == "grid") {
+  GDIR <- file.path(OUT, "grid"); dir.create(GDIR, showWarnings = FALSE)
+  for (k in MINE) {
+    M <- MODELS[[k]]
+    message(sprintf("\n== grid: %s, %s (%d pumps, K_max = %d)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n, M$kmax))
+    res <- tryCatch({
+      des <- design_of(M); g <- grid_of(M, des)
+      utils::write.csv(g$ic$table, file.path(GDIR, paste0(M$id, "_grid.csv")), row.names = FALSE)
+      row <- data.frame(model = M$id, city = FU_CITY[[M$city]], fuel = FU_FUEL[[M$fuel]], pumps = M$n,
+                        weeks = des$Tn, K_max = M$kmax, K = g$sel$K_selected, phi = g$sel$phi_selected,
+                        BIC = g$sel$selected_row$BIC[1],
+                        sizes = paste(tabulate(g$sel$fit$group), collapse = "/"),
+                        min_grid = fu_minutes(g$ic), stringsAsFactors = FALSE)
+      saveRDS(row, file.path(GDIR, paste0(M$id, "_selected.rds")))
+      message(sprintf("   K* = %d, phi* = %s, regimes of %s pumps", row$K, format(row$phi), row$sizes))
+    }, error = function(e) e)
+    if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
+  }
+  ## every process rewrites the table with all the models finished so far
+  rows <- lapply(MODELS, function(M) { f <- file.path(GDIR, paste0(M$id, "_selected.rds"))
+    if (file.exists(f)) readRDS(f) })
+  tab <- do.call(rbind, rows)
+  if (!is.null(tab)) {
+    utils::write.csv(tab, file.path(GDIR, "selected.csv"), row.names = FALSE)
+    cat(sprintf("\nSELECTED AT lambda = 0 (two-step rule, BIC): %d of %d models\n", nrow(tab), length(MODELS)))
+    print(tab, row.names = FALSE)
+  }
+  quit(save = "no", status = 0)
+}
+
+
+## ===========================================================================
+## Stage "lambda": the ridge penalty, on the partition selected at lambda = 0
+## ===========================================================================
+if (STAGE == "lambda") {
+  LDIR <- file.path(OUT, "lambda"); dir.create(LDIR, showWarnings = FALSE)
+  for (k in MINE) {
+    M <- MODELS[[k]]
+    message(sprintf("\n== lambda: %s, %s (%d pumps)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n))
+    res <- tryCatch({
+      need(grid_name(M), "grid")
+      des <- design_of(M); g <- grid_of(M, des)
+      lam <- lambda_of(M, des, g$sel)
+      utils::write.csv(lam$table, file.path(LDIR, paste0(M$id, "_lambda.csv")), row.names = FALSE)
+      row <- data.frame(model = M$id, city = FU_CITY[[M$city]], fuel = FU_FUEL[[M$fuel]], pumps = M$n,
+                        K = g$sel$K_selected, phi = g$sel$phi_selected, criterion = CFG$lambda_ic[1],
+                        lambda = lam$lambda,
+                        df_lambda0 = lam$table$df[lam$table$lambda == 0][1],
+                        df_lambda_star = lam$table$df[lam$table$selected][1],
+                        min_lambda = fu_minutes(lam), stringsAsFactors = FALSE)
+      saveRDS(row, file.path(LDIR, paste0(M$id, "_selected.rds")))
+      message(sprintf("   lambda* = %s (%s)", format(row$lambda), row$criterion))
+    }, error = function(e) e)
+    if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
+  }
+  rows <- lapply(MODELS, function(M) { f <- file.path(LDIR, paste0(M$id, "_selected.rds"))
+    if (file.exists(f)) readRDS(f) })
+  tab <- do.call(rbind, rows)
+  if (!is.null(tab)) {
+    utils::write.csv(tab, file.path(LDIR, "selected.csv"), row.names = FALSE)
+    cat(sprintf("\nlambda* BY THE %s, ON THE PARTITION OF STAGE grid: %d of %d models\n", CFG$lambda_ic[1],
+                nrow(tab), length(MODELS)))
+    print(tab, row.names = FALSE)
+  }
+  quit(save = "no", status = 0)
+}
+
+
+## ===========================================================================
+## Stage "final": bootstrap, tests and tables of one model
+## ===========================================================================
+FDIR <- file.path(OUT, "final"); dir.create(FDIR, showWarnings = FALSE)
+final_one <- function(M) {
+  message(sprintf("\n== final: %s, %s (%d pumps, K_max = %d)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n, M$kmax))
+  need(grid_name(M), "grid")
+  if (is.null(FIT_LAMBDA)) need(lambda_name(M), "lambda")
   od <- file.path(FDIR, M$id); dir.create(od, showWarnings = FALSE)
-  sp <- spec_of(M$city, M$fuel)
-  des <- fu_design(city_data(M$city), M$fuel, XDEF, sp$lags)
-  mod <- fu_model(des)
-  tag <- sprintf("%s_lambda%s_%s", M$id, format(sp$lambda), LAG_KEY)
+  des <- design_of(M)
 
-  ## 1. the grid of (K, phi) and the two-step selection, the pooled model
-  ##    competing; the ridge on the four blocks of lags
-  ic <- fu_cached(CACHE, paste0(tag, "_grid"),
-    Stem::SCSTEM_Infocrit(mod, K_grid = seq_len(M$kmax), phi_grid = CFG$phi_grid,
-                          knn = min(CFG$knn[1], des$d - 1L), distance = "geo",
-                          min_cluster_size = CFG$m[1], seed = seed, verbose = TRUE,
-                          alpha = 0, lambda = sp$lambda, penalize = des$penalize,
-                          control = Stem::STEM_control()))
-  sel <- Stem::SCSTEM_Select(ic, band = CFG$band, criterion = "BIC")
-  pooled <- ic$fits[[which(ic$table$K == 1)[1]]]
-  K <- sel$K_selected
+  ## 1. the regimes at lambda = 0 (stage grid), the pooled model, lambda*
+  ##    (stage lambda, or FIT_LAMBDA) and the fit at lambda* on those regimes
+  g <- grid_of(M, des); sel <- g$sel; K <- sel$K_selected
+  pooled <- g$ic$fits[[which(g$ic$table$K == 1)[1]]]
+  lam <- if (is.null(FIT_LAMBDA)) lambda_of(M, des, sel) else lambda_of(M, des, sel, FIT_LAMBDA, fixed = TRUE)
+  fitL <- lam$fit                                      # NULL when lambda* = 0
 
-  ## 2. the refit-with-clustering bootstrap of the selected model, and of the
-  ##    pooled one for the comparison
-  boot <- function(fit, name) fu_cached(CACHE, paste0(tag, "_", name), {
-    bt <- Stem::SCSTEM_Bootstrap(fit, B = CFG$B[1], seed = seed, verbose = TRUE)
+  ## 2. the refit-with-clustering bootstrap: of the model at lambda = 0 (for
+  ##    the inference), of the model at lambda* (the spread of the ridge
+  ##    estimates) and of the pooled model (for the comparison). The fit at
+  ##    lambda* was made on a fixed partition (max_iter = 0, kept in its
+  ##    control); its draws are given the control of the fit at lambda = 0, so
+  ##    that they re-estimate the partition at (K*, phi*) as those of the
+  ##    model at lambda = 0 do.
+  boot <- function(fit, name, s, ...) fu_cached(CACHE, sprintf("%s_%s_%s", M$id, LAG_KEY, name), with_settings({
+    bt <- Stem::SCSTEM_Bootstrap(fit, B = CFG$B[1], seed = seed_of(M), verbose = TRUE, ...)
     list(info = bt$info, B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = CFG$level[1]),
          groups = bt$groups)
-  })
-  b_sel <- boot(sel$fit, sprintf("boot_K%d", K))
-  b_pool <- if (K == 1L) b_sel else if (isTRUE(CFG$boot_pooled[1])) boot(pooled, "boot_K1") else NULL
+  }, s), valid = same_settings(s))
+  s0 <- list(B = CFG$B[1], level = CFG$level[1], K = K, phi = sel$phi_selected, partition = sel$fit$group)
+  b0 <- boot(sel$fit, "boot_lambda0", s0)
+  bL <- if (is.null(fitL)) NULL else
+    boot(fitL, "boot_lambdastar", c(s0, lambda = lam$lambda), control = sel$fit$input_args$control)
+  bP <- if (K == 1L) b0 else if (isTRUE(CFG$boot_pooled[1]))
+    boot(pooled, "boot_pooled", list(B = CFG$B[1], level = CFG$level[1], K = 1L)) else NULL
 
-  ## 3. the tests: bootstrap Wald regime by regime, for the selected and the
-  ##    pooled model; likelihood ratio on the selected partition (no ridge);
-  ##    pump by pump, F and HC1, with the Dumitrescu-Hurlin combination
+  ## 3. the tests, all at lambda = 0: bootstrap Wald regime by regime, for the
+  ##    selected and the pooled model; likelihood ratio on the selected
+  ##    partition; pump by pump, F and HC1, with the Dumitrescu-Hurlin
+  ##    combination
   tests <- fu_tests(des)
   wald <- function(fit, b, label) if (!is.null(b)) do.call(rbind, lapply(names(tests), function(h)
     cbind(model = label, fu_wald_boot(fit, b$inf, des, tests[[h]], h))))
-  wd <- rbind(wald(sel$fit, b_sel, sprintf("selected, K = %d", K)),
-              if (K > 1L) wald(pooled, b_pool, "pooled"))
-  lr <- fu_cached(CACHE, paste0(tag, "_lr"), fu_lr_fixed(des, sel$fit$group, K, CFG, seed))
+  wd <- rbind(wald(sel$fit, b0, sprintf("selected, K = %d", K)),
+              if (K > 1L) wald(pooled, bP, "pooled"))
+  sP <- list(partition = sel$fit$group, K = K)
+  lr <- fu_cached(CACHE, sprintf("%s_%s_lr", M$id, LAG_KEY),
+                  with_settings(fu_lr_fixed(des, sel$fit$group, K, CFG, seed_of(M)), sP), valid = same_settings(sP))
   pt <- fu_pump_tests(des); dh <- fu_dh(pt)
 
-  ## 4. diagnostics, the pass-through of the excise duties, regimes and brands
+  ## 4. the ridge: the lag coefficients at lambda* beside those at lambda = 0,
+  ##    and the completed response of both fits
+  rt <- fu_ridge_table(b0$inf, if (is.null(bL)) NULL else bL$inf, des)
+  saveRDS(list(weeks = des$weeks, sites = des$meta$y_site, missing = is.na(des$z), lambda = lam$lambda,
+               lambda0 = Stem::SCSTEM_Complete(sel$fit),
+               lambda_star = if (is.null(fitL)) NULL else Stem::SCSTEM_Complete(fitL)),
+          file.path(od, "completed_response.rds"))
+
+  ## 5. diagnostics, the pass-through of the excise duties, regimes and brands
   dg <- fu_diagnostics(sel$fit, des)
-  pul <- rbind(cbind(model = sprintf("selected, K = %d", K), fu_pulse_table(b_sel$inf, des)),
-               if (K > 1L && !is.null(b_pool)) cbind(model = "pooled", fu_pulse_table(b_pool$inf, des)))
+  pul <- rbind(cbind(model = sprintf("selected, K = %d", K), fu_pulse_table(b0$inf, des)),
+               if (K > 1L && !is.null(bP)) cbind(model = "pooled", fu_pulse_table(bP$inf, des)))
   br <- fu_brand_table(sel$fit, des)
 
-  ## 5. the outputs of the model
-  utils::write.csv(ic$table, file.path(od, "grid.csv"), row.names = FALSE)
+  ## 6. the outputs of the model
+  est_table <- function(inf) { e <- as.data.frame(inf$summary)
+    num <- suppressWarnings(as.integer(sub("^beta", "", e$parameter)))
+    e$covariate <- ifelse(is.na(num), e$parameter, des$names[num]); e }
+  utils::write.csv(g$ic$table, file.path(od, "grid.csv"), row.names = FALSE)
+  utils::write.csv(lam$table, file.path(od, "lambda.csv"), row.names = FALSE)
   utils::write.csv(wd, file.path(od, "wald_bootstrap.csv"), row.names = FALSE)
   utils::write.csv(lr, file.path(od, "lr_fixed_partition.csv"), row.names = FALSE)
   utils::write.csv(pt, file.path(od, "pump_tests.csv"), row.names = FALSE)
@@ -317,39 +437,43 @@ fit_one <- function(M, seed) {
   utils::write.csv(dg, file.path(od, "diagnostics.csv"), row.names = FALSE)
   utils::write.csv(pul, file.path(od, "excise_pulses.csv"), row.names = FALSE)
   utils::write.csv(br$table, file.path(od, "regimes_by_brand.csv"), row.names = FALSE)
-  est <- as.data.frame(b_sel$inf$summary)
-  num <- suppressWarnings(as.integer(sub("^beta", "", est$parameter)))
-  est$covariate <- ifelse(is.na(num), est$parameter, des$names[num])
-  utils::write.csv(est, file.path(od, "estimates.csv"), row.names = FALSE)
+  utils::write.csv(est_table(b0$inf), file.path(od, "estimates_lambda0.csv"), row.names = FALSE)
+  if (!is.null(bL)) {
+    utils::write.csv(est_table(bL$inf), file.path(od, "estimates_lambdastar.csv"), row.names = FALSE)
+    utils::write.csv(rt, file.path(od, "ridge_vs_lambda0.csv"), row.names = FALSE)
+  }
   utils::write.csv(data.frame(des$meta, regime = sel$fit$group,
                               theta_bound = sel$fit$theta_bound[sel$fit$group]),
                    file.path(od, "regimes.csv"), row.names = FALSE)
   fu_map(des, sel$fit, file.path(od, "map.pdf"),
-         sprintf("%s, %s (Y): K = %d, phi = %s, lambda = %s", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], K,
-                 format(sel$phi_selected), format(sp$lambda)))
+         sprintf("%s, %s (Y): K = %d, phi = %s", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], K,
+                 format(sel$phi_selected)))
 
-  ## 6. one row of the summary of the case
+  ## 7. one row of the summary of the case
   p_of <- function(h, model) { z <- wd[wd$block == h & startsWith(wd$model, model), ]
     if (!nrow(z)) NA_character_ else paste(format.pval(z$p_value, digits = 2), collapse = "; ") }
   row <- data.frame(model = M$id, city = FU_CITY[[M$city]], fuel = FU_FUEL[[M$fuel]], pumps = M$n,
-                    weeks = des$Tn, lambda = sp$lambda, lambda_from = sp$from, K_max = M$kmax, K = K,
-                    phi = sel$phi_selected, B_valid = b_sel$B_valid,
+                    weeks = des$Tn, K_max = M$kmax, K = K, phi = sel$phi_selected,
+                    lambda = lam$lambda, lambda_from = if (is.null(FIT_LAMBDA)) CFG$lambda_ic[1] else "fixed",
+                    B_valid = b0$B_valid, B_valid_ridge = if (is.null(bL)) NA_integer_ else bL$B_valid,
                     p_nb_both_regimes = p_of("nb_both", "selected"), p_nb_both_pooled = p_of("nb_both", "pooled"),
                     p_nb_regimes = p_of("nb", "selected"), p_nb_other_regimes = p_of("nb_other", "selected"),
                     p_own_other_regimes = p_of("own_other", "selected"),
                     pumps_reject_nb_both_F_pct = dh$reject_F_pct[dh$block == "nb_both"],
                     pumps_reject_nb_both_hc1_pct = dh$reject_hc1_pct[dh$block == "nb_both"],
+                    ridge_se_ratio_median = if (is.null(rt)) NA_real_ else stats::median(rt$se_ratio),
+                    ridge_shift_abs_median = if (is.null(rt)) NA_real_ else stats::median(abs(rt$shift)),
                     ari_regimes_brands = br$ari,
-                    min_grid = fu_minutes(ic), min_boot = fu_minutes(b_sel), stem = SHA7,
-                    stringsAsFactors = FALSE)
+                    min_grid = fu_minutes(g$ic), min_lambda = fu_minutes(lam), min_boot = fu_minutes(b0),
+                    stem = SHA7, stringsAsFactors = FALSE)
   saveRDS(row, file.path(od, "summary_row.rds"))
-  message(sprintf("   K = %d, phi = %s | neighbour -> Y, p by regime: %s", K, format(sel$phi_selected),
-                  row$p_nb_both_regimes))
+  message(sprintf("   K* = %d, phi* = %s, lambda* = %s | neighbour -> Y, p by regime: %s", K,
+                  format(sel$phi_selected), format(lam$lambda), row$p_nb_both_regimes))
   invisible(row)
 }
 
 for (k in MINE) {
-  res <- tryCatch(fit_one(MODELS[[k]], seed = CFG$seed[1] + k), error = function(e) e)
+  res <- tryCatch(final_one(MODELS[[k]]), error = function(e) e)
   if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
 }
 

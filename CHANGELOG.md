@@ -18,6 +18,24 @@ between the reference papers and the code, see
 
 ### 2026-10-09
 
+**The fuel application in four stages.** Decided with the user after checks in
+scratch: the regimes are selected without the ridge (grid of (K, phi) at
+lambda = 0, two-step rule on the BIC), then lambda is chosen on that partition
+held fixed by the AIC, not the BIC (checks on the DGP of the ridge
+experiment: the BIC shrank too much and made the coefficients worse than the
+MLE in most replications at moderate collinearity; AIC = AICc = GCV came close
+to the best lambda). All tests are made at lambda = 0 (the bias-corrected
+ridge is the MLE); the ridge gives the lag coefficients and the completed
+response. The interpolation gain of the ridge was negligible (< 0.1%): the
+paper will say "no loss", not "improvement". Main scripts: stages lags, grid,
+lambda, final, dry; `fu_select()` replaced by `fu_lambda()`; `fu_ridge_table()`;
+`fu_cached(valid =)` reruns a stage whose settings or input changed. A defect
+caught before any run: the fit at lambda* is made with max_iter = 0, which its
+control keeps, so its bootstrap would not have re-estimated the partition; the
+draws now get the control of the fit at lambda = 0. Smoke-tested end to end on
+synthetic data. `run-ridge-experiment.R` is being adapted and is blocked from
+running meanwhile.
+
 **The lags of the fuel application, fixed by the pre-analysis.** Stage `lags`
 of the three main scripts was run on the data of `fuels-data.R` (no model). The
 PACF of the own price is beyond the band 2/sqrt(T) for 100% of the pumps at

@@ -517,44 +517,82 @@ fu_kmax <- function(n, m, k_cap) max(1L, min(as.integer(k_cap), n %/% m))
 
 
 ## ===========================================================================
-## 7. The selection of the lags and of the ridge penalty
+## 7. The ridge penalty, on the partition selected without it
 ## ===========================================================================
-## On the POOLED STEM model of a city and a fuel (cheap: no clustering), every
-## candidate set of lags is crossed with every value of the ridge penalty, and
-## the BIC of each is recorded; the BIC counts the effective number of
-## coefficients the ridge leaves. All the candidates are fitted on the same
-## weeks (the window, or from the largest lag of all the candidates plus one if later), so that their
-## log-likelihoods are comparable. The ridge acts on the four blocks of lags
-## only, never on the intercept and the fiscal pulses. lambda is on the
-## relative scale of the package: on an orthogonal design a coefficient is
-## multiplied by 1 / (1 + lambda). The main scripts pass one set of lags (LAGS),
-## so that only the penalty is chosen, city by city and fuel by fuel.
-fu_select <-function(dfc, fuel, xdef, candidates, lambdas, verbose = FALSE) {
-  first <- if (is.null(dfc$presample)) 1L else min(dfc$t[!dfc$presample])
-  t0 <- max(max(unlist(candidates)) + 1L, first)
-  out <- list()
-  for (cn in names(candidates)) {
-    des <- fu_design(dfc, fuel, xdef, candidates[[cn]], t_start = t0)
-    mod <- fu_model(des)
-    for (lam in lambdas) {
-      f <- tryCatch(suppressWarnings(Stem::SCSTEM_Estimation(
-        mod, K = 1, distance = "geo", alpha = 0, lambda = lam, penalize = des$penalize,
-        control = Stem::STEM_control(), verbose = verbose)), error = function(e) e)
-      out[[length(out) + 1]] <- if (inherits(f, "error")) {
-        data.frame(candidate = cn, lambda = lam, loglik = NA_real_, df = NA_real_, BIC = NA_real_,
-                   error = conditionMessage(f), stringsAsFactors = FALSE)
-      } else {
-        data.frame(candidate = cn, lambda = lam, loglik = f$info_crit[["loglik"]],
-                   df = f$info_crit[["df"]], BIC = f$info_crit[["BIC"]], error = "",
-                   stringsAsFactors = FALSE)
-      }
+## Stage "lambda" of the main scripts. The regimes are those selected at
+## lambda = 0 in stage "grid" (the two-step rule of SCSTEM_Select() on the BIC).
+## Holding that partition fixed (no alternation: max_iter = 0), the model is
+## refitted for every lambda of the grid, and lambda* minimizes the AIC, which
+## counts the effective number of coefficients the ridge leaves. The AIC and not
+## the BIC: K and phi choose the structure of the model, where the consistency
+## of the BIC is what matters, while lambda tunes a continuous shrinkage, where
+## the criterion has to target the error of the estimates; to first order the
+## AIC is the generalized cross-validation of Golub, Heath and Wahba (1979). In
+## a simulation with the collinear lags of this application (Supplementary
+## Material A) the BIC shrank too much and made the coefficients worse than the
+## MLE in most replications at moderate collinearity, the AIC almost never.
+## The ridge acts on the four blocks of lags only, never on the intercept and
+## the fiscal pulses; lambda is on the relative scale of the package (on an
+## orthogonal design a coefficient is multiplied by 1 / (1 + lambda)).
+##
+## sel: SCSTEM_Select() of stage "grid". The refits carry the phi selected
+## there (phi_star), which does not act on a fixed partition but is what the
+## bootstrap of the fit at lambda* re-estimates the partition with.
+## Returns the table of the criteria along lambda and the fit at lambda* (NULL
+## when lambda* = 0: the model at lambda = 0 is sel$fit itself).
+fu_lambda <- function(des, sel, lambdas, cfg, seed, ic = "AIC") {
+  mod <- fu_model(des)
+  K <- sel$K_selected
+  rows <- list(); best <- NULL; best_val <- Inf
+  for (lam in lambdas) {
+    f <- tryCatch(suppressWarnings(if (K == 1L) {
+      Stem::SCSTEM_Estimation(mod, K = 1, distance = "geo", alpha = 0, lambda = lam, penalize = des$penalize,
+                              control = Stem::STEM_control(), verbose = FALSE)
+    } else {
+      Stem::SCSTEM_Estimation(mod, K = K, phi_penalty = sel$phi_selected, init_partition = sel$fit$group,
+                              max_iter = 0, distance = "geo", knn = min(cfg$knn[1], des$d - 1L),
+                              min_cluster_size = cfg$m[1], alpha = 0, lambda = lam, penalize = des$penalize,
+                              seed = seed, control = Stem::STEM_control(), verbose = FALSE)
+    }), error = function(e) e)
+    if (inherits(f, "error")) {
+      rows[[length(rows) + 1]] <- data.frame(lambda = lam, loglik = NA_real_, df = NA_real_, N = NA_real_,
+                                             AIC = NA_real_, BIC = NA_real_, KIC = NA_real_,
+                                             error = conditionMessage(f), stringsAsFactors = FALSE)
+      next
     }
+    ic_f <- f$info_crit
+    rows[[length(rows) + 1]] <- data.frame(lambda = lam, loglik = ic_f[["loglik"]], df = ic_f[["df"]],
+                                           N = sum(!is.na(des$z)), AIC = ic_f[["AIC"]], BIC = ic_f[["BIC"]],
+                                           KIC = ic_f[["KIC"]], error = "", stringsAsFactors = FALSE)
+    if (is.finite(ic_f[[ic]]) && ic_f[[ic]] < best_val) { best_val <- ic_f[[ic]]; best <- f }
   }
-  res <- do.call(rbind, out)
-  res$city <- dfc$city[1]; res$fuel <- FU_FUEL[[fuel]]; res$xdef <- xdef; res$t_start <- t0
-  res$selected <- FALSE
-  if (any(is.finite(res$BIC))) res$selected[which.min(res$BIC)] <- TRUE
-  res
+  tab <- do.call(rbind, rows)
+  tab$selected <- FALSE
+  if (any(is.finite(tab[[ic]]))) tab$selected[which.min(tab[[ic]])] <- TRUE
+  tab$criterion <- ic
+  lam_star <- if (any(tab$selected)) tab$lambda[tab$selected] else 0
+  list(table = tab, lambda = lam_star, fit = if (lam_star > 0) best else NULL,
+       lambdas = lambdas, ic = ic, partition = sel$fit$group)
+}
+
+## The estimates of the lag coefficients at lambda* beside those at lambda = 0,
+## regime by regime, with their bootstrap standard errors: how far the ridge
+## moves each coefficient (shift, in cents per litre per cent of the lagged
+## price) and how much it narrows its bootstrap spread (se ratio). A
+## description of the ridge; the tests are those at lambda = 0. The regimes of
+## the two fits are the same partition, so their labels coincide.
+fu_ridge_table <- function(inf0, infL, des) {
+  if (is.null(infL)) return(NULL)
+  par <- paste0("beta", des$penalize)
+  a <- as.data.frame(inf0$summary); b <- as.data.frame(infL$summary)
+  a <- a[a$parameter %in% par, c("cluster", "parameter", "estimate", "se")]
+  b <- b[b$parameter %in% par, c("cluster", "parameter", "estimate", "se")]
+  m <- merge(a, b, by = c("cluster", "parameter"), suffixes = c("_mle", "_ridge"))
+  m$covariate <- des$names[as.integer(sub("^beta", "", m$parameter))]
+  m$shift <- m$estimate_ridge - m$estimate_mle
+  m$se_ratio <- m$se_ridge / m$se_mle
+  m[order(m$cluster, match(m$parameter, par)),
+    c("cluster", "covariate", "estimate_mle", "se_mle", "estimate_ridge", "se_ridge", "shift", "se_ratio")]
 }
 
 
@@ -579,8 +617,11 @@ fu_tests <- function(des) {
 ## The Wald test of a block of coefficients, regime by regime, on the
 ## covariance of their aligned bootstrap draws (the refit-with-clustering
 ## bootstrap of the package, which re-estimates the partition at every draw).
-## cols: the columns of the block in the design. With the ridge the estimates
-## are shrunk towards zero, so the test is conservative.
+## cols: the columns of the block in the design. The main scripts run it on the
+## fits at lambda = 0 only: a ridge estimate is biased towards zero, and its
+## bias-corrected version is the estimate at lambda = 0 itself, so the
+## inference is made there (the proposition on the ridge in Section 2 of the
+## paper).
 fu_wald_boot <- function(fit, inf, des, cols, label) {
   if (!length(cols)) return(NULL)
   par <- paste0("beta", cols)
@@ -779,10 +820,18 @@ fu_map <- function(des, fit, file, title) {
 
 ## A cached stage: its value is saved in <dir>/<name>.rds and read back on a
 ## later run, with the minutes it took; delete the file to run the stage again.
-fu_cached <- function(dir, name, expr) {
+## valid: optional function of the cached value, FALSE when the value no longer
+## matches the settings or the stage before it (a grid of phi changed, a
+## partition selected again): the stage is then run again and the file
+## replaced.
+fu_cached <- function(dir, name, expr, valid = NULL) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   f <- file.path(dir, paste0(name, ".rds"))
-  if (file.exists(f)) { message("    [cache] ", name); return(readRDS(f)) }
+  if (file.exists(f)) {
+    val <- readRDS(f)
+    if (is.null(valid) || isTRUE(valid(val))) { message("    [cache] ", name); return(val) }
+    message("    [stale] ", name, ": the settings or the stage before it changed")
+  }
   message("    [run  ] ", name); t0 <- Sys.time()
   val <- force(expr)
   mins <- round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 2)
