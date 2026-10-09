@@ -24,7 +24,7 @@ samples from the same fits.
 |---|---|
 | `fuels-functions.R` | the auxiliary functions, sourced by the others |
 | `fuels-data.R` | data management, in five cached stages: the pre-treatment of the station-level file (the register of the notes), the weekly relative prices with their gaps, the Kalman completion of the gaps (for the lags), the radius r* and the pairs, and one data.frame per case, `fuels/<case>/data.RData` |
-| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour: the pre-analysis of the lags (`--stage=lags`), the choice of the lags and of the ridge penalty by the BIC of the pooled model (`--stage=select`), the SC-STEM grid, the selection, the bootstrap and the tests (`--stage=fit`); outputs in the folder of the case |
+| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`), the choice of the ridge penalty by the BIC of the pooled model, city by city and fuel by fuel (`--stage=select`), the SC-STEM grid, the selection, the bootstrap and the tests (`--stage=fit`); outputs in the folder of the case |
 | `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
 | `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
 

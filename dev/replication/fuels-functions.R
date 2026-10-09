@@ -107,8 +107,8 @@ fu_here <- function() {
 
 ## The settings of a script, overridable on the command line with
 ## --name=value (a dash in the name is read as an underscore; lists are
-## separated by commas). A setting that is a list (such as the candidate lag
-## sets) can only be edited in the script.
+## separated by commas). A setting that is a list (such as the lags) can only
+## be edited in the script.
 fu_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
   for (a in grep("^--[^=]+=.", args, value = TRUE)) {
     nm <- gsub("-", "_", sub("^--([^=]+)=.*$", "\\1", a))
@@ -527,8 +527,9 @@ fu_kmax <- function(n, m, k_cap) max(1L, min(as.integer(k_cap), n %/% m))
 ## log-likelihoods are comparable. The ridge acts on the four blocks of lags
 ## only, never on the intercept and the fiscal pulses. lambda is on the
 ## relative scale of the package: on an orthogonal design a coefficient is
-## multiplied by 1 / (1 + lambda).
-fu_select <- function(dfc, fuel, xdef, candidates, lambdas, verbose = FALSE) {
+## multiplied by 1 / (1 + lambda). The main scripts pass one set of lags (LAGS),
+## so that only the penalty is chosen, city by city and fuel by fuel.
+fu_select <-function(dfc, fuel, xdef, candidates, lambdas, verbose = FALSE) {
   first <- if (is.null(dfc$presample)) 1L else min(dfc$t[!dfc$presample])
   t0 <- max(max(unlist(candidates)) + 1L, first)
   out <- list()

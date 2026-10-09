@@ -27,13 +27,13 @@
 ## Three stages, run in this order (--stage=):
 ##
 ##   lags    the pre-analysis of the lags, pump by pump: ACF, PACF, cross-
-##           correlations with the other three series, lag plots. Read its
-##           output, then edit LAG_CANDIDATES below.          (no model)
-##   select  for each city and fuel, the pooled STEM model for every candidate
-##           set of lags and every ridge penalty in `lambdas`: the BIC chooses
-##           both.                                             (pooled fits)
-##   fit     for each city and fuel, at the chosen lags and penalty: the grid of
-##           SC-STEM fits over (K, phi), the two-step selection, the
+##           correlations with the other three series, lag plots. It led to
+##           the lags LAGS below.                              (no model)
+##   select  for each city and fuel, the pooled STEM model at the lags LAGS for
+##           every ridge penalty in `lambdas`: the BIC chooses the penalty, city
+##           by city and fuel by fuel.                         (pooled fits)
+##   fit     for each city and fuel, at the lags LAGS and the chosen penalty:
+##           the grid of SC-STEM fits over (K, phi), the two-step selection, the
 ##           refit-with-clustering bootstrap of the selected model and of the
 ##           pooled one, the tests, the diagnostics, the maps.
 ##   dry     the plan of stage "fit": the models and their cost, nothing fitted.
@@ -92,24 +92,28 @@ CFG <- fu_config(list(
   job         = "1/1"              # "i/N": this process runs its share of the models
 ))
 
-## The candidate sets of lags of stage "select", one list per candidate with
-## the lags of each of the four blocks (FU_BLOCKS: own, own_other, nb,
-## nb_other). Lags may be non-contiguous; integer(0) leaves a block out. EDIT
-## after reading the output of stage "lags". The 52 weeks of 2021 are a
-## presample: lags up to 52 cost no week of the window, and every candidate is
-## fitted on the weeks of the window (2022-01 to 2026-06), so their BIC are
-## comparable.
-LAG_CANDIDATES <- list(
-  short = list(own = 1:2, own_other = 1:2, nb = 1:2, nb_other = 1:2),
-  own4  = list(own = 1:4, own_other = 1:2, nb = 1:2, nb_other = 1:2),
-  all4  = list(own = 1:4, own_other = 1:4, nb = 1:4, nb_other = 1:4)
-)
+## The lags of every model, the same in the three settings, the eleven cities
+## and the two fuels: the last four weeks of each of the four blocks
+## (FU_BLOCKS: own, own_other, nb, nb_other), 16 lags, as in a VAR(4). From the
+## pre-analysis of stage "lags" (2026-10-09), medians over the cities of the
+## three settings: the PACF of the own price is beyond the band for 100% of the
+## pumps at lag 1, 56-72% at lag 2, 26-41% at lag 3, 14-22% at lag 4 and 0-17%
+## at lags 5 to 8; the order of the AR chosen by the AIC pump by pump has
+## median 3-4 and quartiles 2 and 5-6. The own dynamics reach lag 4, with a weak
+## tail to lag 8. Lag 52 is not needed: its PACF is beyond the band for at most
+## 1% of the pumps, the ACF at lag 52 (14-30%) being the persistence of the
+## series, not an annual season. The other three blocks take the same four
+## lags, the convention of the Granger tests. Lags may be non-contiguous;
+## integer(0) leaves a block out. The 52 weeks of 2021 are a presample: the lags
+## cost no week of the window, and every model is fitted on the weeks of the
+## window (2022-01 to 2026-06).
+LAGS <- list(own = 1:4, own_other = 1:4, nb = 1:4, nb_other = 1:4)
 
-## The lags and the penalty of stage "fit": NULL takes, city by city and fuel
-## by fuel, those chosen by the BIC in stage "select"; otherwise they are
-## imposed on every model, for instance
-##   FIT_FIXED <- list(lags = LAG_CANDIDATES$own4, lambda = 0.1)
-FIT_FIXED <- NULL
+## The ridge penalty of stage "fit": NULL takes, city by city and fuel by fuel,
+## the one chosen by the BIC in stage "select"; a number imposes that penalty
+## on every model, for instance
+##   FIT_LAMBDA <- 0.1
+FIT_LAMBDA <- NULL
 
 
 ## ===========================================================================
@@ -136,8 +140,10 @@ city_data <- function(cc) fuels_data[fuels_data$city == cc, , drop = FALSE]
 ## For each city and fuel: the median and the quartiles of the ACF, the PACF
 ## and the cross-correlations at lags 1 to 8 and 52, the share of pumps beyond
 ## the band 2 / sqrt(T), and one page of plots. Read lags_summary.csv first: a
-## lag worth a candidate is one whose share clearly exceeds the 5% expected by
-## chance, in most cities.
+## lag carries information when its share clearly exceeds the 5% expected by
+## chance, in most cities. The lags LAGS were chosen on the ACF and the PACF;
+## the cross-correlations of the persistent price series exceed the band at
+## almost every lag and were not used.
 if (STAGE == "lags") {
   LDIR <- file.path(OUT, "lags"); dir.create(LDIR, showWarnings = FALSE)
   stats_all <- list()
@@ -176,10 +182,16 @@ if (STAGE != "dry") {
   suppressPackageStartupMessages(library(Stem))
 } else SHA7 <- substr(sub("^.*@", "", FU_STEM_REF), 1L, 7L)
 CACHE <- file.path(OUT, "cache", SHA7)
+## The lags, and in stage "select" the penalties, enter the names of the cached
+## fits, so that a fit made with other lags is never reused: for LAGS = 1:4 in
+## every block, "L1.2.3.4-1.2.3.4-1.2.3.4-1.2.3.4".
+LAG_KEY <- paste0("L", paste(vapply(FU_BLOCKS, function(b) paste(LAGS[[b]], collapse = "."), ""),
+                             collapse = "-"))
+SEL_KEY <- paste0(LAG_KEY, "_lam", paste(CFG$lambdas, collapse = "-"))
 
 
 ## ===========================================================================
-## Stage "select": the lags and the ridge penalty, by the BIC of the pooled model
+## Stage "select": the ridge penalty, by the BIC of the pooled model
 ## ===========================================================================
 if (STAGE == "select") {
   SDIR <- file.path(OUT, "select"); dir.create(SDIR, showWarnings = FALSE)
@@ -189,18 +201,18 @@ if (STAGE == "select") {
   for (k in fu_my_share(sizes, CFG$job[1])) {
     cc <- units$city[k]; fu <- units$fuel[k]
     message(sprintf("\n== select: %s, %s (%d pumps)", FU_CITY[[cc]], FU_FUEL[[fu]], sizes[k]))
-    res[[length(res) + 1]] <- fu_cached(CACHE, sprintf("select_%s_%s", cc, fu),
-      fu_select(city_data(cc), fu, XDEF, LAG_CANDIDATES, CFG$lambdas))
+    res[[length(res) + 1]] <- fu_cached(CACHE, sprintf("select_%s_%s_%s", cc, fu, SEL_KEY),
+      fu_select(city_data(cc), fu, XDEF, list(LAGS = LAGS), CFG$lambdas))
   }
   ## every process rewrites the table with all the units finished so far
   done <- lapply(seq_len(nrow(units)), function(k) {
-    f <- file.path(CACHE, sprintf("select_%s_%s.rds", units$city[k], units$fuel[k]))
+    f <- file.path(CACHE, sprintf("select_%s_%s_%s.rds", units$city[k], units$fuel[k], SEL_KEY))
     if (file.exists(f)) readRDS(f)
   })
   tab <- do.call(rbind, done)
   utils::write.csv(tab, file.path(SDIR, "select_all.csv"), row.names = FALSE)
-  chosen <- tab[tab$selected, c("city", "fuel", "candidate", "lambda", "BIC", "df", "t_start")]
-  cat("\nCHOSEN BY THE BIC: lags and ridge penalty, by city and fuel\n"); print(chosen, row.names = FALSE)
+  chosen <- tab[tab$selected, c("city", "fuel", "lambda", "BIC", "df", "t_start")]
+  cat("\nCHOSEN BY THE BIC: the ridge penalty, by city and fuel\n"); print(chosen, row.names = FALSE)
   utils::write.csv(chosen, file.path(SDIR, "selected.csv"), row.names = FALSE)
   quit(save = "no", status = 0)
 }
@@ -209,16 +221,16 @@ if (STAGE == "select") {
 ## ===========================================================================
 ## Stage "fit": the plan
 ## ===========================================================================
-## The lags and the penalty of every model: imposed (FIT_FIXED) or chosen in
-## stage "select".
+## The lags (LAGS) and the penalty of every model: imposed (FIT_LAMBDA) or
+## chosen in stage "select".
 spec_of <- function(cc, fu) {
-  if (!is.null(FIT_FIXED)) return(list(lags = FIT_FIXED$lags, lambda = FIT_FIXED$lambda, from = "fixed"))
+  if (!is.null(FIT_LAMBDA)) return(list(lags = LAGS, lambda = FIT_LAMBDA, from = "fixed"))
   f <- file.path(OUT, "select", "selected.csv")
-  if (!file.exists(f)) stop("no selected lags: run --stage=select first, or set FIT_FIXED", call. = FALSE)
+  if (!file.exists(f)) stop("no selected penalty: run --stage=select first, or set FIT_LAMBDA", call. = FALSE)
   s <- utils::read.csv(f, stringsAsFactors = FALSE)
   s <- s[s$city == cc & s$fuel == FU_FUEL[[fu]], ]
-  if (!nrow(s)) stop("no selected lags for ", cc, ", ", FU_FUEL[[fu]], call. = FALSE)
-  list(lags = LAG_CANDIDATES[[s$candidate[1]]], lambda = s$lambda[1], from = s$candidate[1])
+  if (!nrow(s)) stop("no selected penalty for ", cc, ", ", FU_FUEL[[fu]], call. = FALSE)
+  list(lags = LAGS, lambda = s$lambda[1], from = "BIC")
 }
 MODELS <- list()
 for (cc in CITIES) for (fu in CFG$fuels) {
@@ -251,7 +263,7 @@ fit_one <- function(M, seed) {
   sp <- spec_of(M$city, M$fuel)
   des <- fu_design(city_data(M$city), M$fuel, XDEF, sp$lags)
   mod <- fu_model(des)
-  tag <- sprintf("%s_lambda%s_%s", M$id, format(sp$lambda), sp$from)
+  tag <- sprintf("%s_lambda%s_%s", M$id, format(sp$lambda), LAG_KEY)
 
   ## 1. the grid of (K, phi) and the two-step selection, the pooled model
   ##    competing; the ridge on the four blocks of lags
@@ -316,7 +328,7 @@ fit_one <- function(M, seed) {
   p_of <- function(h, model) { z <- wd[wd$block == h & startsWith(wd$model, model), ]
     if (!nrow(z)) NA_character_ else paste(format.pval(z$p_value, digits = 2), collapse = "; ") }
   row <- data.frame(model = M$id, city = FU_CITY[[M$city]], fuel = FU_FUEL[[M$fuel]], pumps = M$n,
-                    weeks = des$Tn, lags = sp$from, lambda = sp$lambda, K_max = M$kmax, K = K,
+                    weeks = des$Tn, lambda = sp$lambda, lambda_from = sp$from, K_max = M$kmax, K = K,
                     phi = sel$phi_selected, B_valid = b_sel$B_valid,
                     p_nb_both_regimes = p_of("nb_both", "selected"), p_nb_both_pooled = p_of("nb_both", "pooled"),
                     p_nb_regimes = p_of("nb", "selected"), p_nb_other_regimes = p_of("nb_other", "selected"),

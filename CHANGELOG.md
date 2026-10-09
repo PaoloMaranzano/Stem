@@ -16,6 +16,28 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-09
+
+**The lags of the fuel application, fixed by the pre-analysis.** Stage `lags`
+of the three main scripts was run on the data of `fuels-data.R` (no model). The
+PACF of the own price is beyond the band 2/sqrt(T) for 100% of the pumps at
+lag 1, 56-72% at lag 2, 26-41% at lag 3, 14-22% at lag 4 and 0-17% at lags 5
+to 8 (medians over the cities), and the order of the AR chosen by the AIC pump
+by pump has median 3-4: the own dynamics reach lag 4, with a weak tail. Lag 52
+is not needed (PACF beyond the band for at most 1% of the pumps; the ACF at 52
+is the persistence of the series). The cross-correlations of the raw prices
+exceed the band at almost every lag, an effect of the persistence, and were not
+used. The user asked for one indication valid for every setting instead of a
+BIC choice among candidate sets city by city: `LAG_CANDIDATES` is replaced by
+one set, `LAGS`, the last four weeks of each of the four blocks (16 lags, as in
+a VAR(4), the convention of the Granger tests, and the strong level of the
+ridge experiment). Stage `select` now chooses the ridge penalty only, by the
+BIC of the pooled model, for each setting, city and fuel, as the user decided:
+5 pooled fits per city and fuel, 110 per setting. `FIT_FIXED` becomes
+`FIT_LAMBDA`. The lags and the penalties now enter the names of the cached
+fits, so that a change of `LAGS` never reuses a fit made with other lags
+(before, the cache of stage `select` was keyed on the city and the fuel only).
+
 ### 2026-10-05
 
 **SQUAREM with a ridge, and the scripts of the fuel application.** The user
