@@ -49,6 +49,20 @@ Pilot results on Venice (setting 1): K* = 3 for both fuels, lambda* = 0.003;
 the neighbour leads Y in every regime (bootstrap Wald p 0.00003-0.007), while
 the pooled model does not see it for gasoline (p = 0.48).
 
+**The fuel scripts on several machines.** The user will run the application on
+several machines, choosing the cities of each. `--cities` and `--fuels`
+already did that; added `--stage=all` (grid, lambda and final in one process)
+and `--stage=summary` (the tables of the three stages rebuilt from the files
+of every model of the case in the folder, nothing fitted), and the tables of
+every stage are now rebuilt from all the models present rather than from
+those of the process. Tested on a synthetic case of two cities run in two
+folders, merged, then summarized. The test also hit the 260-character limit
+of Windows paths, which made a cached bootstrap fail to save after it had run:
+the lag key in the names of the cached files is shorter ("L1t4-1t4-1t4-1t4",
+runs of consecutive lags written "atb"; the pilot caches were renamed), and
+`fu_cached()` stops before running a stage whose file path would exceed 250
+characters.
+
 **The fuel application in four stages.** Decided with the user after checks in
 scratch: the regimes are selected without the ridge (grid of (K, phi) at
 lambda = 0, two-step rule on the BIC), then lambda is chosen on that partition

@@ -52,16 +52,39 @@
 ##           partition, pump by pump F and HC1, Dumitrescu-Hurlin); the lag
 ##           coefficients at lambda* beside those at lambda = 0; the completed
 ##           response at both; the diagnostics, the pulses, the maps.
+##   all     grid, lambda and final one after the other, in one process.
+##   summary the tables of grid, lambda and final, rebuilt from the files of
+##           every model of the case in the folder; nothing fitted.
 ##   dry     the plan: the models and the fits of every stage; nothing fitted.
 ##
 ##     Rscript fuels-main-setting1.R --stage=lags
 ##     Rscript fuels-main-setting1.R --stage=grid
 ##     Rscript fuels-main-setting1.R --stage=lambda
 ##     Rscript fuels-main-setting1.R --stage=final
+##     Rscript fuels-main-setting1.R --stage=all
 ##     Rscript fuels-main-setting1.R --stage=grid --job=1/3      one of three processes
 ##     Rscript fuels-main-setting1.R --stage=grid --cities=VE    one city only
 ##     Rscript fuels-main-setting1.R --stage=grid --xdef=rs      X = the mean within r*
 ##     Rscript fuels-main-setting1.R --stage=final --boot_cores=8  every bootstrap on 8 processes
+##
+## Several machines. Each machine runs the cities given to it, with as many
+## processes for every bootstrap as it has cores, for instance
+##
+##     Rscript fuels-main-setting1.R --stage=all --cities=RM --boot_cores=7            machine 1
+##     Rscript fuels-main-setting1.R --stage=all --cities=MI,TO,NA --boot_cores=3      machine 2
+##     Rscript fuels-main-setting1.R --stage=all --cities=RM --fuels=d --boot_cores=8  one fuel only
+##
+## Every model writes its own files (grid/, lambda/, final/<model>/ and the
+## cache), and the seed of a model depends on its city and fuel only, so how
+## the cities are shared among the machines does not change the results. Once
+## every machine has finished, copy the folder <case>/<xdef>/ of each into one
+## (the files of the models have different names; the tables, which do not,
+## are rebuilt) and run
+##
+##     Rscript fuels-main-setting1.R --stage=summary
+##
+## which rebuilds grid/selected.csv, lambda/selected.csv and final/summary.csv
+## for all the cities. Never run the same city and fuel on two machines at once.
 ##
 ## Input:  <root>/setting1-Ymajor-Xindependent/data.RData   (fuels-data.R)
 ## Output: <root>/setting1-Ymajor-Xindependent/<xdef>/     lags/, grid/, lambda/, final/
@@ -89,7 +112,7 @@ source(file.path(HERE, "fuels-functions.R"))
 SETTING <- 1L
 CFG <- fu_config(list(
   root        = file.path(HERE, "fuels"),
-  stage       = "lags",            # "lags", "grid", "lambda", "final" or "dry"
+  stage       = "lags",            # "lags", "grid", "lambda", "final", "all", "summary" or "dry"
   ## The neighbour X: "nn" the nearest pump of the X set; "rs" the mean of the X
   ## set within r* (the nearest when r* holds none). "nn" is the main analysis
   ## in every setting, "rs" a check in settings 2 and 3 only: here (setting 1)
@@ -153,8 +176,9 @@ OUT <- file.path(CASE, XDEF)
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 CITIES <- if (any(nzchar(CFG$cities))) CFG$cities else unique(fuels_data$city)
 STAGE <- CFG$stage[1]
-if (!STAGE %in% c("lags", "grid", "lambda", "final", "dry"))
-  stop("unknown stage: ", STAGE, "; the stages are lags, grid, lambda, final and dry", call. = FALSE)
+if (!STAGE %in% c("lags", "grid", "lambda", "final", "all", "summary", "dry"))
+  stop("unknown stage: ", STAGE, "; the stages are lags, grid, lambda, final, all, summary and dry",
+       call. = FALSE)
 options(width = 180)
 message(sprintf("setting %d (%s), X = %s, stage %s, %d cities", SETTING, FU_CASES$folder[SETTING],
                 XDEF, STAGE, length(CITIES)))
@@ -204,19 +228,25 @@ if (STAGE == "lags") {
 ## ===========================================================================
 ## Stem, at the pinned commit, and the cache of the fits
 ## ===========================================================================
-if (STAGE != "dry") {
+if (!STAGE %in% c("dry", "summary")) {
   SHA7 <- fu_require_stem()
   suppressPackageStartupMessages(library(Stem))
 } else SHA7 <- substr(sub("^.*@", "", FU_STEM_REF), 1L, 7L)
 CACHE <- file.path(OUT, "cache", SHA7)
 ## The lags enter the names of the cached fits, so that a fit made with other
-## lags is never reused: for LAGS = 1:4 in every block,
-## "L1.2.3.4-1.2.3.4-1.2.3.4-1.2.3.4". Every cached value also carries the
-## settings it was made with (the grid of phi, the penalties, the partition
-## selected before it, B): when they no longer match, fu_cached() runs the
-## stage again.
-LAG_KEY <- paste0("L", paste(vapply(FU_BLOCKS, function(b) paste(LAGS[[b]], collapse = "."), ""),
-                             collapse = "-"))
+## lags is never reused: one group per block, its runs of consecutive lags
+## written "atb" (a single lag "a"), so that LAGS = 1:4 in every block gives
+## "L1t4-1t4-1t4-1t4" and c(1, 2, 52) would give "1t2.52". Every cached value
+## also carries the settings it was made with (the grid of phi, the
+## penalties, the partition selected before it, B): when they no longer match,
+## fu_cached() runs the stage again.
+lag_runs <- function(l) {
+  if (!length(l)) return("0")
+  l <- sort(unique(l)); r <- split(l, cumsum(c(1, diff(l) != 1)))
+  paste(vapply(r, function(x) if (length(x) == 1L) as.character(x) else paste0(x[1], "t", x[length(x)]), ""),
+        collapse = ".")
+}
+LAG_KEY <- paste0("L", paste(vapply(FU_BLOCKS, function(b) lag_runs(LAGS[[b]]), ""), collapse = "-"))
 with_settings <- function(val, s) { attr(val, "fu_settings") <- s; val }
 same_settings <- function(s) function(val) identical(attr(val, "fu_settings"), s)
 
@@ -224,12 +254,19 @@ same_settings <- function(s) function(val) identical(attr(val, "fu_settings"), s
 ## ===========================================================================
 ## The models: one per city and fuel
 ## ===========================================================================
-MODELS <- list()
-for (cc in CITIES) for (fu in CFG$fuels) {
-  n <- length(unique(city_data(cc)$y_site))
-  MODELS[[length(MODELS) + 1]] <- list(id = sprintf("%s_%s", cc, FU_FUEL[[fu]]), city = cc, fuel = fu, n = n,
-                                       kmax = fu_kmax(n, CFG$m[1], CFG$k_cap[1]))
+model_list <- function(cities) {
+  out <- list()
+  for (cc in cities) for (fu in CFG$fuels) {
+    n <- length(unique(city_data(cc)$y_site))
+    out[[length(out) + 1]] <- list(id = sprintf("%s_%s", cc, FU_FUEL[[fu]]), city = cc, fuel = fu, n = n,
+                                   kmax = fu_kmax(n, CFG$m[1], CFG$k_cap[1]))
+  }
+  out
 }
+## the models this process runs (--cities, --fuels, --job), and every model of
+## the case, from whose files the tables of the stages are rebuilt
+MODELS <- model_list(CITIES)
+MODELS_ALL <- model_list(unique(fuels_data$city))
 sizes <- vapply(MODELS, `[[`, 1, "n")
 MINE <- fu_my_share(sizes, CFG$job[1])
 ## the seed of a model depends on its city and fuel only, so that a run on some
@@ -289,10 +326,48 @@ if (STAGE == "dry") {
 
 
 ## ===========================================================================
+## The tables of the stages
+## ===========================================================================
+## Every model writes its own files. The table of a stage is rebuilt from the
+## files of every model of the case present in this folder, whichever process
+## or machine ran it: once the folders of several machines are put together,
+## --stage=summary rebuilds all of them without fitting anything.
+GDIR <- file.path(OUT, "grid"); LDIR <- file.path(OUT, "lambda"); FDIR <- file.path(OUT, "final")
+for (dd in c(GDIR, LDIR, FDIR)) dir.create(dd, showWarnings = FALSE)
+stack_rows <- function(path_of, keep = function(r) TRUE)
+  do.call(rbind, lapply(MODELS_ALL, function(M) {
+    f <- path_of(M)
+    if (file.exists(f)) { r <- readRDS(f); if (keep(r)) r }
+  }))
+table_grid <- function() {
+  tab <- stack_rows(function(M) file.path(GDIR, paste0(M$id, "_selected.rds")))
+  if (is.null(tab)) return(invisible(NULL))
+  utils::write.csv(tab, file.path(GDIR, "selected.csv"), row.names = FALSE)
+  cat(sprintf("\nSELECTED AT lambda = 0 (two-step rule, BIC): %d of %d models\n", nrow(tab), length(MODELS_ALL)))
+  print(tab, row.names = FALSE)
+}
+table_lambda <- function() {
+  tab <- stack_rows(function(M) file.path(LDIR, paste0(M$id, "_selected.rds")))
+  if (is.null(tab)) return(invisible(NULL))
+  utils::write.csv(tab, file.path(LDIR, "selected.csv"), row.names = FALSE)
+  cat(sprintf("\nlambda* BY THE %s, ON THE PARTITION OF STAGE grid: %d of %d models\n", CFG$lambda_ic[1],
+              nrow(tab), length(MODELS_ALL)))
+  print(tab, row.names = FALSE)
+}
+table_final <- function() {
+  ## the models finished with this Stem only
+  tab <- stack_rows(function(M) file.path(FDIR, M$id, "summary_row.rds"), function(r) identical(r$stem, SHA7))
+  if (is.null(tab)) return(invisible(NULL))
+  utils::write.csv(tab, file.path(FDIR, "summary.csv"), row.names = FALSE)
+  cat(sprintf("\nSUMMARY: %d of %d models finished\n", nrow(tab), length(MODELS_ALL)))
+  print(tab, row.names = FALSE)
+}
+
+
+## ===========================================================================
 ## Stage "grid": the regimes, at lambda = 0
 ## ===========================================================================
-if (STAGE == "grid") {
-  GDIR <- file.path(OUT, "grid"); dir.create(GDIR, showWarnings = FALSE)
+run_grid <- function() {
   for (k in MINE) {
     M <- MODELS[[k]]
     message(sprintf("\n== grid: %s, %s (%d pumps, K_max = %d)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n, M$kmax))
@@ -309,24 +384,14 @@ if (STAGE == "grid") {
     }, error = function(e) e)
     if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
   }
-  ## every process rewrites the table with all the models finished so far
-  rows <- lapply(MODELS, function(M) { f <- file.path(GDIR, paste0(M$id, "_selected.rds"))
-    if (file.exists(f)) readRDS(f) })
-  tab <- do.call(rbind, rows)
-  if (!is.null(tab)) {
-    utils::write.csv(tab, file.path(GDIR, "selected.csv"), row.names = FALSE)
-    cat(sprintf("\nSELECTED AT lambda = 0 (two-step rule, BIC): %d of %d models\n", nrow(tab), length(MODELS)))
-    print(tab, row.names = FALSE)
-  }
-  quit(save = "no", status = 0)
+  table_grid()
 }
 
 
 ## ===========================================================================
 ## Stage "lambda": the ridge penalty, on the partition selected at lambda = 0
 ## ===========================================================================
-if (STAGE == "lambda") {
-  LDIR <- file.path(OUT, "lambda"); dir.create(LDIR, showWarnings = FALSE)
+run_lambda <- function() {
   for (k in MINE) {
     M <- MODELS[[k]]
     message(sprintf("\n== lambda: %s, %s (%d pumps)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n))
@@ -346,23 +411,13 @@ if (STAGE == "lambda") {
     }, error = function(e) e)
     if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
   }
-  rows <- lapply(MODELS, function(M) { f <- file.path(LDIR, paste0(M$id, "_selected.rds"))
-    if (file.exists(f)) readRDS(f) })
-  tab <- do.call(rbind, rows)
-  if (!is.null(tab)) {
-    utils::write.csv(tab, file.path(LDIR, "selected.csv"), row.names = FALSE)
-    cat(sprintf("\nlambda* BY THE %s, ON THE PARTITION OF STAGE grid: %d of %d models\n", CFG$lambda_ic[1],
-                nrow(tab), length(MODELS)))
-    print(tab, row.names = FALSE)
-  }
-  quit(save = "no", status = 0)
+  table_lambda()
 }
 
 
 ## ===========================================================================
 ## Stage "final": bootstrap, tests and tables of one model
 ## ===========================================================================
-FDIR <- file.path(OUT, "final"); dir.create(FDIR, showWarnings = FALSE)
 final_one <- function(M) {
   message(sprintf("\n== final: %s, %s (%d pumps, K_max = %d)", FU_CITY[[M$city]], FU_FUEL[[M$fuel]], M$n, M$kmax))
   need(grid_name(M), "grid")
@@ -473,20 +528,20 @@ final_one <- function(M) {
   invisible(row)
 }
 
-for (k in MINE) {
-  res <- tryCatch(final_one(MODELS[[k]]), error = function(e) e)
-  if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
+run_final <- function() {
+  for (k in MINE) {
+    res <- tryCatch(final_one(MODELS[[k]]), error = function(e) e)
+    if (inherits(res, "error")) message("   FAILED: ", conditionMessage(res))
+  }
+  table_final()
 }
 
-## the summary of every model finished so far with this Stem
-rows <- lapply(MODELS, function(M) {
-  f <- file.path(FDIR, M$id, "summary_row.rds")
-  if (file.exists(f)) { r <- readRDS(f); if (identical(r$stem, SHA7)) r }
-})
-summ <- do.call(rbind, rows)
-if (!is.null(summ) && nrow(summ)) {
-  utils::write.csv(summ, file.path(FDIR, "summary.csv"), row.names = FALSE)
-  cat(sprintf("\nSUMMARY: %d of %d models finished\n", nrow(summ), length(MODELS)))
-  print(summ, row.names = FALSE)
-}
+
+## ===========================================================================
+## Run the stage
+## ===========================================================================
+if (STAGE == "summary") { table_grid(); table_lambda(); table_final() }
+if (STAGE %in% c("grid", "all")) run_grid()
+if (STAGE %in% c("lambda", "all")) run_lambda()
+if (STAGE %in% c("final", "all")) run_final()
 cat("\noutputs in", OUT, "\n")

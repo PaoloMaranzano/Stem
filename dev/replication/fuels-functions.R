@@ -827,6 +827,13 @@ fu_map <- function(des, fit, file, title) {
 fu_cached <- function(dir, name, expr, valid = NULL) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   f <- file.path(dir, paste0(name, ".rds"))
+  ## Windows limits a path to 260 characters, and saving a stage to a longer
+  ## one fails only after the stage has run, hours later on a large model:
+  ## stop before running it
+  nf <- nchar(normalizePath(f, winslash = "/", mustWork = FALSE))
+  if (.Platform$OS.type == "windows" && nf > 250)
+    stop("the path of the cached file is ", nf, " characters long, and Windows allows 260: ",
+         "move the folder of the outputs (--root) to a shorter path\n  ", f, call. = FALSE)
   if (file.exists(f)) {
     val <- readRDS(f)
     if (is.null(valid) || isTRUE(valid(val))) { message("    [cache] ", name); return(val) }

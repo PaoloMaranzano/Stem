@@ -28,8 +28,16 @@ samples from the same fits.
 | `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
 | `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
 
-Run `fuels-data.R` once, then each main script stage by stage. The first
-scripts of the application are archived in `dev/archive/fuels-first-scripts/`.
+Run `fuels-data.R` once, then each main script stage by stage, or all the
+stages at once with `--stage=all`. To share the work among machines, give each
+its cities (`--cities=RM`, `--cities=MI,TO,NA`, and `--fuels=` to split one
+city by fuel) and as many processes for every bootstrap as it has cores
+(`--boot_cores=`); the seed of a model depends on its city and fuel only, so
+the split does not change the results. Then copy the folders `<case>/<xdef>/`
+of the machines into one and run `--stage=summary`, which rebuilds the tables
+of all the cities without fitting anything. The header of the main scripts
+gives the commands. The first scripts of the application are archived in
+`dev/archive/fuels-first-scripts/`.
 
 The design of the simulation study is described in full in
 `supplement-simulations.tex` (Supplementary Material B), in the Overleaf
