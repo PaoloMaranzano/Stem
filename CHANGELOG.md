@@ -16,7 +16,24 @@ between the reference papers and the code, see
 
 ## Unreleased
 
-### 2026-10-09
+### 2026-10-10
+
+**`SCSTEM_Bootstrap()` in parallel.** The pilot of the fuel application on
+Venice (100 pumps) took 32-46 minutes for one bootstrap of 100 draws, 19-27 s
+a draw; on Bari (200 pumps) a draw takes 33 s with one fit per draw, and the
+cost grows faster than the number of locations, so a bootstrap of Rome (551
+pumps) would run for many hours in one process. The draws are independent, and
+the user asked for an argument `cores` (default 1) so that the user chooses how
+many processes to use. With `cores > 1` a socket cluster (package parallel,
+now in Imports; it works on every platform) shares the draws in blocks and is
+stopped on exit; the processes load the installed Stem. To make the result
+independent of the number of processes, every draw now runs under its own
+seed, drawn from `seed` before the draws start (before, the draws shared one
+stream, so a draw depended on those computed before it): the draws of a given
+seed differ from those of the previous code, and are the same whatever
+`cores`. Test: a bootstrap on two processes returns the draws of the one in
+the session. R CMD check: Status OK. Script-level chunking of the bootstrap
+was written first and dropped in favour of this.
 
 **The fuel application in four stages.** Decided with the user after checks in
 scratch: the regimes are selected without the ridge (grid of (K, phi) at

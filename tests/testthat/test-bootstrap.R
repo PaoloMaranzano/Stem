@@ -46,6 +46,26 @@ test_that("the bootstrap is reproducible under a fixed seed", {
 })
 
 
+test_that("the draws do not depend on the number of processes", {
+  skip_on_cran()
+  ### Every draw runs under its own seed, so a bootstrap shared among two
+  ### processes returns the draws of the one computed in the session. The
+  ### processes load the installed Stem: skipped when it is not installed.
+  skip_if_not(nzchar(system.file(package = "Stem")))
+
+  mod <- po_model(Tn = 45L)
+  fit <- SCSTEM_Estimation(mod, K = 2, phi_penalty = 0.5, distance = "geo",
+                           precision = 0.05)
+  b1 <- SCSTEM_Bootstrap(fit, B = 4, seed = 42)
+  b2 <- SCSTEM_Bootstrap(fit, B = 4, seed = 42, cores = 2)
+
+  expect_equal(b1$groups, b2$groups)
+  expect_equal(b1$draws, b2$draws)
+  expect_equal(b1$info$ok, b2$info$ok)
+  expect_error(SCSTEM_Bootstrap(fit, B = 4, cores = 0), "cores")
+})
+
+
 test_that("the bootstrap inference aligns labels and returns coherent intervals", {
   skip_on_cran()
 

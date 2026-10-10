@@ -4,7 +4,14 @@
 \alias{SCSTEM_Bootstrap}
 \title{Refit-with-clustering parametric bootstrap for SC-STEM models}
 \usage{
-SCSTEM_Bootstrap(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
+SCSTEM_Bootstrap(
+  SCSTEM,
+  B = 100,
+  seed = NULL,
+  verbose = FALSE,
+  cores = 1L,
+  ...
+)
 }
 \arguments{
 \item{SCSTEM}{an object of class \dQuote{SCSTEM_Estimation} returned by
@@ -17,6 +24,14 @@ reproducible; the RNG stream is restored on exit. Default is \code{NULL}.}
 
 \item{verbose}{logical. If \code{TRUE}, progress is reported via
 \code{message()}. Default is \code{FALSE}.}
+
+\item{cores}{integer, the number of \R processes the draws are computed on.
+Default is 1: one after the other, in the current session. With
+\code{cores > 1} a socket cluster of that many processes is started with
+the package \pkg{parallel}, the draws are shared among them in blocks, and
+the cluster is stopped on exit. The processes load the installed \pkg{Stem}.
+Every draw has its own seed, drawn from \code{seed}, so the draws are the
+same whatever the number of processes.}
 
 \item{...}{further arguments passed to \code{\link{SCSTEM_Estimation}} for the
 refits, overriding the settings of the original fit.}
@@ -78,6 +93,15 @@ neighborhood graph.
 whose refit collapses a cluster, is recorded but excluded from the
 inferential summaries computed by \code{\link{SCSTEM_BootInference}}. The
 share of usable draws is reported.
+
+\strong{Seeds and parallel draws.} Every draw is computed under its own seed,
+drawn from \code{seed} before the draws start, so a draw depends on its seed
+only and not on the draws computed before it. The draws can therefore be
+shared among several processes (\code{cores}) without changing the result:
+a bootstrap with a given \code{seed} returns the same draws whatever the
+number of processes. The draws are independent, so the time of a bootstrap
+falls nearly in proportion to the processes, up to the cost of starting them
+and of sending each the fitted model.
 
 \strong{Label alignment.} The clusters of a refit carry arbitrary labels, so
 they are relocated onto the clusters of the original fit by the majority

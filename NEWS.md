@@ -83,6 +83,9 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   understated the uncertainty. The refits use the same `alpha`, `lambda`,
   `penalize`, `lambda_scale`, `lambda_by`, `latent` and `spatial` as the
   original fit, so a fit with a ridge on the coefficients is resampled with it.
+  Its draws can be computed in parallel: `cores` (default 1) shares them among
+  that many R processes. Every draw runs under its own seed, drawn from `seed`,
+  so the draws are the same whatever the number of processes.
 * `SCSTEM_BootInference()` aligns every refit onto the original clusters by the
   majority rule and returns bootstrap standard errors; normal, basic,
   percentile and bias-corrected confidence intervals; pairwise percentile tests

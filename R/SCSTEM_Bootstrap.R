@@ -42,6 +42,15 @@
 #' inferential summaries computed by \code{\link{SCSTEM_BootInference}}. The
 #' share of usable draws is reported.
 #'
+#' \strong{Seeds and parallel draws.} Every draw is computed under its own seed,
+#' drawn from \code{seed} before the draws start, so a draw depends on its seed
+#' only and not on the draws computed before it. The draws can therefore be
+#' shared among several processes (\code{cores}) without changing the result:
+#' a bootstrap with a given \code{seed} returns the same draws whatever the
+#' number of processes. The draws are independent, so the time of a bootstrap
+#' falls nearly in proportion to the processes, up to the cost of starting them
+#' and of sending each the fitted model.
+#'
 #' \strong{Label alignment.} The clusters of a refit carry arbitrary labels, so
 #' they are relocated onto the clusters of the original fit by the majority
 #' rule before any statistic is computed. The alignment is applied by
@@ -56,6 +65,13 @@
 #'   reproducible; the RNG stream is restored on exit. Default is \code{NULL}.
 #' @param verbose logical. If \code{TRUE}, progress is reported via
 #'   \code{message()}. Default is \code{FALSE}.
+#' @param cores integer, the number of \R processes the draws are computed on.
+#'   Default is 1: one after the other, in the current session. With
+#'   \code{cores > 1} a socket cluster of that many processes is started with
+#'   the package \pkg{parallel}, the draws are shared among them in blocks, and
+#'   the cluster is stopped on exit. The processes load the installed \pkg{Stem}.
+#'   Every draw has its own seed, drawn from \code{seed}, so the draws are the
+#'   same whatever the number of processes.
 #' @param ... further arguments passed to \code{\link{SCSTEM_Estimation}} for the
 #'   refits, overriding the settings of the original fit.
 #'
@@ -128,7 +144,7 @@
 #' @keywords models spatial
 #'
 #' @export
-SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...) {
+SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, cores = 1L, ...) {
 
   if (!inherits(SCSTEM, "SCSTEM_Estimation")) {
     stop("'SCSTEM' must be an object of class 'SCSTEM_Estimation' returned by SCSTEM_Estimation().",
@@ -138,6 +154,10 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
     stop("'B' must be a single positive integer.", call. = FALSE)
   }
   B <- as.integer(B)
+  if (length(cores) != 1L || is.na(cores) || cores < 1 || cores != round(cores)) {
+    stop("'cores' must be a single positive integer.", call. = FALSE)
+  }
+  cores <- as.integer(cores)
 
   args <- SCSTEM$input_args
   base_model <- args$StemModel
@@ -250,13 +270,16 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
     do.call(SCSTEM_Estimation, c(list(StemModel = mod_star), refit_args))
   }
 
-  ### The whole loop is evaluated under the requested seed. scstem_with_seed()
-  ### restores the RNG stream on exit, so the caller's workspace is untouched.
-  res <- scstem_with_seed(seed, lapply(seq_len(B), function(b) {
-    if (isTRUE(verbose) && (b %% 10L == 0L || b == 1L)) {
-      message("* bootstrap draw ", b, " / ", B)
-    }
-    fit_b <- tryCatch(suppressWarnings(one_draw(b)), error = function(e) e)
+  ### Every draw has its own seed, drawn from `seed` (or from the current
+  ### stream when `seed` is NULL), and is evaluated under it. A draw therefore
+  ### depends on its seed only, not on the draws computed before it in the same
+  ### process, and the draws are the same whatever the number of processes they
+  ### are shared among. scstem_with_seed() restores the RNG stream on exit, so
+  ### the caller's workspace is untouched.
+  draw_seeds <- scstem_with_seed(seed, sample.int(.Machine$integer.max, B))
+  run_one <- function(b) {
+    fit_b <- scstem_with_seed(draw_seeds[b],
+                              tryCatch(suppressWarnings(one_draw(b)), error = function(e) e))
     if (inherits(fit_b, "error")) {
       return(list(ok = FALSE, message = conditionMessage(fit_b)))
     }
@@ -269,7 +292,28 @@ SCSTEM_Bootstrap <- function(SCSTEM, B = 100, seed = NULL, verbose = FALSE, ...)
          loglik = unname(fit_b$info_crit[["loglik"]]),
          iter = if (nrow(fit_b$obj_trace)) max(fit_b$obj_trace$iter) else NA_integer_,
          convergence = fit_b$convergence)
-  }))
+  }
+
+  cores <- min(cores, B)
+  if (cores == 1L) {
+    res <- lapply(seq_len(B), function(b) {
+      if (isTRUE(verbose) && (b %% 10L == 0L || b == 1L)) {
+        message("* bootstrap draw ", b, " / ", B)
+      }
+      run_one(b)
+    })
+  } else {
+    ### The draws are shared among `cores` R processes of a socket cluster,
+    ### which works on every platform. Each process receives one block of
+    ### draws and the objects they need once, and loads the installed Stem.
+    if (isTRUE(verbose)) message("* bootstrap: ", B, " draws on ", cores, " processes")
+    cl <- parallel::makePSOCKcluster(cores)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    blocks <- split(seq_len(B), cut(seq_len(B), cores, labels = FALSE))
+    out <- parallel::parLapply(cl, blocks, function(ii) lapply(ii, run_one))
+    res <- vector("list", B)
+    for (j in seq_along(blocks)) res[blocks[[j]]] <- out[[j]]
+  }
 
   for (b in seq_len(B)) {
     rb <- res[[b]]

@@ -54,6 +54,7 @@ Depends: R (>= 4.1.0)
 Imports:
     geodist,
     MASS,
+    parallel,
     spdep,
     stats
 Suggests:
