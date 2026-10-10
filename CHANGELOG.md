@@ -35,6 +35,20 @@ seed differ from those of the previous code, and are the same whatever
 the session. R CMD check: Status OK. Script-level chunking of the bootstrap
 was written first and dropped in favour of this.
 
+**The fuel scripts on the parallel bootstrap.** `FU_STEM_REF` and
+`RX_STEM_REF` pinned to 09e9cdb; the main scripts get `boot_cores` (default 1,
+`--boot_cores=`). Between 989790b and 09e9cdb only `R/SCSTEM_Bootstrap.R`
+changed, so the cached grids, penalty paths and likelihood-ratio fits of the
+pilot were copied to `cache/09e9cdb/`; the bootstraps were not (every draw now
+has its own seed). Measured on setting 1, gasoline, one draw in one process:
+Venice (100 pumps, phi* = 0.025) 19 s, Bari (200, phi* = 0) 33 s, Rome (551,
+phi* = 0.025) 168 s; grids 2.6, 5.5 and 81 minutes. Eight draws of Rome on
+eight processes took 306 s, a speed-up of 4.4 (with one draw per process the
+start of the processes and the transfer of the fitted model weigh most).
+Pilot results on Venice (setting 1): K* = 3 for both fuels, lambda* = 0.003;
+the neighbour leads Y in every regime (bootstrap Wald p 0.00003-0.007), while
+the pooled model does not see it for gasoline (p = 0.48).
+
 **The fuel application in four stages.** Decided with the user after checks in
 scratch: the regimes are selected without the ridge (grid of (K, phi) at
 lambda = 0, two-step rule on the BIC), then lambda is chosen on that partition

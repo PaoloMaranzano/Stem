@@ -109,9 +109,11 @@ CFG <- rx_config(list(
 OUT <- normalizePath(CFG$out[1], winslash = "/", mustWork = FALSE)
 dir.create(file.path(OUT, "reps"), recursive = TRUE, showWarnings = FALSE)
 
-## Stem with SQUAREM for the ridge (989790b); installed from GitHub when the
-## installed copy is another commit.
-RX_STEM_REF <- "PaoloMaranzano/Stem@989790bf0d6d321de2cc1d3599ffb397e7db4dc8"
+## Stem with SQUAREM for the ridge (989790b) and the parallel bootstrap
+## (09e9cdb), the commit of the fuel application, so that one installed Stem
+## serves both; installed from GitHub when the installed copy is another commit.
+## The experiment runs no bootstrap: on it the two commits give identical fits.
+RX_STEM_REF <- "PaoloMaranzano/Stem@09e9cdb2d13fdfc94d8bc74e62645ebbc0b16a54"
 rx_stem <- function() {
   sha <- sub("^.*@", "", RX_STEM_REF)
   ok <- function() nzchar(system.file(package = "Stem")) &&

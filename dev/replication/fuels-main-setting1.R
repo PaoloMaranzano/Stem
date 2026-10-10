@@ -61,6 +61,7 @@
 ##     Rscript fuels-main-setting1.R --stage=grid --job=1/3      one of three processes
 ##     Rscript fuels-main-setting1.R --stage=grid --cities=VE    one city only
 ##     Rscript fuels-main-setting1.R --stage=grid --xdef=rs      X = the mean within r*
+##     Rscript fuels-main-setting1.R --stage=final --boot_cores=8  every bootstrap on 8 processes
 ##
 ## Input:  <root>/setting1-Ymajor-Xindependent/data.RData   (fuels-data.R)
 ## Output: <root>/setting1-Ymajor-Xindependent/<xdef>/     lags/, grid/, lambda/, final/
@@ -107,6 +108,9 @@ CFG <- fu_config(list(
   lambdas     = c(0, 0.001, 0.003, 0.01, 0.02, 0.03, 0.05, 0.1, 0.3, 1),
   lambda_ic   = "AIC",
   B           = 100L,              # bootstrap draws
+  ## the R processes every bootstrap runs on (SCSTEM_Bootstrap(cores =)): 1, the
+  ## default, runs the draws one after the other; the draws do not depend on it
+  boot_cores  = 1L,
   boot_pooled = TRUE,              # bootstrap the pooled model too, when K* > 1
   level       = 0.95,
   seed        = 20261005L,
@@ -381,7 +385,8 @@ final_one <- function(M) {
   ##    that they re-estimate the partition at (K*, phi*) as those of the
   ##    model at lambda = 0 do.
   boot <- function(fit, name, s, ...) fu_cached(CACHE, sprintf("%s_%s_%s", M$id, LAG_KEY, name), with_settings({
-    bt <- Stem::SCSTEM_Bootstrap(fit, B = CFG$B[1], seed = seed_of(M), verbose = TRUE, ...)
+    bt <- Stem::SCSTEM_Bootstrap(fit, B = CFG$B[1], seed = seed_of(M), verbose = TRUE,
+                                 cores = CFG$boot_cores[1], ...)
     list(info = bt$info, B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = CFG$level[1]),
          groups = bt$groups)
   }, s), valid = same_settings(s))

@@ -56,7 +56,7 @@
 ## simulation study (0f7b744) with two changes that matter here and not there:
 ## the BIC counts the observed values (the response has gaps here), and SQUAREM
 ## also accelerates the fits with a ridge (all the fits of the application).
-FU_STEM_REF <- "PaoloMaranzano/Stem@989790bf0d6d321de2cc1d3599ffb397e7db4dc8"
+FU_STEM_REF <- "PaoloMaranzano/Stem@09e9cdb2d13fdfc94d8bc74e62645ebbc0b16a54"
 
 ## The eleven cities: the nine with at least 10 kept independents, plus
 ## Florence and Venice by choice (notes, Section "Data pre-treatment").

@@ -55,10 +55,12 @@ session. Offline, an installed Stem that carries what the script uses is
 accepted as it is. `run-application.R` (`APP_STEM_REF`) is pinned to ddf90a8,
 the code of 0f7b744 with the BIC counting the observed values of the response
 instead of `d * T`; the scripts of the fuel application (`FU_STEM_REF` in
-`fuels-functions.R`) to 989790b, which adds SQUAREM for the fits with a ridge.
+`fuels-functions.R`) and of the ridge experiment (`RX_STEM_REF`) to 09e9cdb, which
+adds SQUAREM for the fits with a ridge (989790b) and the parallel draws of
+`SCSTEM_Bootstrap()` (`cores`, the option `--boot_cores` of the main scripts).
 On the simulated data, complete and without penalty, the three commits give
 identical results. The applications keep their caches in a folder named after
-the commit (`application/ddf90a8/`, `<case>/<xdef>/cache/989790b/`), so that
+the commit (`application/ddf90a8/`, `<case>/<xdef>/cache/09e9cdb/`), so that
 fits of an earlier Stem are never reused. All
 three run the computational settings of the package (`STEM_control()`:
 SQUAREM, tolerances 1e-3), passed explicitly so that a session option cannot
