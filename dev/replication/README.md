@@ -27,9 +27,11 @@ samples from the same fits.
 | `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour, in four stages: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`); at lambda = 0, the grid of (K, phi) and the two-step rule on the BIC (`--stage=grid`); on that partition, the ridge penalty chosen by the AIC (`--stage=lambda`); the bootstrap at lambda = 0, at lambda* and of the pooled model, the tests (all at lambda = 0), the ridge estimates beside the MLE and the completed response (`--stage=final`); outputs in the folder of the case |
 | `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
 | `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
+| `fuels-run.R` | the launcher: choose in its setup the settings (1, 2, 3 or all), the cities, the fuels, the stage and the processes, then press Source in RStudio (or `Rscript fuels-run.R`); every run is a main script in an R process of its own, with its log in `fuels/logs/`, and the tables of every setting are rebuilt at the end |
 
 Run `fuels-data.R` once, then each main script stage by stage, or all the
-stages at once with `--stage=all`. To share the work among machines, give each
+stages at once with `--stage=all`; or edit the setup of `fuels-run.R` and
+source it, which does the same from R. To share the work among machines, give each
 its cities (`--cities=RM`, `--cities=MI,TO,NA`, and `--fuels=` to split one
 city by fuel) and as many processes for every bootstrap as it has cores
 (`--boot_cores=`); the seed of a model depends on its city and fuel only, so
