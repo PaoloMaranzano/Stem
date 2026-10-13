@@ -33,6 +33,13 @@ main text. The Wilson helper is gone. The paper (Overleaf, not in this
 repository) moved to the Springer Nature template in referee mode for ASMBI,
 with the computational section before the simulations and two supplements, the
 Computational and Algorithmic Supplement (A) and the Simulation Supplement (B).
+In the evening the manuscript lost every reference to the package (only the
+code-availability declaration names it; the package appendix became a Code
+Supplement, not submitted, for the GitHub page and CRAN), the EM appendix moved
+into Supplement A, and the internal design notes of the simulation study, whose
+content now lives in Supplement B, moved from the Overleaf project to
+`dev/simulation-design.tex` (their development-extension section stays out of
+the paper).
 
 **The simulation results, first reading (replication material only).** Stream
 1 of main3 ended on 2026-10-12 (332 cells x 100 replications, 1,344
