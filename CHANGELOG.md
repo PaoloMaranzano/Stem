@@ -18,6 +18,22 @@ between the reference papers and the code, see
 
 ### 2026-10-13
 
+**At most five regimes in the fuel application (night).** With the cap of
+three, the rule selected K* = 3, the cap itself, in every model fitted so far
+(Rome gasoline, 167/248/136 pumps; Venice gasoline and diesel): a selection on
+the boundary of the grid cannot tell whether four or five regimes would be
+preferred, and on networks of hundreds of pumps three regimes may be too few.
+The user raised the cap to five (`k_cap = 5`, the default of the three main
+scripts and an option of `fuels-run.R`): K_max = min(5, floor(n / 5)), the
+pooled model below ten pumps. The grid grows from 15 to 29 fits per model;
+its cache is keyed on the K of the grid, so the grids computed with the cap
+of three are refitted. The run launched on the other machine with the cap of
+three was stopped by the user before any grid was saved. The dry plan now
+counts the bootstrap at lambda* only when the grid of lambda has a positive
+value. The over-selection that the BIC showed on wide networks in the
+simulation study (up to 27% at d = 200 with weak overlapping regimes) makes
+the EBIC a check worth computing on the saved grids.
+
 **The ridge leaves the fuel application and the paper (night).** The questions
 of the application are inferential, and the ridge corrected for its bias is the
 estimate at lambda = 0 (Proposition 1(c) of the earlier draft), so it changed

@@ -122,7 +122,7 @@ CFG <- fu_config(list(
   cities      = "",                # empty: every city of the case
   fuels       = c("g", "d"),       # the fuel of Y: g gasoline, d diesel
   m           = 5L,                # the smallest regime: K_max = min(k_cap, floor(n / m))
-  k_cap       = 3L,
+  k_cap       = 5L,                # the cap on the number of regimes
   knn         = 5L,                # neighbours of the graph of the Potts penalty
   phi_grid    = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   band        = c(0.025, 0.2),     # the band of the two-step rule
@@ -312,7 +312,7 @@ plan <- do.call(rbind, lapply(seq_along(MODELS), function(k) with(MODELS[[k]], d
   model = id, city = FU_CITY[[city]], fuel = FU_FUEL[[fuel]], pumps = n, K_max = kmax,
   grid_fits = 1L + (kmax - 1L) * length(CFG$phi_grid),
   lambda_fits = length(CFG$lambdas),
-  boot_refits_max = CFG$B[1] * (2L + (kmax > 1L && isTRUE(CFG$boot_pooled[1]))),
+  boot_refits_max = CFG$B[1] * (1L + any(CFG$lambdas > 0) + (kmax > 1L && isTRUE(CFG$boot_pooled[1]))),
   this_job = k %in% MINE))))
 if (STAGE == "dry") {
   cat(sprintf("\nTHE PLAN: %d models (%d in this job), X = %s, B = %d\n", nrow(plan), length(MINE), XDEF, CFG$B[1]))

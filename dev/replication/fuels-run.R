@@ -58,6 +58,9 @@ RUN <- list(
   ## processes of every bootstrap (keep processes * boot_cores within the cores
   ## of the machine)
   boot_cores = 7L,
+  ## the cap on the number of regimes: K_max = min(k_cap, floor(pumps / 5)),
+  ## and the pooled model below 10 pumps
+  k_cap      = 5L,
   ## the ridge on the lags: FALSE (the analysis of the paper) fits and
   ## bootstraps the model at lambda = 0 only, the stage "lambda" reduces to one
   ## fit at lambda = 0 and the bootstrap at lambda* is skipped; TRUE runs the
@@ -128,12 +131,13 @@ fr_run <- function(run = RUN, here = fr_here) {
     paste0("--stage=", stage_tk), paste0("--xdef=", run$xdef), paste0("--fuels=", paste(fuels, collapse = ",")),
     if (length(cities)) paste0("--cities=", paste(cities, collapse = ",")),
     paste0("--boot_cores=", as.integer(run$boot_cores)), paste0("--job=", tk$job),
-    if (!isTRUE(run$ridge)) "--lambdas=0",
+    if (!isTRUE(run$ridge)) "--lambdas=0", paste0("--k_cap=", as.integer(run$k_cap)),
     if (nzchar(run$root)) paste0("--root=", root))
 
-  cat(sprintf("fuel application: settings %s; cities %s; fuels %s; stage %s; ridge %s\n",
+  cat(sprintf("fuel application: settings %s; cities %s; fuels %s; stage %s; K at most %d; ridge %s\n",
               paste(settings, collapse = ", "), if (length(cities)) paste(cities, collapse = ", ") else "all",
-              paste(fuels, collapse = ", "), stage, if (isTRUE(run$ridge)) "yes" else "no (lambda = 0 only)"))
+              paste(fuels, collapse = ", "), stage, as.integer(run$k_cap),
+              if (isTRUE(run$ridge)) "yes" else "no (lambda = 0 only)"))
   cat(sprintf("  %d run(s) on %d process(es) at a time, %d processes per bootstrap; outputs in %s\n\n",
               nrow(tasks), processes, as.integer(run$boot_cores), root))
 
