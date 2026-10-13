@@ -58,6 +58,11 @@ RUN <- list(
   ## processes of every bootstrap (keep processes * boot_cores within the cores
   ## of the machine)
   boot_cores = 7L,
+  ## the ridge on the lags: FALSE (the analysis of the paper) fits and
+  ## bootstraps the model at lambda = 0 only, the stage "lambda" reduces to one
+  ## fit at lambda = 0 and the bootstrap at lambda* is skipped; TRUE runs the
+  ## grid of lambda of the main scripts and the bootstrap at lambda*
+  ridge      = FALSE,
   ## the neighbour X: "nn" the nearest pump of the X set (the main analysis)
   xdef       = "nn",
   ## the folder with the data and the outputs: "" for fuels/ beside the
@@ -123,11 +128,12 @@ fr_run <- function(run = RUN, here = fr_here) {
     paste0("--stage=", stage_tk), paste0("--xdef=", run$xdef), paste0("--fuels=", paste(fuels, collapse = ",")),
     if (length(cities)) paste0("--cities=", paste(cities, collapse = ",")),
     paste0("--boot_cores=", as.integer(run$boot_cores)), paste0("--job=", tk$job),
+    if (!isTRUE(run$ridge)) "--lambdas=0",
     if (nzchar(run$root)) paste0("--root=", root))
 
-  cat(sprintf("fuel application: settings %s; cities %s; fuels %s; stage %s\n",
+  cat(sprintf("fuel application: settings %s; cities %s; fuels %s; stage %s; ridge %s\n",
               paste(settings, collapse = ", "), if (length(cities)) paste(cities, collapse = ", ") else "all",
-              paste(fuels, collapse = ", "), stage))
+              paste(fuels, collapse = ", "), stage, if (isTRUE(run$ridge)) "yes" else "no (lambda = 0 only)"))
   cat(sprintf("  %d run(s) on %d process(es) at a time, %d processes per bootstrap; outputs in %s\n\n",
               nrow(tasks), processes, as.integer(run$boot_cores), root))
 

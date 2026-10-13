@@ -18,6 +18,23 @@ between the reference papers and the code, see
 
 ### 2026-10-13
 
+**The ridge leaves the fuel application and the paper (night).** The questions
+of the application are inferential, and the ridge corrected for its bias is the
+estimate at lambda = 0 (Proposition 1(c) of the earlier draft), so it changed
+only point estimates (Venice pilot: lambda* = 0.003, standard errors
+unchanged); pumps are point installations, nothing is mapped at unmonitored
+sites, and in the scratch checks the ridge improved the interpolation of
+missing cells by less than 0.1%. The user decided to take it out of the paper
+and keep it for a second paper on interpolation and extrapolation (air quality
+over Europe, ERA5 covariates in complex terrain), whose pieces are in the
+Overleaf folder "SC-STEM Ridge". `fuels-run.R` gains `ridge = FALSE` (the
+default): it passes `--lambdas=0`, so that stage lambda reduces to one fit at
+lambda = 0 (its cache, keyed on the grid of lambda, is recomputed), lambda* is
+0, the fit at lambda* and its bootstrap are skipped, and no ridge table is
+written; checked end to end on Venice gasoline with two draws (lambda stage
+0.15 min, bootstraps at lambda = 0 and of the pooled model only). The
+bootstrap at lambda* was one of the three bootstraps of stage final.
+
 **Boxplots everywhere, K_0, the paper restructured (afternoon).** The user
 prefers boxplots to intervals throughout, for coherence. The core selection
 figure now shows the selection error K_hat - K_0 of every replication as
