@@ -8,8 +8,8 @@ disconnected from its sources.
 | script | what it does |
 |---|---|
 | `run-simulations.R` | runs the simulation study |
-| `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.pdf`) in `output/` |
-| `design-figures.R` | the figures and tables that describe the design (geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into Supplementary Material B of the paper |
+| `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.png`) in `output/`, the summary figure of Section 3 of the paper included |
+| `design-figures.R` | the figures and tables that describe the design (an overview of the regimes and the series for the appendix of the paper, geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into the paper and Supplementary Material B |
 | `run-application.R` | runs an application on the Po Valley data of the package, staged and cached |
 | `run-ridge-experiment.R` | the experiment on the ridge in SC-STEM: data with the collinear lags of the fuel application and some values blanked; the procedure of the paper (regimes selected at lambda = 0, then a path in lambda on that partition), lambda chosen by seven information criteria, against the MLE, the truth, the oracle partition and the oracle lambda, for the coefficients and for the interpolation of the blanked values; results in `ridge-experiment/` (Supplementary Material A) |
 
@@ -50,7 +50,16 @@ support so far. The analysis of the previous design is archived in
 ```
 Rscript analyse-simulations.R                  # the results of tag "main3"
 Rscript analyse-simulations.R --tag=main,ref   # several tags, stacked
+Rscript analyse-simulations.R --upto=100,42    # at most 100 replications of stream 1, 42 of stream 2
 ```
+
+The results are read defensively: a synchronization client (Google Drive)
+can lose blocks of the lines that the runner appends to the large files while
+it uploads them, and the analysis drops the broken lines and the replications
+left incomplete, and says how many. A stream still running counts only the
+replications that every one of its cells has reached (`--balanced=FALSE`
+keeps them all). Writing the results to a local folder and copying them at the
+end avoids the losses.
 
 ## Requirements
 

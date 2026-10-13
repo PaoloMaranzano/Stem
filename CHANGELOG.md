@@ -16,6 +16,63 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-13
+
+**The simulation results, first reading (replication material only).** Stream
+1 of main3 ended on 2026-10-12 (332 cells x 100 replications, 1,344
+core-hours, three replications failed because R could not enter its working
+directory, no timeout); stream 2 was at replication 42 of 100. The large
+results files of stream 1, written on Google Drive, had lost blocks of
+appended lines (7 broken lines in the grids, 8 in the parameters, 28 in the
+stations; the small summary file intact). The runner writes from one process
+only, one replication at a time, so the synchronization client is the cause:
+it loses an appended block while it uploads a file of hundreds of megabytes.
+The losses do not depend on the results. `analyse-simulations.R` now reads the
+files defensively: a line that does not start with the quoted cell or has the
+wrong number of fields (commas inside quotes excluded) is dropped, a last line
+without its end of line too, and a replication with fewer rows than the others
+of its cell is dropped from that file (15 in the grids, 10 in the parameters).
+A stream still running counts the replications that all its cells have reached
+(`--balanced`, default TRUE), and `--upto=100,42` caps them per stream, so
+that the numbers stay fixed while the paper is written.
+
+**Figures, at the user's request.** All the figures of the analysis and of the
+design are PNG (300 dpi). The core figures show d as ordered categories, the
+ARI as boxplots of the replications of a cell, the selection of K as a share
+with its 95% Wilson interval (a boxplot of a 0/1 outcome is degenerate), and
+the legend below the panels in a larger font. The robustness figure says what
+the arms are (one factor changed at a time, the others at the reference cell,
+named in a subtitle) and carries 95% intervals. New: R10, the parameters at the
+true K split by whether the rule selected the true K in the same replication
+(`fig_sim_params`, `tab_sim_params_by_selection.csv`), and the fitted signal of
+the selected model against the pooled fit (`fig_sim_signal`, `tab_sim_signal.csv`);
+the runner records the parameters at the true K only, so the parameters of a
+selected fit with the wrong K are not available without refitting. R11, the
+one summary figure of Section 3 (`fig_sim_main`): the share selecting the true
+K by scenario-variant and (T, d) over the four geometries, the ARI and the
+relative error of the parameters at the reference cell. `design-figures.R`
+adds `fig_sim_overview`, the regimes in space (four geometries, unbalanced
+sizes) and the series of the nine scenario-variants, for the appendix of the
+paper, in the place of the old `fig_dgp_examples` of the first design.
+
+**What the results say** (142 replications per cell). S2 is never split
+(1,704 replications). The well separated scenario-variants are identified in
+93-100% of the replications from d = 100 on (over the geometries), the
+failures being at d = 40 with T <= 120; S1w-shr and S3beta-shr in 25% and 24%
+at the reference cell, up to 88% and 67% at d = 200, T = 365. Separation in
+space makes K harder to identify (70% total overlap against 33% strong
+separation at d = 40, T = 60), while the ARI at the true K hardly changes; the
+over-selections occur with overlapping regimes (never with strongly separated
+weak regimes), up to 27% of the
+replications of the weak scenario-variants at d = 200 and 12-20% at d = 400.
+At the true K and with K selected correctly the parameters are centred (median
+relative error within 0.3% for the coefficients, 4% for the rest); with K
+wrong the coefficients stay centred but are more dispersed and the variance
+components are distorted. The AIC selects the true K more often than the BIC
+in the weak scenario-variants (32-33% against 26-28%) with more
+over-selection. Section 3 of the paper is rewritten short, in bullets, around
+this figure, the extended results go to Supplementary Material B, Section B9.
+
 ### 2026-10-10
 
 **`SCSTEM_Bootstrap()` in parallel.** The pilot of the fuel application on

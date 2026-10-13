@@ -9,12 +9,15 @@
 ##     Rscript design-figures.R
 ##     Rscript design-figures.R --out=D:/paper/Figures
 ##
-##   fig_sim_geometry.pdf     the four geometries of the regimes in space
-##   fig_sim_data.pdf         one data set of S1-strong-ind and one of
+##   fig_sim_overview.png     the regimes in space (the four geometries and the
+##                            unbalanced sizes) and the series of every
+##                            scenario-variant (appendix of the manuscript)
+##   fig_sim_geometry.png     the four geometries of the regimes in space
+##   fig_sim_data.png         one data set of S1-strong-ind and one of
 ##                            S1-weak-shr, in time and in space
-##   fig_sim_correlation.pdf  the correlation of the measurement error against
+##   fig_sim_correlation.png  the correlation of the measurement error against
 ##                            distance, and of the latent process against lag
-##   fig_sim_variance.pdf     the variance of the response of every regime of
+##   fig_sim_variance.png     the variance of the response of every regime of
 ##                            every scenario, by source
 ##   tab_sim_scenarios.tex    the parameter values of every regime
 ##   tab_sim_geometry.tex     the four geometries in numbers
@@ -64,9 +67,11 @@ cat("design figures and tables to ", OUT, "\n\n", sep = "")
 RC   <- c("#1f6f8b", "#e0a458", "#a8516e")       # regimes 1, 2, 3
 GREY <- "#8a939f"
 INK  <- "#1b2430"
-pdf_open <- function(name, width, height)
-  grDevices::cairo_pdf(file.path(OUT, name), width = width, height = height)
-pdf_close <- function(name) {
+## figures in PNG, 300 dpi, sizes in inches
+fig_open <- function(name, width, height)
+  grDevices::png(file.path(OUT, name), width = width, height = height, units = "in", res = 300,
+                 type = if (isTRUE(capabilities("cairo"))) "cairo" else "windows")
+fig_close <- function(name) {
   invisible(grDevices::dev.off())
   message("wrote ", name)
 }
@@ -124,7 +129,7 @@ ref_cell <- function(scen) {
 ## ===========================================================================
 ## Figure: the four geometries
 ## ===========================================================================
-pdf_open("fig_sim_geometry.pdf", 10, 10)
+fig_open("fig_sim_geometry.png", 10, 10)
 par_base(mfrow = c(2, 2), mar = c(3, 3, 3.8, 1))
 th <- seq(0, 2 * pi, length.out = 120)
 for (i in seq_len(nrow(GEO))) {
@@ -143,7 +148,70 @@ for (i in seq_len(nrow(GEO))) {
                           2 * GEO$omega[i], sqrt(GEO$nu[i]), 100 * GEO$share_other[i]),
                   cex.main = 0.9, font.main = 1)
 }
-pdf_close("fig_sim_geometry.pdf")
+fig_close("fig_sim_geometry.png")
+
+
+## ===========================================================================
+## Figure: an overview of the design (appendix of the manuscript). Above, where
+## the regimes lie: the four geometries and the unbalanced sizes, at d = 100.
+## Below, the series of every scenario-variant at the reference cell, from the
+## first replication: three locations of every regime (thin) and the mean of
+## the response over the locations of each regime (thick).
+## ===========================================================================
+OV_DESC <- c(`S2` = "no regimes", `S1s-ind` = "every block differs, strongly; independent regimes",
+             `S1s-shr` = "every block differs, strongly; shared shocks",
+             `S1w-shr` = "every block differs, weakly",
+             `S3beta-shr` = "common regression coefficients", `S3G-shr` = "common persistence G",
+             `S3Seta-shr` = "common innovation variance", `S3theta-shr` = "common range",
+             `S3error-shr` = "common measurement error")
+ov <- lapply(stats::setNames(SIM_SCENARIOS, SIM_SCENARIOS), function(id) dgp_draw(ref_cell(id), 1L))
+ov_lines <- function(dd) {
+  out <- list()
+  for (g in sort(unique(dd$labels))) {
+    ii <- which(dd$labels == g)
+    out[[length(out) + 1L]] <- list(g = g, thin = dd$z[, ii[1:3], drop = FALSE],
+                                    thick = rowMeans(dd$z[, ii, drop = FALSE]))
+  }
+  out
+}
+ov_l <- lapply(ov, ov_lines)
+ov_ylim <- range(unlist(lapply(ov_l, function(l) lapply(l, function(q) c(q$thin, q$thick)))))
+fig_open("fig_sim_overview.png", 11, 10.2)
+graphics::layout(rbind(rep(1:5, each = 3), rep(6:8, each = 5), rep(9:11, each = 5),
+                       rep(12:14, each = 5)), heights = c(0.82, 1, 1, 1))
+graphics::par(oma = c(0.5, 0, 0.5, 0), mgp = c(2.0, 0.55, 0), las = 1, tcl = -0.3)
+maps <- rbind(GEO[, c("omega", "spread", "label")],
+              data.frame(omega = SIM_REFERENCE$omega, spread = SIM_REFERENCE$spread,
+                         label = "unbalanced sizes 1:2:3", stringsAsFactors = FALSE))
+maps$balance <- c(rep("balanced", nrow(GEO)), "unbalanced")
+for (i in seq_len(nrow(maps))) {
+  graphics::par(mar = c(1.2, 1.2, 2.6, 1.2))
+  loc <- dgp_locations(SIM_REFERENCE$n, 3L, maps$omega[i], balance = maps$balance[i],
+                       seed = 1001L, spread = maps$spread[i])
+  mu <- dgp_centres(3L, maps$omega[i])
+  graphics::plot(loc$coords, col = RC[loc$labels], pch = 16, cex = 0.75, asp = 1,
+                 xlim = c(-3, 3), ylim = c(-3, 3), xlab = "", ylab = "", axes = FALSE)
+  graphics::box(col = "#d5dbe1")
+  graphics::points(mu[, 1], mu[, 2], pch = 3, col = INK, cex = 1.3, lwd = 2)
+  graphics::title(sprintf("(%s) %s", letters[i], maps$label[i]), cex.main = 1.0, font.main = 1,
+                  line = 0.6)
+}
+for (k in seq_along(SIM_SCENARIOS)) {
+  id <- SIM_SCENARIOS[k]
+  graphics::par(mar = c(3.0, 3.4, 2.6, 0.8))
+  graphics::plot(NA, xlim = c(1, SIM_REFERENCE$TN), ylim = ov_ylim, xlab = "t", ylab = "response",
+                 bty = "n", cex.axis = 0.85)
+  for (q in ov_l[[id]]) {
+    col <- if (id == "S2") RC[1] else RC[q$g]
+    for (j in seq_len(ncol(q$thin)))
+      graphics::lines(q$thin[, j], col = grDevices::adjustcolor(col, 0.35), lwd = 0.7)
+  }
+  for (q in ov_l[[id]])
+    graphics::lines(q$thick, col = if (id == "S2") RC[1] else RC[q$g], lwd = 2)
+  graphics::title(sprintf("(%s) %s: %s", letters[nrow(maps) + k], id, OV_DESC[[id]]),
+                  cex.main = 0.95, font.main = 1, line = 0.8, adj = 0)
+}
+fig_close("fig_sim_overview.png")
 
 
 ## ===========================================================================
@@ -160,7 +228,7 @@ map_col <- function(v, lim) {
 ## (the 90th percentile of the absolute values, beyond which the colour saturates)
 lim_mean <- stats::quantile(unlist(lapply(draws, function(dd) { m <- colMeans(dd$z); abs(m - mean(m)) })), 0.9)
 lim_err  <- stats::quantile(unlist(lapply(draws, function(dd) abs(dd$z[TT, ] - dd$mu[TT, ]))), 0.9)
-pdf_open("fig_sim_data.pdf", 12, 11)
+fig_open("fig_sim_data.png", 12, 11)
 ## by column a data set: (a) and (b) span the column, (c) and (d) share a row
 graphics::layout(matrix(c(1, 1, 5, 5,
                           2, 2, 6, 6,
@@ -192,7 +260,7 @@ for (nm in names(draws)) {
   graphics::title(sprintf("(d) the measurement error at t = %d\n", TT), cex.main = 0.9, font.main = 1)
   graphics::par(mar = c(3.4, 3.6, 3, 1))
 }
-pdf_close("fig_sim_data.pdf")
+fig_close("fig_sim_data.png")
 
 
 ## ===========================================================================
@@ -204,7 +272,7 @@ nn_spacing <- vapply(SIM_BLOCKS$core$n, function(n) {
   D <- as.matrix(stats::dist(xy)); diag(D) <- Inf
   stats::median(apply(D, 1, min))
 }, numeric(1))
-pdf_open("fig_sim_correlation.pdf", 11, 8.5)
+fig_open("fig_sim_correlation.png", 11, 8.5)
 par_base(mfrow = c(2, 2), mar = c(3.6, 3.8, 3, 1))
 hh <- seq(0, 4, length.out = 300)
 for (lv in c("S1-weak", "S1-strong")) {
@@ -233,7 +301,7 @@ for (lv in c("S1-weak", "S1-strong")) {
                    legend = sprintf("regime %d: G = %.1f, half-life %.1f", 1:3, psi$G, log(0.5) / log(psi$G)))
   graphics::title(sprintf("%s: the latent process, against lag", lv), cex.main = 0.95, font.main = 1)
 }
-pdf_close("fig_sim_correlation.pdf")
+fig_close("fig_sim_correlation.png")
 
 
 ## ===========================================================================
@@ -248,7 +316,7 @@ VS$scenario <- factor(VS$scenario, levels = c("S2", SC$name))
 VS <- VS[order(VS$scenario, VS$regime), ]
 src <- c("covariate", "latent", "sill", "nugget")
 src_col <- c("#5b8c5a", "#1f6f8b", "#e0a458", "#a8516e")
-pdf_open("fig_sim_variance.pdf", 11, 5.6)
+fig_open("fig_sim_variance.png", 11, 5.6)
 par_base(mar = c(6.5, 4, 2.5, 9), xpd = NA)
 M <- t(as.matrix(VS[, src]))
 gap <- unlist(lapply(levels(VS$scenario), function(s) c(0.9, rep(0.15, sum(VS$scenario == s) - 1))))
@@ -261,7 +329,7 @@ graphics::legend(max(bp) + 1.4, 2.4, bty = "n", fill = rev(src_col), border = NA
                                          paste("partial sill, ", sigma[omega]^2),
                                          paste("nugget, ", sigma[epsilon]^2))))
 graphics::title("The variance of the response of every regime (1, 2, 3) by source", cex.main = 0.95, font.main = 1)
-pdf_close("fig_sim_variance.pdf")
+fig_close("fig_sim_variance.png")
 
 
 ## ===========================================================================
