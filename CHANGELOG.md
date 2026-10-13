@@ -18,6 +18,22 @@ between the reference papers and the code, see
 
 ### 2026-10-13
 
+**Boxplots everywhere, K_0, the paper restructured (afternoon).** The user
+prefers boxplots to intervals throughout, for coherence. The core selection
+figure now shows the selection error K_hat - K_0 of every replication as
+boxplots (a boxplot of the 0/1 outcome "K right" collapses; this one also shows
+whether the errors are too few or too many regimes; the shares stay in the
+tables and in the summary heatmap); the robustness figure shows K_hat - K_0 and
+the ARI as boxplots, S2 out of the ARI panel; the penalty figure is one panel
+of boxplots per scenario-variant. The true number of regimes is written K_0 in
+every figure and in the text, the reference cell is spelled out wherever it is
+used, the parameters figure has three columns, the summary figure a common
+title and the four geometries named. The fitted-signal figure moved to the
+main text. The Wilson helper is gone. The paper (Overleaf, not in this
+repository) moved to the Springer Nature template in referee mode for ASMBI,
+with the computational section before the simulations and two supplements, the
+Computational and Algorithmic Supplement (A) and the Simulation Supplement (B).
+
 **The simulation results, first reading (replication material only).** Stream
 1 of main3 ended on 2026-10-12 (332 cells x 100 replications, 1,344
 core-hours, three replications failed because R could not enter its working

@@ -147,12 +147,6 @@ mc <- function(x) {
     se = if (length(x) > 1) stats::sd(x) / sqrt(length(x)) else NA_real_,
     M = length(x))
 }
-## the Wilson 95% interval of a proportion p out of M
-wilson <- function(p, M, z = 1.96) {
-  ctr <- (p + z^2 / (2 * M)) / (1 + z^2 / M)
-  hw  <- z * sqrt(p * (1 - p) / M + z^2 / (4 * M^2)) / (1 + z^2 / M)
-  cbind(lo = pmax(0, ctr - hw), hi = pmin(1, ctr + hw))
-}
 ## one row per group of `by`, built by f
 agg <- function(d, by, f) {
   sp <- split(d, lapply(d[by], function(v) ifelse(is.na(v), "NA", as.character(v))),
@@ -340,7 +334,7 @@ if (nrow(ref)) {
   csv_write(tr, "tab_sim_reference.csv")
   tex_write(c(
     "\\begin{tabular}{lrrrrrr}", "\\toprule",
-    paste("scenario-variant & $M$ & $\\Pr(\\hat K = K)$ & ARI at $K$ & ARI at $\\hat K$",
+    paste("scenario-variant & $M$ & $\\Pr(\\hat K = K_0)$ & ARI at $K_0$ & ARI at $\\hat K$",
           "& modal $\\hat\\phi$ & RMSE ratio \\\\"),
     "\\midrule",
     sprintf("%s & %d & %s & %s & %s & %s & %s \\\\", tt(tr$scenario), as.integer(tr$M),
@@ -397,18 +391,19 @@ if (nrow(core)) {
   ng <- length(GEO_LEV)
   xpos <- function(j, wi) (j - 1) * (ng + 1.2) + wi
   xmid <- vapply(seq_along(CORE_N), function(j) mean(xpos(j, seq_len(ng))), numeric(1))
-  core_panels <- function(name, title, draw) {
+  core_panels <- function(name, title, draw, ylim = c(0, 1), yat = seq(0, 1, 0.25),
+                          ylab = c("0", "0.25", "0.5", "0.75", "1"), href = NULL) {
     nr <- length(ids); nc <- length(CORE_T)
     fig_open(name, 8.6, 1.35 * nr + 1.7)
     graphics::layout(rbind(matrix(seq_len(nr * nc), nr, byrow = TRUE), nr * nc + 1),
                      heights = c(rep(1, nr), 0.5))
     graphics::par(mar = c(1.8, 2.6, 0.9, 0.4), oma = c(0, 7.4, 4.4, 0), mgp = c(1.7, 0.5, 0))
     for (i in ids) for (Tn in CORE_T) {
-      graphics::plot(NA, xlim = c(0.4, xpos(length(CORE_N), ng) + 0.6), ylim = c(0, 1), axes = FALSE,
+      graphics::plot(NA, xlim = c(0.4, xpos(length(CORE_N), ng) + 0.6), ylim = ylim, axes = FALSE,
                      xlab = "", ylab = "")
-      graphics::abline(h = c(0.25, 0.5, 0.75, 1), col = "#e6eaee")
-      graphics::axis(2, at = seq(0, 1, 0.25), labels = c("0", "0.25", "0.5", "0.75", "1"),
-                     las = 1, cex.axis = 0.85)
+      graphics::abline(h = yat, col = "#e6eaee")
+      if (!is.null(href)) graphics::abline(h = href, col = GREY, lty = 2)
+      graphics::axis(2, at = yat, labels = ylab, las = 1, cex.axis = 0.85)
       graphics::axis(1, at = xmid, labels = paste0("d = ", CORE_N), tick = FALSE,
                      cex.axis = 0.85, line = -0.7)
       draw(i, Tn)
@@ -426,27 +421,27 @@ if (nrow(core)) {
   }
   ## the ARI of every replication, as boxplots
   ari_of <- split(core$ari_true, list(core$scenario, core$TN, core$n, core$geo), drop = TRUE)
+  core_box <- function(of) function(i, Tn) for (j in seq_along(CORE_N)) for (wi in seq_len(ng)) {
+    v <- of[[paste(i, Tn, CORE_N[j], GEO_LEV[wi], sep = ".")]]
+    v <- v[is.finite(v)]
+    if (!length(v)) next
+    graphics::boxplot(v, at = xpos(j, wi), add = TRUE, axes = FALSE, boxwex = 0.9,
+                      col = grDevices::adjustcolor(PAL4[wi], 0.45), border = PAL4[wi],
+                      lwd = 0.7, staplewex = 0.4, outpch = 20, outcex = 0.4, outcol = PAL4[wi])
+  }
   core_panels("fig_sim_core_ari.png",
-              "Recovery of the partition: ARI at the true number of regimes, one box per cell",
-              function(i, Tn) for (j in seq_along(CORE_N)) for (wi in seq_len(ng)) {
-                v <- ari_of[[paste(i, Tn, CORE_N[j], GEO_LEV[wi], sep = ".")]]
-                v <- v[is.finite(v)]
-                if (!length(v)) next
-                graphics::boxplot(v, at = xpos(j, wi), add = TRUE, axes = FALSE, boxwex = 0.9,
-                                  col = grDevices::adjustcolor(PAL4[wi], 0.45), border = PAL4[wi],
-                                  lwd = 0.7, staplewex = 0.4, outpch = 20, outcex = 0.25)
-              })
-  ## the share selecting the true K, with its 95% Wilson interval
+              expression(bold("Recovery of the partition: ARI at the true number of regimes") ~ bolditalic(K)[0]),
+              core_box(ari_of))
+  ## the selection error of every replication, K selected minus K_0, as
+  ## boxplots: a boxplot of the 0/1 outcome "K right" would collapse, while
+  ## this one shows the direction of the errors (the shares are in the tables)
+  core$dK <- core$K_hat - core$K_true
+  dk_of <- split(core$dK, list(core$scenario, core$TN, core$n, core$geo), drop = TRUE)
   core_panels("fig_sim_core_select.png",
-              "Selection of the number of regimes: share of replications with K selected = K, with 95% intervals",
-              function(i, Tn) for (j in seq_along(CORE_N)) for (wi in seq_len(ng)) {
-                q <- tc[tc$scenario == i & tc$TN == Tn & tc$n == CORE_N[j] & tc$geo %in% GEO_LEV[wi], ]
-                if (!nrow(q)) next
-                ci <- wilson(q$k_ok, q$M)
-                graphics::segments(xpos(j, wi), ci[, "lo"], xpos(j, wi), ci[, "hi"],
-                                   col = PAL4[wi], lwd = 1.8)
-                graphics::points(xpos(j, wi), q$k_ok, pch = 19, col = PAL4[wi], cex = 0.8)
-              })
+              expression(bold("Selection of the number of regimes: error") ~ hat(K) - K[0] ~
+                           bold("of every replication")),
+              core_box(dk_of), ylim = c(-2.2, 1.2), yat = -2:1, ylab = c("-2", "-1", "0", "+1"),
+              href = 0)
   cat("\n")
 } else cat("R2: no replication of the core with three regimes yet\n\n")
 
@@ -511,42 +506,52 @@ if (!is.null(rob) && length(unique(rob$arm)) > 1) {
   rob_tex("k_ok", "tab_sim_robustness_select.tex")
 
   ## each arm changes one factor of the reference cell and keeps the others;
-  ## the bars are 95% intervals: Wilson for the share selecting the true K,
-  ## mean +- 1.96 standard errors for the ARI
+  ## boxplots over the replications: the selection error K selected - K_0, and
+  ## the ARI at K_0
   arm_lab <- c(reference = "reference cell", unbalanced = "unbalanced regimes (1:2:3)",
                `knn = 3` = "sparser graph (m = 3)", `knn = 10` = "denser graph (m = 10)",
                `n = 400` = "larger network (d = 400)")
-  fig_open("fig_sim_robustness.png", 9.6, 0.5 * length(ids) + 3.0)
+  S$dK <- S$K_hat - S$K_true
+  fig_open("fig_sim_robustness.png", 9.6, 0.62 * length(ids) + 3.0)
   graphics::layout(rbind(c(1, 2), c(3, 3)), heights = c(1, 0.2))
   graphics::par(mar = c(3.8, 7.8, 2.0, 0.8), oma = c(0, 0, 3.6, 0), mgp = c(2.2, 0.6, 0))
-  off <- seq(0.3, -0.3, length.out = length(arms))
-  for (v in c("k_ok", "ari")) {
-    graphics::plot(NA, xlim = c(0, 1), ylim = c(0.5, length(ids) + 0.5), yaxt = "n",
-                   xlab = if (v == "ari") "ARI at the true K" else "share of replications with K selected = K",
-                   ylab = "", bty = "n", las = 1)
+  off <- seq(0.32, -0.32, length.out = length(arms))
+  for (v in c("dK", "ari_true")) {
+    graphics::plot(NA, xlim = if (v == "dK") c(-2.2, 1.2) else c(0, 1),
+                   ylim = c(0.5, length(ids) + 0.5), yaxt = "n", xaxt = "n",
+                   xlab = if (v == "dK") expression(hat(K) - K[0]) else expression("ARI at" ~ K[0]),
+                   ylab = "", bty = "n")
+    if (v == "dK") {
+      graphics::axis(1, at = -2:1, labels = c("-2", "-1", "0", "+1"))
+      graphics::abline(v = 0, col = GREY, lty = 2)
+    } else graphics::axis(1)
     graphics::axis(2, at = rev(seq_along(ids)), labels = ids, las = 1, cex.axis = 0.9,
                    tick = FALSE)
     graphics::abline(h = seq_along(ids) + 0.5, col = "#e6eaee")
     for (ai in seq_along(arms)) {
-      q <- rob[rob$arm == names(arms)[ai] & is.finite(rob[[v]]), ]
-      if (!nrow(q)) next
-      y <- length(ids) + 1 - match(q$scenario, ids) + off[ai]
-      ci <- if (v == "k_ok") wilson(q$k_ok, q$M) else
-        cbind(lo = pmax(0, q$ari - 1.96 * q$ari_se), hi = pmin(1, q$ari + 1.96 * q$ari_se))
-      graphics::segments(ci[, "lo"], y, ci[, "hi"], y, col = PAL5[ai], lwd = 1.6)
-      graphics::points(q[[v]], y, pch = 19, cex = 0.8, col = PAL5[ai])
+      d <- S[arms[[ai]], , drop = FALSE]
+      for (k in seq_along(ids)) {
+        x <- d[[v]][d$scenario == ids[k] & (v == "dK" | d$K_true > 1)]
+        x <- x[is.finite(x)]
+        if (!length(x)) next
+        graphics::boxplot(x, at = length(ids) + 1 - k + off[ai], add = TRUE, horizontal = TRUE,
+                          axes = FALSE, boxwex = 0.14, col = grDevices::adjustcolor(PAL5[ai], 0.45),
+                          border = PAL5[ai], lwd = 0.7, staplewex = 0.4, outpch = 20,
+                          outcex = 0.45, outcol = PAL5[ai])
+      }
     }
-    graphics::mtext(if (v == "ari") "recovery of the partition" else "selection of the number of regimes",
+    graphics::mtext(if (v == "ari_true") "recovery of the partition" else "selection of the number of regimes",
                     side = 3, line = 0.5, cex = 0.9, font = 2, col = INK)
   }
   graphics::par(mar = c(0, 0, 0, 0)); graphics::plot.new()
-  graphics::legend("center", bty = "n", cex = 1.05, pch = 19, lwd = 1.6, col = PAL5, ncol = 3, x.intersp = 0.8,
+  graphics::legend("center", bty = "n", cex = 1.05, fill = grDevices::adjustcolor(PAL5, 0.45),
+                   border = PAL5, ncol = 3, x.intersp = 0.8,
                    text.width = max(graphics::strwidth(arm_lab, cex = 1.05)),
                    legend = arm_lab[names(arms)])
   graphics::mtext("Robustness: one factor of the design changed at a time, the others kept at the reference cell",
                   outer = TRUE, side = 3, line = 1.9, cex = 1.0, font = 2, col = INK)
   graphics::mtext(paste("reference cell: d = 100 locations, T = 120, medium-high overlap, balanced regimes,",
-                        "m = 5 neighbours; bars: 95% intervals; S2 has no partition"),
+                        "m = 5 neighbours; boxplots over the replications; S2 has no partition"),
                   outer = TRUE, side = 3, line = 0.6, cex = 0.85, col = GREY)
   fig_close("fig_sim_robustness.png")
   cat("\n")
@@ -641,22 +646,33 @@ if (!is.null(G) && "ari" %in% names(G)) {
     m <- matrix(m, nrow = length(ids), dimnames = list(ids, format(phis)))
     print(round(m, 3))
 
-    fig_open("fig_sim_penalty.png", 6.4, 4.4)
-    graphics::par(mar = c(4.0, 4.2, 2.2, 7.6), xpd = FALSE)
+    ## one panel per scenario-variant, one boxplot per penalty over the
+    ## replications of the reference cell
+    fig_open("fig_sim_penalty.png", 9.6, 5.8)
+    nc4 <- 4L; nr4 <- ceiling(length(ids) / nc4)
+    graphics::par(mfrow = c(nr4, nc4), mar = c(3.4, 3.2, 2.0, 0.6), oma = c(0, 0, 3.4, 0),
+                  mgp = c(2.0, 0.55, 0))
     x <- seq_along(phis)
-    graphics::plot(NA, xlim = range(x), ylim = c(0, 1), xaxt = "n", las = 1, bty = "n",
-                   xlab = "spatial penalty phi", ylab = "ARI at the true K")
-    graphics::axis(1, at = x, labels = format(phis, drop0trailing = TRUE))
-    cols <- grDevices::hcl.colors(length(ids), "Dark 3")
-    for (i in seq_along(ids)) {
-      graphics::lines(x, m[i, ], col = cols[i], lwd = 1.5)
-      graphics::points(x, m[i, ], col = cols[i], pch = 19, cex = 0.6)
+    for (i in ids) {
+      graphics::plot(NA, xlim = c(0.4, length(phis) + 0.6), ylim = c(0, 1), xaxt = "n", las = 1,
+                     bty = "n", xlab = expression("spatial penalty" ~ phi), ylab = expression("ARI at" ~ K[0]),
+                     cex.axis = 0.8)
+      graphics::axis(1, at = x, labels = format(phis, drop0trailing = TRUE), cex.axis = 0.75, las = 2)
+      for (k in x) {
+        v <- g$ari[g$scenario == i & abs(g$phi - phis[k]) < 1e-9]
+        v <- v[is.finite(v)]
+        if (!length(v)) next
+        graphics::boxplot(v, at = k, add = TRUE, axes = FALSE, boxwex = 0.7,
+                          col = grDevices::adjustcolor("#1f6f8b", 0.45), border = "#1f6f8b",
+                          lwd = 0.7, staplewex = 0.4, outpch = 20, outcex = 0.35, outcol = "#1f6f8b")
+      }
+      graphics::mtext(i, side = 3, line = 0.4, cex = 0.8, font = 2, col = INK)
     }
-    graphics::par(xpd = NA)
-    graphics::legend(max(x) + 0.3, 1, bty = "n", cex = 0.72, legend = ids, col = cols,
-                     lwd = 1.5, pch = 19)
-    graphics::mtext("Recovery against the penalty, at the reference cell", side = 3,
-                    line = 0.6, cex = 0.95, font = 2, col = INK)
+    graphics::mtext("Recovery of the partition against the spatial penalty",
+                    outer = TRUE, side = 3, line = 1.8, cex = 1.0, font = 2, col = INK)
+    graphics::mtext(paste("reference cell: d = 100 locations, T = 120, medium-high overlap,",
+                          "balanced regimes, m = 5 neighbours; boxplots over the replications"),
+                    outer = TRUE, side = 3, line = 0.5, cex = 0.82, col = GREY)
     fig_close("fig_sim_penalty.png")
   } else cat("R6: no grid at the reference yet\n")
   ## the phi selected, over every cell with three regimes where k is right
@@ -849,8 +865,8 @@ PAR_EXPR <- list(beta1 = quote(beta[0]), beta2 = quote(beta[1]), G = quote(G),
                  Sigmaeta = quote(sigma[eta]^2), sigma2eps = quote(sigma[epsilon]^2),
                  sigma2omega = quote(sigma[omega]^2), theta = quote(theta))
 SEL_COL <- c(true = GREY, right = "#1f6f8b", wrong = "#e0a458")
-SEL_LAB <- c(true = "fit at the true K, every replication", right = "K selected correctly",
-             wrong = "K selected wrongly")
+SEL_LAB <- list(true = quote("fit at" ~ K[0] * ", every replication"),
+                right = quote("selected" ~ hat(K) == K[0]), wrong = quote("selected" ~ hat(K) != K[0]))
 ## a box with whiskers to 1.5 IQR, the outliers not drawn; at least 10 values
 box_at <- function(v, at, col, wex = 0.8, horizontal = FALSE) {
   v <- v[is.finite(v)]
@@ -890,8 +906,8 @@ if (!is.null(P_all) && nrow(P_all)) {
 
   ids10 <- scen_order(unique(pe$scenario))
   sp10 <- split(pe$rel, list(pe$parameter, pe$scenario, pe$sel), drop = TRUE)
-  fig_open("fig_sim_params.png", 9.0, 11.0)
-  graphics::layout(matrix(1:8, 4, byrow = TRUE))
+  fig_open("fig_sim_params.png", 11.0, 9.6)
+  graphics::layout(matrix(1:9, 3, byrow = TRUE))
   graphics::par(mar = c(5.6, 3.8, 2.2, 0.6), oma = c(0, 0, 3.4, 0), mgp = c(2.4, 0.6, 0))
   for (p in PAR10) {
     vs <- sp10[startsWith(names(sp10), paste0(p, "."))]
@@ -906,12 +922,13 @@ if (!is.null(P_all) && nrow(P_all)) {
     graphics::mtext(as.expression(PAR_EXPR[[p]]), side = 3, line = 0.4, cex = 1.1)
   }
   graphics::par(mar = c(0, 0, 0, 0)); graphics::plot.new()
-  graphics::legend("center", bty = "n", cex = 1.15, border = SEL_COL[c("right", "wrong")],
+  graphics::legend("center", bty = "n", cex = 1.2, border = SEL_COL[c("right", "wrong")],
                    fill = grDevices::adjustcolor(SEL_COL[c("right", "wrong")], 0.5),
-                   legend = SEL_LAB[c("right", "wrong")],
+                   legend = as.expression(SEL_LAB[c("right", "wrong")]),
                    title = "in the same replication, the two-step rule has")
-  graphics::mtext("The parameters at the true number of regimes: relative error (estimate - truth) / |truth|",
-                  outer = TRUE, side = 3, line = 1.8, cex = 1.0, font = 2, col = INK)
+  graphics::mtext(expression(bold("The parameters at the true number of regimes") ~ bolditalic(K)[0] *
+                               bold(": relative error (estimate - truth) / |truth|")),
+                  outer = TRUE, side = 3, line = 1.8, cex = 1.0, col = INK)
   graphics::mtext(paste("every cell with three regimes, the three regimes together;",
                         "boxes from the first to the third quartile, whiskers to 1.5 IQR"),
                   outer = TRUE, side = 3, line = 0.5, cex = 0.85, col = GREY)
@@ -958,7 +975,8 @@ if (nrow(sg)) {
   graphics::par(mar = c(0, 0, 0, 0)); graphics::plot.new()
   graphics::legend("center", ncol = 3, bty = "n", cex = 1.0, border = SEL_COL,
                    fill = grDevices::adjustcolor(SEL_COL, 0.5),
-                   legend = c(SEL_LAB[["true"]], "selected fit, K right", "selected fit, K wrong"))
+                   legend = expression("fit at" ~ K[0] * ", every replication",
+                                       "selected fit," ~ hat(K) == K[0], "selected fit," ~ hat(K) != K[0]))
   fig_close("fig_sim_signal.png")
   cat("\n")
 }
@@ -989,10 +1007,11 @@ if (nrow(hm_d) && nrow(ref3) && !is.null(P) && nrow(P)) {
   csv_write(data.frame(scenario = rows, hm, check.names = FALSE), "tab_sim_main_select.csv")
   pal <- grDevices::hcl.colors(101, "YlGnBu", rev = TRUE)
 
-  fig_open("fig_sim_main.png", 7.6, 7.8)
-  graphics::layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE), heights = c(1.08, 1))
+  fig_open("fig_sim_main.png", 7.6, 8.3)
+  graphics::layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE), heights = c(1.12, 1))
+  graphics::par(oma = c(0, 0, 2.4, 0))
   ## (a)
-  graphics::par(mar = c(1.0, 8.4, 6.0, 1.0))
+  graphics::par(mar = c(1.0, 8.4, 7.2, 1.0))
   nr <- length(rows); nc <- nrow(cols)
   graphics::plot(NA, xlim = c(0, nc), ylim = c(0, nr), axes = FALSE, xlab = "", ylab = "",
                  xaxs = "i", yaxs = "i")
@@ -1010,29 +1029,34 @@ if (nrow(hm_d) && nrow(ref3) && !is.null(P) && nrow(P)) {
   graphics::text(seq_len(nc) - 0.5, nr + 0.28, paste0("d = ", cols$n), cex = 0.85, xpd = NA)
   graphics::text(c(1.5, 4.5, 7.5), nr + 0.75, paste0("T = ", CORE_T), cex = 0.95, font = 2, xpd = NA)
   graphics::mtext(expression(bold("(a) Selection of the number of regimes")),
-                  side = 3, line = 4.3, adj = 0, cex = 0.85, col = INK)
-  graphics::mtext(expression("% of replications with" ~ hat(K) == K ~ "(S2:" ~ hat(K) == 1 * "),"
-                             ~ "over the four geometries"),
-                  side = 3, line = 3.1, adj = 0, cex = 0.75, col = GREY)
+                  side = 3, line = 5.5, adj = 0, cex = 0.85, col = INK)
+  graphics::mtext(expression("% of replications with" ~ hat(K) == K[0] ~ "(S2:" ~ hat(K) == 1 * "),"
+                             ~ "pooled over the four geometries of the regimes in space:"),
+                  side = 3, line = 4.3, adj = 0, cex = 0.75, col = GREY)
+  graphics::mtext("total overlap, medium-high overlap, medium-low overlap, strong separation",
+                  side = 3, line = 3.3, adj = 0, cex = 0.75, col = GREY)
   ## (b)
-  graphics::par(mar = c(4.2, 8.4, 3.0, 1.0), mgp = c(2.3, 0.6, 0))
+  graphics::par(mar = c(4.2, 8.4, 4.0, 1.0), mgp = c(2.3, 0.6, 0))
   r3 <- rows[rows != "S2"]
   graphics::plot(NA, xlim = c(0, 1), ylim = c(0.5, length(r3) + 0.5), yaxt = "n", bty = "n",
-                 xlab = "ARI at the true K", ylab = "", las = 1, cex.axis = 0.85)
+                 xlab = expression("ARI at" ~ K[0]), ylab = "", las = 1, cex.axis = 0.85)
   graphics::axis(2, at = rev(seq_along(r3)), labels = r3, las = 1, tick = FALSE, cex.axis = 0.85)
   for (k in seq_along(r3))
     box_at(ref3$ari_true[ref3$scenario == r3[k]], length(r3) + 1 - k,
            if (r3[k] %in% WEAK) "#e0a458" else "#1f6f8b", wex = 0.6, horizontal = TRUE)
-  graphics::mtext(expression(bold("(b) Recovery of the partition")), side = 3, line = 1.6,
+  graphics::mtext(expression(bold("(b) Recovery of the partition")), side = 3, line = 2.6,
                   adj = 0, cex = 0.85, col = INK)
-  graphics::mtext("reference cell", side = 3, line = 0.5, adj = 0, cex = 0.75, col = GREY)
+  graphics::mtext("reference cell: d = 100, T = 120, medium-high", side = 3, line = 1.5, adj = 0,
+                  cex = 0.75, col = GREY)
+  graphics::mtext("overlap, balanced regimes, m = 5", side = 3, line = 0.5, adj = 0, cex = 0.75,
+                  col = GREY)
   ## (c)
   P$rel <- P$err / abs(P$truth)
   P$weak <- P$scenario %in% WEAK
   vs <- c(split(P$rel[!P$weak], P$parameter[!P$weak]), split(P$rel[P$weak], P$parameter[P$weak]))
-  graphics::par(mar = c(4.2, 3.6, 3.0, 1.0))
+  graphics::par(mar = c(4.2, 3.6, 4.0, 1.0))
   graphics::plot(NA, xlim = whisk(vs), ylim = c(0.5, length(PAR10) + 0.5), yaxt = "n", bty = "n",
-                 xlab = "relative error at the true K", ylab = "", las = 1, cex.axis = 0.85)
+                 xlab = expression("relative error at" ~ K[0]), ylab = "", las = 1, cex.axis = 0.85)
   graphics::abline(v = 0, col = INK, lty = 2)
   graphics::axis(2, at = rev(seq_along(PAR10)), labels = as.expression(PAR_EXPR[PAR10]), las = 1,
                  tick = FALSE, cex.axis = 0.95)
@@ -1041,10 +1065,14 @@ if (nrow(hm_d) && nrow(ref3) && !is.null(P) && nrow(P)) {
     box_at(P$rel[!P$weak & P$parameter == PAR10[k]], y + 0.17, "#1f6f8b", wex = 0.3, horizontal = TRUE)
     box_at(P$rel[P$weak & P$parameter == PAR10[k]], y - 0.17, "#e0a458", wex = 0.3, horizontal = TRUE)
   }
-  graphics::mtext(expression(bold("(c) Parameters")), side = 3, line = 1.6, adj = 0, cex = 0.85,
+  graphics::mtext(expression(bold("(c) Parameters")), side = 3, line = 2.6, adj = 0, cex = 0.85,
                   col = INK)
-  graphics::mtext("reference cell; orange: S1w-shr and S3beta-shr", side = 3,
+  graphics::mtext("reference cell, as in (b); blue: well separated", side = 3,
+                  line = 1.5, adj = 0, cex = 0.75, col = GREY)
+  graphics::mtext("scenario-variants, orange: S1w-shr and S3beta-shr", side = 3,
                   line = 0.5, adj = 0, cex = 0.75, col = GREY)
+  graphics::mtext("Simulation study: number of regimes, partition and parameters",
+                  outer = TRUE, side = 3, line = 0.8, cex = 1.0, font = 2, col = INK)
   fig_close("fig_sim_main.png")
 }
 cat("\ndone\n")
