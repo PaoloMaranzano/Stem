@@ -53,8 +53,8 @@
 ##           `lambdas`; lambda* minimizes the AIC (`lambda_ic`).
 ##   final   the refit-with-clustering bootstrap of the model at lambda = 0,
 ##           of the model at lambda* and of the pooled model; the tests, all at
-##           lambda = 0 (bootstrap Wald by regime, likelihood ratio on the
-##           partition, pump by pump F and HC1, Dumitrescu-Hurlin); the lag
+##           lambda = 0 (bootstrap Wald by regime, pump by pump F and HC1,
+##           Dumitrescu-Hurlin; the bootstrap LR test is fuels-lr-bootstrap.R); the lag
 ##           coefficients at lambda* beside those at lambda = 0; the completed
 ##           response at both; the diagnostics, the pulses, the maps.
 ##   all     grid, lambda and final one after the other, in one process.
@@ -457,17 +457,14 @@ final_one <- function(M) {
     boot(pooled, "boot_pooled", list(B = CFG$B[1], level = CFG$level[1], K = 1L)) else NULL
 
   ## 3. the tests, all at lambda = 0: bootstrap Wald regime by regime, for the
-  ##    selected and the pooled model; likelihood ratio on the selected
-  ##    partition; pump by pump, F and HC1, with the Dumitrescu-Hurlin
-  ##    combination
+  ##    selected and the pooled model; pump by pump, F and HC1, with the
+  ##    Dumitrescu-Hurlin combination (the bootstrap LR test is
+  ##    fuels-lr-bootstrap.R, the bootstrap Wald test also fuels-wald-bootstrap.R)
   tests <- fu_tests(des)
   wald <- function(fit, b, label) if (!is.null(b)) do.call(rbind, lapply(names(tests), function(h)
     cbind(model = label, fu_wald_boot(fit, b$inf, des, tests[[h]], h))))
   wd <- rbind(wald(sel$fit, b0, sprintf("selected, K = %d", K)),
               if (K > 1L) wald(pooled, bP, "pooled"))
-  sP <- list(partition = sel$fit$group, K = K)
-  lr <- fu_cached(CACHE, sprintf("%s_%s_lr", M$id, LAG_KEY),
-                  with_settings(fu_lr_fixed(des, sel$fit$group, K, CFG, seed_of(M)), sP), valid = same_settings(sP))
   pt <- fu_pump_tests(des); dh <- fu_dh(pt)
 
   ## 4. the ridge: the lag coefficients at lambda* beside those at lambda = 0,
@@ -491,7 +488,6 @@ final_one <- function(M) {
   utils::write.csv(g$ic$table, file.path(od, "grid.csv"), row.names = FALSE)
   utils::write.csv(lam$table, file.path(od, "lambda.csv"), row.names = FALSE)
   utils::write.csv(wd, file.path(od, "wald_bootstrap.csv"), row.names = FALSE)
-  utils::write.csv(lr, file.path(od, "lr_fixed_partition.csv"), row.names = FALSE)
   utils::write.csv(pt, file.path(od, "pump_tests.csv"), row.names = FALSE)
   utils::write.csv(dh, file.path(od, "dumitrescu_hurlin.csv"), row.names = FALSE)
   utils::write.csv(dg, file.path(od, "diagnostics.csv"), row.names = FALSE)

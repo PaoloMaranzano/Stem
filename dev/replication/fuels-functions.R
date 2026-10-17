@@ -140,6 +140,16 @@ fu_require_stem <- function(ref = FU_STEM_REF) {
     if (!ok()) stop("Stem could not be installed at ", ref, ": restart R and run again, ",
                     "or install it by hand with remotes::install_github()", call. = FALSE)
   }
+  ## A script sourced in an open session (RStudio) uses the Stem already loaded
+  ## there, which may be another version than the one installed: stop
+  if ("Stem" %in% loadedNamespaces()) {
+    p <- getNamespaceInfo("Stem", "path")
+    s <- tryCatch(unname(read.dcf(file.path(p, "DESCRIPTION"), fields = "RemoteSha")[1, 1]),
+                  error = function(e) NA_character_)
+    if (!identical(s, sha))
+      stop("this R session has another version of Stem loaded (", p, "): restart R ",
+           "(in RStudio, Session > Restart R) and run again", call. = FALSE)
+  }
   invisible(substr(sha, 1L, 7L))
 }
 
@@ -641,45 +651,6 @@ fu_wald_boot <- function(fit, inf, des, cols, label) {
   }))
 }
 
-## The likelihood-ratio test of each hypothesis of fu_tests() on the SELECTED
-## partition, without the ridge: the model with and without the lags tested,
-## refitted regime by regime on
-## the partition held fixed (no alternation), and 2 (l_full - l_restricted) for
-## each regime and in total, against a chi-square with as many degrees of
-## freedom as lags are tested. It is the likelihood counterpart of the F
-## test; on the first test of the application (Isernia) it rejected more often
-## than the pump-level tests, so it is read next to the bootstrap Wald test.
-fu_lr_fixed <- function(des, partition, K, cfg, seed) {
-  refit <- function(d) {
-    mod <- fu_model(d)
-    if (K == 1L) {
-      Stem::SCSTEM_Estimation(mod, K = 1, distance = "geo", lambda = 0,
-                              control = Stem::STEM_control(), verbose = FALSE)
-    } else {
-      Stem::SCSTEM_Estimation(mod, K = K, phi_penalty = 0, init_partition = partition, max_iter = 0,
-                              distance = "geo", knn = min(cfg$knn[1], d$d - 1L),
-                              min_cluster_size = cfg$m[1], lambda = 0, seed = seed,
-                              control = Stem::STEM_control(), verbose = FALSE)
-    }
-  }
-  full <- refit(des)
-  tests <- fu_tests(des)
-  rows <- lapply(names(tests), function(b) {
-    cols <- tests[[b]]
-    dr <- fu_subset_design(des, setdiff(seq_along(des$names), cols))
-    rest <- tryCatch(refit(dr), error = function(e) NULL)
-    if (is.null(rest)) return(data.frame(block = b, regime = NA, LR = NA, df = length(cols), p_value = NA))
-    lr_g <- 2 * (full$loglik_g - rest$loglik_g)
-    data.frame(block = b, regime = c(seq_len(K), 0L),
-               LR = c(lr_g, sum(lr_g)), df = c(rep(length(cols), K), K * length(cols)),
-               p_value = stats::pchisq(c(lr_g, sum(lr_g)), c(rep(length(cols), K), K * length(cols)),
-                                       lower.tail = FALSE))
-  })
-  out <- do.call(rbind, rows)
-  out$regime <- ifelse(out$regime == 0L, "all", as.character(out$regime))
-  out
-}
-
 ## A design restricted to some of its columns (keep: indices), with the blocks
 ## and the penalized columns re-indexed.
 fu_subset_design <- function(des, keep) {
@@ -855,4 +826,117 @@ fu_my_share <- function(sizes, job) {
   j <- as.integer(strsplit(job, "/", fixed = TRUE)[[1]])
   ord <- order(-sizes)
   ord[(seq_along(ord) - 1L) %% j[2] == j[1] - 1L]
+}
+
+
+## ===========================================================================
+## 10. The bootstrap tests of leadership: the machinery shared by
+##     fuels-wald-bootstrap.R and fuels-lr-bootstrap.R
+## ===========================================================================
+## The two scripts test the same hypotheses (the blocks of fu_tests()) on the
+## same selected fits, regime by regime and in all the regimes at once, and
+## differ only in the statistic and in the model the bootstrap draws from.
+## Everything else -- the setup, the models, the selected fit, the seeds, the
+## table of a model and the run -- is here, so that the two run and report in
+## the same way, column for column.
+
+## the settings of the main scripts (fuels-main-setting*.R): keep them equal
+FU_BT <- list(lags = list(own = 1:4, own_other = 1:4, nb = 1:4, nb_other = 1:4),
+              lag_key = "L1t4-1t4-1t4-1t4", band = c(0.025, 0.2), seed = 20261005L, level = 0.95,
+              blocks = c("nb_both", "nb", "nb_other", "own_other"))
+
+## THE SETUP of a script, with the command line over it (--settings=1,2 and
+## so on), the blocks checked and the folders resolved.
+fu_bt_setup <- function(run, here, args = commandArgs(trailingOnly = TRUE)) {
+  for (k in names(run)) {
+    v <- grep(paste0("^--", k, "="), args, value = TRUE)
+    if (!length(v)) next
+    v <- strsplit(sub("^--[^=]+=", "", v[1]), ",")[[1]]
+    run[[k]] <- if (k %in% c("settings", "B", "cores")) as.integer(v) else v
+  }
+  run$blocks <- intersect(FU_BT$blocks, run$blocks)
+  if (!length(run$blocks)) stop("blocks must be among ", paste(FU_BT$blocks, collapse = ", "), call. = FALSE)
+  run$root <- normalizePath(if (nzchar(run$root[1])) run$root[1] else file.path(here, "fuels"),
+                            winslash = "/", mustWork = TRUE)
+  run$out <- if (nzchar(run$out[1])) normalizePath(run$out[1], winslash = "/", mustWork = FALSE) else run$root
+  run
+}
+
+## The models, one row per setting, city and fuel, with K* and phi* from the
+## summary of stage "final"; the quick ones first, so that most results are in
+## early and Rome comes at the end.
+fu_bt_tasks <- function(run) {
+  tasks <- do.call(rbind, lapply(sort(unique(as.integer(run$settings))), function(s) {
+    case <- fu_case_dir(run$root, s)
+    sm <- utils::read.csv(file.path(case, "nn", "final", "summary.csv"), stringsAsFactors = FALSE)
+    data.frame(setting = s, case = case, out_case = file.path(run$out, basename(case)), model = sm$model,
+               city = sub("_.*$", "", sm$model), fuel = names(FU_FUEL)[match(sm$fuel, FU_FUEL)],
+               pumps = sm$pumps, K = sm$K, phi = sm$phi, stringsAsFactors = FALSE)
+  }))
+  if (!identical(run$cities, "all")) tasks <- tasks[tasks$city %in% toupper(run$cities), ]
+  tasks <- tasks[tasks$fuel %in% run$fuels, ]
+  tasks[order(tasks$pumps, tasks$setting), ]
+}
+
+## The design of a model and its selected fit: the grid of stage "grid" (read
+## from the cache of the main scripts) and the two-step rule on the BIC, as in
+## the main scripts; it must give the K* and phi* of the summary.
+fu_bt_selected <- function(tk, sha7) {
+  e <- new.env(); load(file.path(tk$case, "data.RData"), envir = e)
+  des <- fu_design(e$fuels_data[e$fuels_data$city == tk$city, , drop = FALSE], tk$fuel, "nn", FU_BT$lags)
+  rm(e)
+  ic <- readRDS(file.path(tk$case, "nn", "cache", sha7, sprintf("%s_%s_grid.rds", tk$model, FU_BT$lag_key)))
+  sel <- Stem::SCSTEM_Select(ic, band = FU_BT$band, criterion = "BIC")
+  rm(ic); invisible(gc())
+  if (sel$K_selected != tk$K || abs(sel$phi_selected - tk$phi) > 1e-9)
+    stop("the grid of ", tk$model, " does not give the K* and phi* of the summary", call. = FALSE)
+  list(des = des, fit = sel$fit)
+}
+
+## The seed of a model: that of the main scripts (seed_of()), so that the
+## bootstrap of the Wald test is the one of stage "final"; the bootstrap of the
+## LR test of a block draws its own seeds from it.
+fu_bt_seed <- function(tk) FU_BT$seed + 10L * match(tk$city, names(FU_CITY)) + match(tk$fuel, names(FU_FUEL))
+
+## The table of a model and a hypothesis: the statistic of every regime and of
+## all the regimes at once (the last element), against the chi-square and
+## against its bootstrap distribution under the null (null: a list with the
+## draws of every element), p = (1 + #{draws >= statistic}) / (1 + draws).
+fu_bt_table <- function(tk, test, block, stat, df, pumps, null, B, ari = NA_real_, extra = NULL) {
+  K <- length(pumps)
+  out <- data.frame(
+    setting = tk$setting, model = tk$model, test = test, block = block,
+    regime = c(as.character(seq_len(K)), "all"), pumps = c(pumps, sum(pumps)),
+    statistic = stat, df = df, p_chisq = stats::pchisq(stat, df, lower.tail = FALSE),
+    p_boot = vapply(seq_along(stat), function(j) (1 + sum(null[[j]] >= stat[j])) / (1 + length(null[[j]])), 1),
+    B = B, B_valid = vapply(null, length, 1L),
+    null_mean = vapply(null, function(x) if (length(x)) mean(x) else NA_real_, 1),
+    null_q95 = vapply(null, function(x) if (length(x)) unname(stats::quantile(x, 0.95)) else NA_real_, 1),
+    ari_draws_median = ari, stringsAsFactors = FALSE)
+  if (!is.null(extra)) out <- cbind(out, extra)
+  out
+}
+
+## The run: every model in turn (model_fun(tk) returns its table, written to
+## <out>/<case>/nn/final/<model>/<file>), the table printed, and the summary of
+## the setting, <file> with "_summary", rebuilt from all its models done so far.
+fu_bt_run <- function(tasks, model_fun, file, title) {
+  t0 <- Sys.time()
+  for (i in seq_len(nrow(tasks))) {
+    tk <- tasks[i, ]
+    cat(sprintf("%s  [%d/%d] setting %d, %s (%d pumps, K = %d)\n", format(Sys.time(), "%H:%M"), i, nrow(tasks),
+                tk$setting, tk$model, tk$pumps, tk$K))
+    res <- tryCatch(model_fun(tk), error = function(e) e)
+    if (inherits(res, "error")) { cat("  FAILED:", conditionMessage(res), "\n"); next }
+    dir_model <- file.path(tk$out_case, "nn", "final", tk$model)
+    dir.create(dir_model, recursive = TRUE, showWarnings = FALSE)
+    utils::write.csv(res, file.path(dir_model, file), row.names = FALSE)
+    print(res[, c("block", "regime", "pumps", "statistic", "df", "p_chisq", "p_boot", "B_valid")],
+          row.names = FALSE, digits = 3)
+    fs <- Sys.glob(file.path(tk$out_case, "nn", "final", "*", file))
+    utils::write.csv(do.call(rbind, lapply(fs, utils::read.csv, stringsAsFactors = FALSE)),
+                     file.path(tk$out_case, "nn", "final", sub("[.]csv$", "_summary.csv", file)), row.names = FALSE)
+    utils::flush.console()
+  }
+  cat(sprintf("\n%s: all done in %.1f hours\n", title, as.numeric(difftime(Sys.time(), t0, units = "hours"))))
 }

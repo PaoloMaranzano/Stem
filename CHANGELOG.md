@@ -16,6 +16,151 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-17
+
+**The likelihood-ratio test of the fuel application, on converged fits.** The
+run of the three settings (K at most 5, lambda = 0) ended without errors, all
+127 bootstraps with 100 usable draws out of 100. In one of the 66 models,
+Rome gasoline of setting 1, the likelihood-ratio test on the selected partition
+(`fu_lr_fixed()`) gave negative statistics in regime 1 (127 pumps): -335, -351
+and -261 on the three blocks, so that the full model had a lower
+log-likelihood than the restricted ones. The refits of the test started from
+least squares and stopped by the default rule (`em_stop = "any"`), which ends
+the EM algorithm as soon as the parameters move little, even while the
+log-likelihood is still rising: the full model of that regime stopped short.
+The refits of the test now stop only when both criteria are met
+(`em_stop = "all"`, at most 2000 iterations), and the full model of a regime
+is the better of its refit and of the final refit of the selected fit, which
+has the same partition and covariates and starts from the alternation. The
+output reports the log-likelihoods, the source of the full one and the
+convergence of every fit. The bootstrap Wald tests, the main inference, were
+not affected. The settings of the cached test carry a marker, so that a rerun
+of stage final recomputes the test; only Rome gasoline of setting 1 was rerun
+for now, the other 65 models keep the test computed with the default rule.
+
+The rerun did not remove the negative statistics: in regime 1 all the fits
+now converge under the stricter rule, and the full model still ends at
+-57742 (from least squares; the selected fit at -57836) against -57567 to
+-57611 for the restricted ones. The cause is not an early stop but a
+likelihood with several local maxima in the regime: the EM algorithm reaches
+different ones from different starts.
+
+**How common the local maxima are (`fuels-check-optima.R`).** For the 66
+models, the selected partition was refitted regime by regime from least
+squares (em_stop = "all") and set beside the selected fit, whose regimes start
+from the alternation; output `fuels/checks/optima_by_regime.csv`, 25 minutes on
+6 processes. Of 268 regimes (the 5 pooled models have one start only), 191
+agree within 1 unit of log-likelihood; 52 differ by more than 10 and 17 by
+more than 100, every fit converged. Least squares reaches the higher maximum
+in 38 regimes by more than 10, the selected fit in 14. 35 of the 61 models
+with K* > 1 have at least one regime differing by more than 10 (15 of 22 in
+setting 1, 6 of 17 in setting 2, 14 of 22 in setting 3); the share grows with
+the size of the regime (11% of the regimes up to 10 pumps, 47% above 100).
+The two maxima of a regime usually differ in the range of the spatial field
+and the persistence of the latent process (Rome gasoline, setting 3, regime 3:
+theta 5.7e-6 and G = 0.93 in the selected fit, theta 3.7e-3 and G = 0.19 from
+least squares, 264 units higher). The final refit of a regime starts from one
+point (`SCSTEM_Estimation`, Final refit); whether to change it is open.
+
+**The coefficients do not depend on the maximum.** The check was extended to
+the coefficients at the two maxima (with the bootstrap standard errors of the
+selected fit) and to the bootstrap Wald tests at both (on the covariance of the
+same draws); outputs `optima_coefficients.csv` and `optima_wald.csv`, 28
+minutes. In the 52 regimes whose maxima differ by more than 10 units, the
+lag coefficients move by a median of 0.13 to 0.17 bootstrap standard errors;
+of the 416 neighbour coefficients, one moves by more than 2; no significant
+coefficient changes sign. The two maxima differ in the variance parameters
+(range of the spatial field, persistence of the latent process), not in the
+regression. At 5%, the Wald test of the neighbour (both fuels) changes
+decision in 4 of 268 regimes: in two the selected fit is the higher maximum,
+so its decision stands; in the other two the selected fit is the lower one,
+Turin diesel of setting 3 (p = 0.048 against 0.050) and Catania gasoline of
+setting 2 (a regime of 5 pumps, p = 0.39 against 0.027). On this evidence the
+estimates and the bootstrap tests can stand without a rerun (the user's
+preference), the check serving as a robustness note; the decision is the
+user's. The likelihood-ratio test on the fixed partition is the output the
+multiple maxima do affect.
+
+**A bootstrap likelihood-ratio test (`fuels-lr-bootstrap.R`).** To put the
+likelihood-ratio test on the same footing as the bootstrap Wald test, which
+propagates the uncertainty of the partition, its null distribution is now
+obtained by a parametric bootstrap under the null: samples drawn regime by
+regime from the restricted fits (the generator of `SCSTEM_Bootstrap`), SC-STEM
+re-estimated on each at (K*, phi*), the statistic recomputed on the regimes of
+the draw and matched to the observed ones by the majority rule; p-value
+(1 + #{LR* >= LR}) / (1 + B). The two maximized likelihoods are made
+consistent by nested starts: the restricted model from two starts (the full
+estimates without the tested lags, least squares), the full model refitted
+from the restricted solution with the tested lags at zero, so that the
+statistic is never negative. One bootstrap per block imposes the null in all
+the regimes. Only exported functions of Stem are used; by the user's
+decision the test stays in the replication material, and the package is
+left as it is (a joint test on a subset of coefficients is computed by the
+user from the aligned draws of `SCSTEM_BootInference`). Tested on Bari and
+Venice diesel, setting 2 (4 to 6 draws), including the resumption of a
+stopped run.
+
+**The Wald test in a script of the same form (`fuels-wald-bootstrap.R`).** At
+the user's request the two tests are written in parallel: the same header
+(with the table of what each takes from the bootstrap), the same setup, the
+same sections and the same output columns (`test_wald.csv`, `test_lr.csv`,
+and their summaries per setting); the machinery they share is section 10 of
+`fuels-functions.R`. The Wald script reads the bootstrap of stage `final`
+(same seed, same B) and reproduces its statistics exactly (Bari and Venice
+diesel, setting 2); it adds the test in all the regimes at once (the
+coefficients of the K regimes stacked, with their joint bootstrap
+covariance) and a bootstrap p-value from the draws centred at the estimate,
+the counterpart of the p-value of the LR test.
+
+**The old likelihood-ratio test leaves the main scripts.** With the user's
+approval, `fu_lr_fixed()` (the test on the fixed partition with the chi-square
+reference) is removed from `fuels-functions.R` and from stage `final` of the
+three main scripts, and the change of the morning (EM rule and start from the
+selected fit) is undone with it: the bootstrap LR test of
+`fuels-lr-bootstrap.R` replaces it. The 66 files `lr_fixed_partition.csv`
+already written stay where they are.
+
+**The bootstrap LR test failed on the other machine.** Run with Source in an
+open RStudio session, every model stopped at once ("the restricted model of a
+regime could not be fitted"), while the same script ran here from a terminal
+and through `source()`. The fits of the test call `STEM_Model()` and
+`STEM_Estimation()` in the session itself, and the likely cause is another
+version of Stem loaded in that session: `fu_require_stem()` checked the
+version installed, not the one loaded. It now also stops, with a message to
+restart R, when the loaded Stem is not the pinned one; and a failed fit of the
+LR test reports its error instead of a bare NULL.
+
+**The analysis of the application (`fuels-analysis.R`) and its text.** A new
+script reads the outputs of the 66 models (the Wald tests regime by regime,
+the bootstraps, the regimes, the pulses, the pump-by-pump tests, the
+diagnostics, the check of the local maxima) and writes the tables and figures
+of Section 5 of the paper and of a new Supplementary Material C, the
+Application Supplement. The long-run pass-through from the neighbour,
+lambda_k = sum_l d_kl / (1 - sum_l b_kl), and its percentile interval come
+from the aligned draws of the bootstrap of stage `final`. Findings, Wald only
+(the LR test is running): the neighbour leads in 83% of the regimes of setting
+3 (major after another major; 89-93% of the pumps, long-run pass-through median
+0.15-0.17), 68% in setting 1 and 56% in setting 2; the regimes are pricing
+groups of the brands rather than areas (phi* = 0 in 29 models, ARI with the
+brands median 0.24, one Eni-only regime in 25 of the 44 models of settings 1
+and 3); Eni-dominated regimes follow less (72% against 86% in setting 3); the
+pooled model misses the leadership in 9 city-fuel-settings where most pumps
+follow, and attributes it to the whole city in 5 where a minority does; the
+2022 excise cut and its end pass through very unevenly across the regimes of a
+city (spread about 25 cents in the week), the small changes of 2025-2026
+uniformly. Paper: Section 5 rewritten (questions, data, model, results,
+implications; three figures and one table), the abstract and the outline
+mention the application, Section 3.3 points to the new Section A7.
+
+**Supplement A, Section A7: tests of several coefficients under the
+bootstrap.** The Wald test (the bootstrap gives the covariance; with the draws
+centred at the estimate, also the null distribution) and the likelihood-ratio
+test (the bootstrap of the restricted model gives the null distribution), with
+the classical F test as the exact case they generalize, the nested fits that
+make the LR statistic immune to local maxima, and a table setting the two side
+by side. Simulation experiments and code move to A8 and A9; the code section
+lists the scripts of the application.
+
 ### 2026-10-13
 
 **At most five regimes in the fuel application (night).** With the cap of
