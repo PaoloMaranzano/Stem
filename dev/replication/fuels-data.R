@@ -27,7 +27,7 @@
 ##                    smoother of a pooled STEM model of each city and fuel,
 ##                    used only to build the lags        -> <root>/common/completed.rds
 ##   4. pairs         the radius r* of each city (correlogram of the prices
-##                    centred on the metropolitan mean) and, for each setting,
+##                    centered on the metropolitan mean) and, for each setting,
 ##                    the nearest X and the X within r* of every Y
 ##                                                       -> <root>/common/pairs.rds
 ##   5. cases         the data.frame of each case        -> <root>/<case>/data.RData
@@ -76,7 +76,7 @@ CFG <- fu_config(list(
   ## completion of stage 3 (stage 2 counts how many).
   presample_from = "2021-01-04", # a Monday, 52 weeks before `from`
   metros      = names(FU_CITY),  # the eleven cities
-  d_link      = 50,              # metres: successive codes closer than this are one site
+  d_link      = 50,              # meters: successive codes closer than this are one site
   overlap     = 7L,              # days two successive codes may overlap
   link_gap    = 120L,            # days that may separate successive codes
   min_cover   = 0.95,            # both prices on at least 95% of the days
@@ -295,11 +295,11 @@ PULSES <- fu_pulses(WEEKS)
 ## ===========================================================================
 ## Stage 2. Weekly relative prices
 ## ===========================================================================
-## For each city and fuel, sites x weeks in cents per litre, presample and
+## For each city and fuel, sites x weeks in cents per liter, presample and
 ## window: the Sunday price minus the NATIONAL mean of that Sunday, minus the
 ## pump mean over the window (decided: the national centring leaves to the
 ## latent process the movement common to the city). A Sunday without a report
-## stays NA. The same prices centred on the METROPOLITAN mean are kept for the
+## stays NA. The same prices centered on the METROPOLITAN mean are kept for the
 ## radius r* only.
 F_WEEKLY <- file.path(COM, "weekly.rds")
 if (run_stage("weekly", F_WEEKLY)) {
@@ -368,7 +368,7 @@ CP <- readRDS(F_COMP)
 ## ===========================================================================
 ## Stage 4. The radius r* and the pairs
 ## ===========================================================================
-## r* of each city: the correlogram of the weekly prices centred on the
+## r* of each city: the correlogram of the weekly prices centered on the
 ## metropolitan mean (pairwise-complete weeks), both fuels; r* is the distance
 ## at which the excess correlation over the plateau (pairs beyond 10 km)
 ## halves. For each setting and each Y: the nearest X, and every X within r*.

@@ -2,7 +2,7 @@
 ## SC-STEM fuel application: MAIN SCRIPT, SETTING 2
 ##
 ##   Y  an independent pump (pompa bianca)
-##   X  its neighbour among the pumps of the major brands (Eni, Api-Ip, Esso, Q8,
+##   X  its neighbor among the pumps of the major brands (Eni, Api-Ip, Esso, Q8,
 ##      Tamoil)
 ##
 ## Question: do the major-brand pumps lead the independent pumps near them, on
@@ -19,12 +19,12 @@
 ##
 ##   y*_t = a_g + sum_l b_gl y*_{t-l}        own lags, fuel f
 ##              + sum_l c_gl y*o_{t-l}       own lags, the other fuel
-##              + sum_l d_gl x*_{t-l}        the neighbour X, fuel f
-##              + sum_l e_gl x*o_{t-l}       the neighbour X, the other fuel
+##              + sum_l d_gl x*_{t-l}        the neighbor X, fuel f
+##              + sum_l e_gl x*o_{t-l}       the neighbor X, the other fuel
 ##              + pulses of the excise duties
 ##              + latent AR(1) of the regime + spatially correlated error
 ##
-## with y* the weekly relative prices (cents per litre; Sunday price minus the
+## with y* the weekly relative prices (cents per liter; Sunday price minus the
 ## national mean, minus the pump mean). The response keeps its missing weeks,
 ## which the Kalman filter handles; the lags come from the completed series
 ## (fuels-data.R, stage 3).
@@ -55,7 +55,7 @@
 ##   final   the refit-with-clustering bootstrap of the model at lambda = 0,
 ##           of the model at lambda* and of the pooled model; the tests, all at
 ##           lambda = 0 (bootstrap Wald by regime, pump by pump F and HC1,
-##           Dumitrescu-Hurlin; the bootstrap LR test is fuels-lr-bootstrap.R); the lag
+##           Dumitrescu-Hurlin; the bootstrap Wald test also fuels-wald-bootstrap.R); the lag
 ##           coefficients at lambda* beside those at lambda = 0; the completed
 ##           response at both; the diagnostics, the pulses, the maps.
 ##   all     grid, lambda and final one after the other, in one process.
@@ -119,7 +119,7 @@ SETTING <- 2L
 CFG <- fu_config(list(
   root        = file.path(HERE, "fuels"),
   stage       = "lags",            # "lags", "grid", "lambda", "final", "all", "summary" or "dry"
-  ## The neighbour X: "nn" the nearest pump of the X set; "rs" the mean of the X
+  ## The neighbor X: "nn" the nearest pump of the X set; "rs" the mean of the X
   ## set within r* (the nearest when r* holds none). "nn" is the main analysis
   ## in every setting, "rs" a check here, where r* often holds several X and
   ## their mean is a different object from the nearest pump.
@@ -128,7 +128,7 @@ CFG <- fu_config(list(
   fuels       = c("g", "d"),       # the fuel of Y: g gasoline, d diesel
   m           = 5L,                # the smallest regime: K_max = min(k_cap, floor(n / m))
   k_cap       = 5L,                # the cap on the number of regimes
-  knn         = 5L,                # neighbours of the graph of the Potts penalty
+  knn         = 5L,                # neighbors of the graph of the Potts penalty
   phi_grid    = c(0, 0.025, 0.05, 0.1, 0.2, 0.5, 1),
   band        = c(0.025, 0.2),     # the band of the two-step rule
   ## the ridge penalties of stage "lambda" and the criterion choosing among
@@ -459,8 +459,8 @@ final_one <- function(M) {
 
   ## 3. the tests, all at lambda = 0: bootstrap Wald regime by regime, for the
   ##    selected and the pooled model; pump by pump, F and HC1, with the
-  ##    Dumitrescu-Hurlin combination (the bootstrap LR test is
-  ##    fuels-lr-bootstrap.R, the bootstrap Wald test also fuels-wald-bootstrap.R)
+  ##    Dumitrescu-Hurlin combination (the bootstrap Wald test also
+  ##    fuels-wald-bootstrap.R)
   tests <- fu_tests(des)
   wald <- function(fit, b, label) if (!is.null(b)) do.call(rbind, lapply(names(tests), function(h)
     cbind(model = label, fu_wald_boot(fit, b$inf, des, tests[[h]], h))))
@@ -524,7 +524,7 @@ final_one <- function(M) {
                     min_grid = fu_minutes(g$ic), min_lambda = fu_minutes(lam), min_boot = fu_minutes(b0),
                     stem = SHA7, stringsAsFactors = FALSE)
   saveRDS(row, file.path(od, "summary_row.rds"))
-  message(sprintf("   K* = %d, phi* = %s, lambda* = %s | neighbour -> Y, p by regime: %s", K,
+  message(sprintf("   K* = %d, phi* = %s, lambda* = %s | neighbor -> Y, p by regime: %s", K,
                   format(sel$phi_selected), format(lam$lambda), row$p_nb_both_regimes))
   invisible(row)
 }

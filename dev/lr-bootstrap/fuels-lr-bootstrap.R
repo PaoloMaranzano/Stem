@@ -1,10 +1,13 @@
 ## ===========================================================================
 ## SC-STEM fuel application: THE BOOTSTRAP LIKELIHOOD-RATIO TEST
 ##
+## Not part of the paper or of the replication material (decision of
+## 2026-10-20): the results are kept for a possible request of a referee.
+##
 ## The two bootstrap tests of leadership, this one and fuels-wald-bootstrap.R,
 ## are post-estimation inference on the selected fit of a model: the same
 ## hypotheses (the blocks of lags of fu_tests(): in a regime, the lags of the
-## neighbour have zero coefficients), the same regimes, the same tables. Both
+## neighbor have zero coefficients), the same regimes, the same tables. Both
 ## propagate the uncertainty of the estimated partition, by re-estimating
 ## SC-STEM at (K*, phi*) on every bootstrap sample and matching the regimes of
 ## the sample to the observed ones by the majority rule. They differ in the
@@ -14,7 +17,7 @@
 ##   statistic     W_k = b_k' V_k^-1 b_k             LR_k = 2 (l_full,k - l_restr,k)
 ##   draws from    the fitted model                  the restricted model (the null)
 ##   the bootstrap the covariance V_k of the         the distribution of LR_k
-##   gives         coefficients and, centred at      under the null
+##   gives         coefficients and, centered at      under the null
 ##                 the estimate, the distribution
 ##                 of W_k under the null
 ##   p_chisq       W_k against chi-square(q)         LR_k against chi-square(q)
@@ -80,7 +83,7 @@ RUN <- list(
   ## the fuel of Y: "g" gasoline, "d" diesel
   fuels    = c("g", "d"),
   ## the hypotheses (blocks of lags of fu_tests()): "nb_both" (the lags of the
-  ## neighbour, both fuels: the leadership test of the paper), "nb", "nb_other",
+  ## neighbor, both fuels: the leadership test of the paper), "nb", "nb_other",
   ## "own_other"
   blocks   = "nb_both",
   ## bootstrap draws (stage "final" of the main scripts uses 100)
@@ -108,6 +111,9 @@ HERE <- local({
   }
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
+## kept outside the replication material (dev/lr-bootstrap): the functions
+## and the fuels folder are those of dev/replication
+if (!file.exists(file.path(HERE, "fuels-functions.R"))) HERE <- file.path(dirname(HERE), "replication")
 source(file.path(HERE, "fuels-functions.R"))
 RUN <- fu_bt_setup(RUN, HERE)
 SHA7 <- fu_require_stem()

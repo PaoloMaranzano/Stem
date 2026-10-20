@@ -91,9 +91,9 @@ GEO <- data.frame(code   = c("0", "0.7", "1b", "1"),
                   stringsAsFactors = FALSE)
 GEO$nu <- NU_TOT - mapply(function(om, sp)
   dgp_centre_var(3L, if (sp == "regime") SIM_REFERENCE$omega else om), GEO$omega, GEO$spread)
-## share of the locations of a regime nearer the centre of another regime, by
+## share of the locations of a regime nearer the center of another regime, by
 ## Monte Carlo on a fixed seed (a draw from N(mu_g, nu I) falls outside the
-## 120-degree wedge of its own centre)
+## 120-degree wedge of its own center)
 GEO$share_other <- vapply(seq_len(nrow(GEO)), function(i) {
   if (GEO$omega[i] == 0) return(2 / 3)
   mu <- dgp_centres(3L, GEO$omega[i])
@@ -142,7 +142,7 @@ for (i in seq_len(nrow(GEO))) {
                     mu[g, 2] + 2 * sqrt(GEO$nu[i]) * sin(th), col = RC[g], lty = 2)
     graphics::points(mu[g, 1], mu[g, 2], pch = 3, col = INK, cex = 1.4, lwd = 2)
   }
-  graphics::title(sprintf("(%s) %s: omega = %s, spread fixed %s\ncentres %.1f apart, regime sd %.2f, %.0f%% of the locations nearer another centre",
+  graphics::title(sprintf("(%s) %s: omega = %s, spread fixed %s\ncenters %.1f apart, regime sd %.2f, %.0f%% of the locations nearer another center",
                           letters[i], GEO$label[i], format(GEO$omega[i]),
                           if (GEO$spread[i] == "total") "over the network" else "within a regime",
                           2 * GEO$omega[i], sqrt(GEO$nu[i]), 100 * GEO$share_other[i]),
@@ -224,8 +224,8 @@ map_col <- function(v, lim) {
   cl <- grDevices::hcl.colors(21, "Blue-Red 2")
   cl[findInterval(pmax(pmin(v, lim - 1e-9), -lim + 1e-9), seq(-lim, lim, length.out = 22))]
 }
-## one colour scale per kind of map, common to the two data sets
-## (the 90th percentile of the absolute values, beyond which the colour saturates)
+## one color scale per kind of map, common to the two data sets
+## (the 90th percentile of the absolute values, beyond which the color saturates)
 lim_mean <- stats::quantile(unlist(lapply(draws, function(dd) { m <- colMeans(dd$z); abs(m - mean(m)) })), 0.9)
 lim_err  <- stats::quantile(unlist(lapply(draws, function(dd) abs(dd$z[TT, ] - dd$mu[TT, ]))), 0.9)
 fig_open("fig_sim_data.png", 12, 11)
@@ -266,7 +266,7 @@ fig_close("fig_sim_data.png")
 ## ===========================================================================
 ## Figure: the correlations and their decay
 ## ===========================================================================
-## nearest-neighbour spacing of a network of n locations at the reference
+## nearest-neighbor spacing of a network of n locations at the reference
 nn_spacing <- vapply(SIM_BLOCKS$core$n, function(n) {
   xy <- dgp_locations(n, 3L, SIM_REFERENCE$omega, seed = 1001L)$coords
   D <- as.matrix(stats::dist(xy)); diag(D) <- Inf
@@ -282,7 +282,7 @@ for (lv in c("S1-weak", "S1-strong")) {
   for (g in 1:3)
     graphics::lines(hh, psi$so[g] / (psi$se[g] + psi$so[g]) * exp(-psi$theta[g] * hh), col = RC[g], lwd = 2)
   graphics::abline(v = nn_spacing, col = GREY, lty = 3)
-  graphics::text(max(nn_spacing), 0.02, sprintf("nearest-neighbour spacing\nat n = %s",
+  graphics::text(max(nn_spacing), 0.02, sprintf("nearest-neighbor spacing\nat n = %s",
                                                  paste(rev(SIM_BLOCKS$core$n), collapse = ", ")),
                  pos = 4, cex = 0.7, col = GREY)
   graphics::legend("topright", bty = "n", lwd = 2, col = RC, cex = 0.8,
@@ -357,7 +357,7 @@ tex_write(c(lines, "\\bottomrule", "\\end{tabular}"), "tab_sim_scenarios.tex")
 ## Table: the four geometries
 ## ===========================================================================
 tex_write(c("\\begin{tabular}{lcl rrrrr}", "\\toprule",
-            "geometry & $\\omega$ & fixed spread & centre distance & regime sd & distance in sd & nearer another centre & network sd \\\\",
+            "geometry & $\\omega$ & fixed spread & center distance & regime sd & distance in sd & nearer another center & network sd \\\\",
             "\\midrule",
             sprintf("%s & %s & %s & %s & %s & %s & %s\\%% & %s \\\\", GEO$label, fmt(GEO$omega, 1),
                     ifelse(GEO$spread == "total", "network", "regime"), fmt(2 * GEO$omega), fmt(sqrt(GEO$nu)),
@@ -412,7 +412,7 @@ all_cells <- sim_cells(cfg_all, SIM_BLOCKS)
 blk_desc <- c(core    = "$n \\in \\{40, 100, 200\\}$, $T \\in \\{60, 120, 365\\}$, $\\omega \\in \\{0, 0.7, 1\\}$",
               spread  = "$n$ and $T$ as the core, $\\omega = 1$ with the spread of a regime fixed",
               balance = "regime sizes $1:2:3$",
-              knn     = "$m \\in \\{3, 10\\}$ neighbours",
+              knn     = "$m \\in \\{3, 10\\}$ neighbors",
               n400    = "$n = 400$")
 cnt <- table(factor(all_cells$block, levels = names(SIM_BLOCKS)))
 tex_write(c("\\begin{tabular}{ll r}", "\\toprule",

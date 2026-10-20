@@ -107,7 +107,7 @@ CORE_OM <- SIM_BLOCKS$core$omega
 ## The four geometries of the core, from the most to the least overlapping: the
 ## overlap omega and what is held fixed as it grows (spread = "total": the
 ## variance of the whole network; "regime": the variance within a regime).
-## Share of the locations nearer the centre of another regime: 67, 32, 20, 10%.
+## Share of the locations nearer the center of another regime: 67, 32, 20, 10%.
 GEO_LEV <- c("0", "0.7", "1b", "1")
 GEO_LAB <- c("0" = "total overlap", "0.7" = "medium-high overlap",
              "1b" = "medium-low overlap", "1" = "strong separation")
@@ -551,7 +551,7 @@ if (!is.null(rob) && length(unique(rob$arm)) > 1) {
   graphics::mtext("Robustness: one factor of the design changed at a time, the others kept at the reference cell",
                   outer = TRUE, side = 3, line = 1.9, cex = 1.0, font = 2, col = INK)
   graphics::mtext(paste("reference cell: d = 100 locations, T = 120, medium-high overlap, balanced regimes,",
-                        "m = 5 neighbours; boxplots over the replications; S2 has no partition"),
+                        "m = 5 neighbors; boxplots over the replications; S2 has no partition"),
                   outer = TRUE, side = 3, line = 0.6, cex = 0.85, col = GREY)
   fig_close("fig_sim_robustness.png")
   cat("\n")
@@ -671,7 +671,7 @@ if (!is.null(G) && "ari" %in% names(G)) {
     graphics::mtext("Recovery of the partition against the spatial penalty",
                     outer = TRUE, side = 3, line = 1.8, cex = 1.0, font = 2, col = INK)
     graphics::mtext(paste("reference cell: d = 100 locations, T = 120, medium-high overlap,",
-                          "balanced regimes, m = 5 neighbours; boxplots over the replications"),
+                          "balanced regimes, m = 5 neighbors; boxplots over the replications"),
                     outer = TRUE, side = 3, line = 0.5, cex = 0.82, col = GREY)
     fig_close("fig_sim_penalty.png")
   } else cat("R6: no grid at the reference yet\n")

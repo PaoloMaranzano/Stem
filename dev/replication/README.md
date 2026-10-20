@@ -15,21 +15,20 @@ disconnected from its sources.
 
 The fuel-price application of the paper: local leaders and followers among the
 pumps of the eleven metropolitan cities, in three settings (Y a major-brand pump
-and X its independent neighbour; Y independent and X a major; Y a major and X a
+and X its independent neighbor; Y independent and X a major; Y a major and X a
 major of another brand), on the weekly relative prices of the two fuels, with
-the pass-through of the excise duties by regime and the behaviour on small
+the pass-through of the excise duties by regime and the behavior on small
 samples from the same fits.
 
 | script | what it does |
 |---|---|
 | `fuels-functions.R` | the auxiliary functions, sourced by the others |
 | `fuels-data.R` | data management, in five cached stages: the pre-treatment of the station-level file (the register of the notes), the weekly relative prices with their gaps, the Kalman completion of the gaps (for the lags), the radius r* and the pairs, and one data.frame per case, `fuels/<case>/data.RData` |
-| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbour, in four stages: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`); at lambda = 0, the grid of (K, phi) and the two-step rule on the BIC (`--stage=grid`); on that partition, the ridge penalty chosen by the AIC (`--stage=lambda`); the bootstrap at lambda = 0, at lambda* and of the pooled model, the tests (all at lambda = 0), the ridge estimates beside the MLE and the completed response (`--stage=final`); outputs in the folder of the case |
-| `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbour (also the case of the small samples) |
-| `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbour of another major brand |
+| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbor, in four stages: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`); at lambda = 0, the grid of (K, phi) and the two-step rule on the BIC (`--stage=grid`); on that partition, the ridge penalty chosen by the AIC (`--stage=lambda`); the bootstrap at lambda = 0, at lambda* and of the pooled model, the tests (all at lambda = 0), the ridge estimates beside the MLE and the completed response (`--stage=final`); outputs in the folder of the case |
+| `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbor (also the case of the small samples) |
+| `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbor of another major brand |
 | `fuels-run.R` | the launcher: choose in its setup the settings (1, 2, 3 or all), the cities, the fuels, the stage, the processes and whether to run the ridge (`ridge = FALSE`, the analysis of the paper, fits and bootstraps at lambda = 0 only), then press Source in RStudio (or `Rscript fuels-run.R`); every run is a main script in an R process of its own, with its log in `fuels/logs/`, and the tables of every setting are rebuilt at the end |
-| `fuels-wald-bootstrap.R` | the bootstrap Wald test of leadership, regime by regime and in all the regimes at once: the coefficients of the selected fit against the covariance of the refit-with-clustering bootstrap of stage `final` (read from its cache, or computed with the same seed), p-values from the chi-square and from the draws centred at the estimate; `test_wald.csv` per model, `test_wald_summary.csv` per setting |
-| `fuels-lr-bootstrap.R` | the bootstrap likelihood-ratio test of the same hypotheses: the statistic with nested starts (never negative), its null distribution from samples drawn from the restricted model with SC-STEM re-estimated on each, p-values from the chi-square and from the draws; resumable; `test_lr.csv` per model, `test_lr_summary.csv` per setting. The two scripts have the same setup, the same sections and the same tables (their common machinery is section 10 of `fuels-functions.R`) |
+| `fuels-wald-bootstrap.R` | the bootstrap Wald test of leadership, regime by regime and in all the regimes at once: the coefficients of the selected fit against the covariance of the refit-with-clustering bootstrap of stage `final` (read from its cache, or computed with the same seed), p-values from the chi-square and from the draws centered at the estimate; `test_wald.csv` per model, `test_wald_summary.csv` per setting |
 | `fuels-check-optima.R` | the check of the local maxima of the selected fits: every regime refitted from least squares beside the selected fit, with the coefficients and the Wald tests at both maxima (`fuels/checks/`) |
 
 Run `fuels-data.R` once, then each main script stage by stage, or all the

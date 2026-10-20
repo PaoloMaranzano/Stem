@@ -1,28 +1,16 @@
 ## ===========================================================================
 ## SC-STEM fuel application: THE BOOTSTRAP WALD TEST
 ##
-## The two bootstrap tests of leadership, this one and fuels-lr-bootstrap.R,
-## are post-estimation inference on the selected fit of a model: the same
-## hypotheses (the blocks of lags of fu_tests(): in a regime, the lags of the
-## neighbour have zero coefficients), the same regimes, the same tables. Both
-## propagate the uncertainty of the estimated partition, by re-estimating
-## SC-STEM at (K*, phi*) on every bootstrap sample and matching the regimes of
-## the sample to the observed ones by the majority rule. They differ in the
-## statistic and in what the bootstrap is asked for:
-##
-##                 Wald                              LR
-##   statistic     W_k = b_k' V_k^-1 b_k             LR_k = 2 (l_full,k - l_restr,k)
-##   draws from    the fitted model                  the restricted model (the null)
-##   the bootstrap the covariance V_k of the         the distribution of LR_k
-##   gives         coefficients and, centred at      under the null
-##                 the estimate, the distribution
-##                 of W_k under the null
-##   p_chisq       W_k against chi-square(q)         LR_k against chi-square(q)
-##   p_boot        share of the W*_k >= W_k          share of the LR*_k >= LR_k
+## The test of leadership is post-estimation inference on the selected fit of
+## a model: the hypotheses are the blocks of lags of fu_tests() (in a regime,
+## the lags of the neighbor have zero coefficients). The test propagates the
+## uncertainty of the estimated partition, because the bootstrap re-estimates
+## SC-STEM at (K*, phi*) on every sample and matches the regimes of the sample
+## to the observed ones by the majority rule.
 ##
 ## Row "all" is the hypothesis in all the regimes at once, on q K degrees of
 ## freedom: the coefficients of the K regimes stacked, with their joint
-## bootstrap covariance (Wald); the sum of the K statistics (LR).
+## bootstrap covariance.
 ##
 ## THE WALD TEST, for one model and one hypothesis (q lags):
 ##   1. on the data: the coefficients b_k of the q lags in every regime k of
@@ -36,7 +24,7 @@
 ##      differs;
 ##   3. V_k, the covariance of the draws of b_k, and W_k = b_k' V_k^-1 b_k;
 ##   4. p_chisq against the chi-square on q degrees of freedom; p_boot against
-##      the draws W*_kb = (b*_kb - b_k)' V_k^-1 (b*_kb - b_k): centred at the
+##      the draws W*_kb = (b*_kb - b_k)' V_k^-1 (b*_kb - b_k): centered at the
 ##      estimate, a draw reproduces the deviation of b_k from its true value,
 ##      which is what W_k measures when the null holds.
 ##
@@ -72,7 +60,7 @@ RUN <- list(
   ## the fuel of Y: "g" gasoline, "d" diesel
   fuels    = c("g", "d"),
   ## the hypotheses (blocks of lags of fu_tests()): "nb_both" (the lags of the
-  ## neighbour, both fuels: the leadership test of the paper), "nb", "nb_other",
+  ## neighbor, both fuels: the leadership test of the paper), "nb", "nb_other",
   ## "own_other"
   blocks   = "nb_both",
   ## bootstrap draws (stage "final" of the main scripts uses 100)
@@ -106,7 +94,7 @@ SHA7 <- fu_require_stem()
 
 ## --- the statistic --------------------------------------------------------------
 ## The Wald statistic of the coefficients est, with the covariance of their
-## bootstrap draws D (one row per draw), and its draws centred at est.
+## bootstrap draws D (one row per draw), and its draws centered at est.
 wd_stat <- function(est, D) {
   if (nrow(D) <= length(est)) return(list(stat = NA_real_, null = numeric(0), se = rep(NA_real_, length(est))))
   V <- stats::cov(D)

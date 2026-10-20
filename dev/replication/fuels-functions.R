@@ -6,22 +6,22 @@
 ## Nothing here runs on its own: every function is called from those scripts.
 ##
 ## The application in one paragraph. In the eleven metropolitan cities, for
-## every pump Y of a set (major brands, or independents) and its neighbour X of
+## every pump Y of a set (major brands, or independents) and its neighbor X of
 ## another set, the weekly relative price of Y on one fuel is regressed on four
 ## blocks of lags -- its own price on that fuel, its own price on the other
-## fuel, the neighbour's price on that fuel, the neighbour's price on the other
+## fuel, the neighbor's price on that fuel, the neighbor's price on the other
 ## fuel -- plus the pulses of the changes of the excise duties, within an
 ## SC-STEM model: a latent AR(1) process per regime and a spatially correlated
 ## error. The three settings:
 ##
-##   setting 1  Y a major-brand pump,  X its neighbour among the independents
-##   setting 2  Y an independent pump, X its neighbour among the major brands
-##   setting 3  Y a major-brand pump,  X its neighbour among the OTHER major brands
+##   setting 1  Y a major-brand pump,  X its neighbor among the independents
+##   setting 2  Y an independent pump, X its neighbor among the major brands
+##   setting 3  Y a major-brand pump,  X its neighbor among the OTHER major brands
 ##
-## The questions: does the neighbour lead Y (the two neighbour blocks), on the
+## The questions: does the neighbor lead Y (the two neighbor blocks), on the
 ## same fuel or across fuels; does the relation differ across spatial regimes;
 ## and, from the same fits, the pass-through of the excise duties by regime
-## (the pulse coefficients) and the behaviour on small samples (setting 2,
+## (the pulse coefficients) and the behavior on small samples (setting 2,
 ## 6 to 71 independents per city).
 ##
 ## Contents
@@ -36,10 +36,10 @@
 ##   8. tests, diagnostics and tables of the fitted models
 ##   9. bookkeeping
 ##
-## Conventions. Prices are in cents per litre. A "relative price" is the
+## Conventions. Prices are in cents per liter. A "relative price" is the
 ## Sunday price minus the national mean of that Sunday, minus the mean of the
 ## pump over the window. Matrices of series are sites x weeks. Distances are
-## geodesic, in metres for the package and in kilometres for the pairs.
+## geodesic, in meters for the package and in kilometers for the pairs.
 ##
 ## This is part of the REPLICATION MATERIAL of the paper, not of the Stem
 ## package. The code uses data.table (attached by the scripts) and calls every
@@ -88,8 +88,8 @@ FU_CASES <- data.frame(
 ## and the other fuel o:
 ##   own       Y's own price on f            (column y<f>_c, completed)
 ##   own_other Y's own price on o            (column y<o>_c, completed)
-##   nb        the neighbour's price on f    (column x<f>_<xdef>)
-##   nb_other  the neighbour's price on o    (column x<o>_<xdef>)
+##   nb        the neighbor's price on f    (column x<f>_<xdef>)
+##   nb_other  the neighbor's price on o    (column x<o>_<xdef>)
 FU_BLOCKS <- c("own", "own_other", "nb", "nb_other")
 
 ## Where the script that sources this file sits: from Rscript, or from Source
@@ -169,7 +169,7 @@ fu_case_dir <- function(root, setting) {
 fu_sundays <- function(days) which(format(days, "%u") == "7")
 
 ## Weekly relative prices of the sites of a city, sites x weeks, in cents per
-## litre. P is the daily price matrix of one fuel (sites x days, NA where the
+## liter. P is the daily price matrix of one fuel (sites x days, NA where the
 ## site did not report), ref the daily reference mean of the same fuel (the
 ## national mean of all reporting non-highway pumps, or the metropolitan one).
 ## The Sunday price is taken as it is: a Sunday without a report stays NA, and
@@ -199,7 +199,7 @@ fu_pulses <- function(weeks, events = FU_EVENTS) {
 }
 
 ## Coordinates of a set of sites as the package wants them (longitude,
-## latitude); sites at identical coordinates are moved by a few centimetres, so
+## latitude); sites at identical coordinates are moved by a few centimeters, so
 ## that the spatial covariance stays non-singular.
 fu_coords <- function(meta) {
   co <- cbind(lon = meta$lon, lat = meta$lat)
@@ -237,7 +237,7 @@ fu_complete <- function(Y, meta, pulses) {
   b <- ols$coefficients; b[!is.finite(b)] <- 0
   s2 <- stats::var(ols$residuals)
   co <- fu_coords(meta)
-  dm <- stats::median(geodist::geodist(co, measure = "geodesic"))   # metres
+  dm <- stats::median(geodist::geodist(co, measure = "geodesic"))   # meters
   mod <- Stem::STEM_Model(z = z, covariates = X, coordinates = co,
                           phi = list(beta = matrix(b, ncol = 1), sigma2eps = 0.6 * s2,
                                      sigma2omega = 0.4 * s2, theta = 3 / dm,
@@ -262,7 +262,7 @@ fu_complete <- function(Y, meta, pulses) {
 ## ===========================================================================
 
 ## The correlogram of a city: pairwise Pearson correlation of the weekly prices
-## centred on the METROPOLITAN mean (the cleaner reference for local
+## centered on the METROPOLITAN mean (the cleaner reference for local
 ## interaction, notes Section "Exploration"), against distance, binned. M:
 ## sites x weeks; Dkm: distances in km. Pairwise-complete weeks.
 fu_correlogram <- function(M, Dkm, bins = c(0, .5, 1, 1.5, 2, 3, 4, 5, 7.5, 10, 15, 20, 30)) {
@@ -366,7 +366,7 @@ fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses
 ##   ACF  of Y's own price on f                 (own block)
 ##   PACF of Y's own price on f                 (own block, net of the shorter lags)
 ##   CCF  cor(y_t, z_{t-l}) with z = Y's own price on the other fuel (own_other),
-##        the neighbour's price on f (nb) and on the other fuel (nb_other)
+##        the neighbor's price on f (nb) and on the other fuel (nb_other)
 ## at the lags `lags` (by default 1 to 8 and the annual lag 52). For each lag:
 ## the median, the quartiles and the share of pumps whose coefficient exceeds
 ## the band 2 / sqrt(T) in absolute value, against about 5% by chance.
@@ -415,7 +415,7 @@ fu_series <- function(dfc, fuel, xdef) {
 ## cross-correlations against the lag, with the interquartile band of the
 ## pumps and the band 2 / sqrt(T); and lag plots, pooled over the pumps of the
 ## city (smoothed scatter): y_t against y_{t-1}, y_{t-2}, y_{t-4}, y_{t-52},
-## and against the neighbour's price on the same fuel at t-1.
+## and against the neighbor's price on the same fuel at t-1.
 fu_lag_plots <- function(dfc, fuel, xdef, st) {
   S <- fu_series(dfc, fuel, xdef)
   Tn <- nrow(S$own); band <- 2 / sqrt(Tn)
@@ -442,7 +442,7 @@ fu_lag_plots <- function(dfc, fuel, xdef, st) {
   }
   for (l in c(1, 2, 4)) lp(l, S$own, sprintf("y_{t-%d}", l))
   if (Tn > 60) lp(52, S$own, "y_{t-52}") else graphics::plot.new()
-  lp(1, S$nb, "neighbour, same fuel, t-1")
+  lp(1, S$nb, "neighbor, same fuel, t-1")
   graphics::mtext(sprintf("%s, %s (Y), X %s: %d pumps, %d weeks", FU_CITY[dfc$city[1]],
                           FU_FUEL[[fuel]], xdef, ncol(S$own), Tn),
                   side = 3, outer = TRUE, line = -1.2, cex = 0.8)
@@ -587,7 +587,7 @@ fu_lambda <- function(des, sel, lambdas, cfg, seed, ic = "AIC") {
 
 ## The estimates of the lag coefficients at lambda* beside those at lambda = 0,
 ## regime by regime, with their bootstrap standard errors: how far the ridge
-## moves each coefficient (shift, in cents per litre per cent of the lagged
+## moves each coefficient (shift, in cents per liter per cent of the lagged
 ## price) and how much it narrows its bootstrap spread (se ratio). A
 ## description of the ridge; the tests are those at lambda = 0. The regimes of
 ## the two fits are the same partition, so their labels coincide.
@@ -612,10 +612,10 @@ fu_ridge_table <- function(inf0, infL, des) {
 
 ## The hypotheses tested, as sets of columns of the design. Each is the null
 ## that the coefficients of those lags are all zero:
-##   nb_both    the neighbour does not lead Y (its two fuels together): THE
+##   nb_both    the neighbor does not lead Y (its two fuels together): THE
 ##              leader-follower question
-##   nb         the neighbour does not lead Y on the same fuel
-##   nb_other   the neighbour does not lead Y across fuels
+##   nb         the neighbor does not lead Y on the same fuel
+##   nb_other   the neighbor does not lead Y across fuels
 ##   own_other  Y's own price on the other fuel does not lead its price on this
 ##              one (the multi-product link within the station)
 fu_tests <- function(des) {
@@ -664,7 +664,7 @@ fu_subset_design <- function(des, keep) {
 
 ## The pump-by-pump benchmark: for every pump Y, the same regression by least
 ## squares on the weeks with an observed response (own lags, own other fuel,
-## neighbour, fiscal pulses; no latent process, no spatial correlation), and for
+## neighbor, fiscal pulses; no latent process, no spatial correlation), and for
 ## every hypothesis of fu_tests() the classical F test and the Wald test with the
 ## heteroskedasticity-consistent covariance HC1 (White 1980; MacKinnon and
 ## White 1985). With sticky prices the error variance is far from constant, and
@@ -769,7 +769,7 @@ fu_brand_table <- function(fit, des) {
                fu_ari(fit$group, des$meta$y_brand) else NA_real_)
 }
 
-## The map of the regimes of a fit: the pumps Y coloured by regime, their
+## The map of the regimes of a fit: the pumps Y colored by regime, their
 ## nearest X in grey.
 fu_map <- function(des, fit, file, title) {
   pal <- c("#1f6f8b", "#e0a458", "#a8516e")
@@ -830,15 +830,12 @@ fu_my_share <- function(sizes, job) {
 
 
 ## ===========================================================================
-## 10. The bootstrap tests of leadership: the machinery shared by
-##     fuels-wald-bootstrap.R and fuels-lr-bootstrap.R
+## 10. The bootstrap test of leadership: the machinery of
+##     fuels-wald-bootstrap.R
 ## ===========================================================================
-## The two scripts test the same hypotheses (the blocks of fu_tests()) on the
-## same selected fits, regime by regime and in all the regimes at once, and
-## differ only in the statistic and in the model the bootstrap draws from.
-## Everything else -- the setup, the models, the selected fit, the seeds, the
-## table of a model and the run -- is here, so that the two run and report in
-## the same way, column for column.
+## The script tests the hypotheses of fu_tests() on the selected fits, regime
+## by regime and in all the regimes at once. The setup, the models, the
+## selected fit, the seeds, the table of a model and the run are here.
 
 ## the settings of the main scripts (fuels-main-setting*.R): keep them equal
 FU_BT <- list(lags = list(own = 1:4, own_other = 1:4, nb = 1:4, nb_other = 1:4),
@@ -894,8 +891,7 @@ fu_bt_selected <- function(tk, sha7) {
 }
 
 ## The seed of a model: that of the main scripts (seed_of()), so that the
-## bootstrap of the Wald test is the one of stage "final"; the bootstrap of the
-## LR test of a block draws its own seeds from it.
+## bootstrap of the Wald test is the one of stage "final".
 fu_bt_seed <- function(tk) FU_BT$seed + 10L * match(tk$city, names(FU_CITY)) + match(tk$fuel, names(FU_FUEL))
 
 ## The table of a model and a hypothesis: the statistic of every regime and of

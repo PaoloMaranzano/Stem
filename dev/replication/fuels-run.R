@@ -39,8 +39,8 @@
 ## THE SETUP. This is the part meant to be edited.
 ## ===========================================================================
 RUN <- list(
-  ## the settings: 1 = Y a major, X its independent neighbour; 2 = Y
-  ## independent, X its major neighbour; 3 = Y a major, X its neighbour of
+  ## the settings: 1 = Y a major, X its independent neighbor; 2 = Y
+  ## independent, X its major neighbor; 3 = Y a major, X its neighbor of
   ## another major brand. One, several, or 1:3 for all
   settings   = 1:3,
   ## the cities: "all", or codes among
@@ -66,7 +66,7 @@ RUN <- list(
   ## fit at lambda = 0 and the bootstrap at lambda* is skipped; TRUE runs the
   ## grid of lambda of the main scripts and the bootstrap at lambda*
   ridge      = FALSE,
-  ## the neighbour X: "nn" the nearest pump of the X set (the main analysis)
+  ## the neighbor X: "nn" the nearest pump of the X set (the main analysis)
   xdef       = "nn",
   ## the folder with the data and the outputs: "" for fuels/ beside the
   ## scripts. A local folder is safer than a synchronized one (Google Drive):

@@ -16,6 +16,38 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-20
+
+**The likelihood-ratio test leaves the replication material.** The bootstrap
+likelihood-ratio test of the fuel application added little to the Wald test
+(they agreed on 93% of the regimes and 97% of the joint tests in the first
+32 models) and lengthened a paper that is already long. The paper and the
+replication material therefore use the bootstrap Wald test only, and the
+results of the likelihood-ratio run are kept for a possible request of a
+referee. `fuels-lr-bootstrap.R` moves to `dev/lr-bootstrap/`, where it still
+runs: it finds `fuels-functions.R` and the fuels folder in `dev/replication`.
+The README row, the comparison table in the header of
+`fuels-wald-bootstrap.R` and the mentions in the comments of
+`fuels-functions.R` and of the three main scripts are removed. The functions
+of section 10 of `fuels-functions.R` are unchanged, since the private script
+uses them. The Drive copies of `fuels-functions.R` and `fuels-lr-bootstrap.R`
+are not updated while the run on the other machine may still be using them.
+
+**American spelling in the replication material.** Comments, figure labels
+and table captions of the fuel scripts, of `design-figures.R` and of
+`analyse-simulations.R` now use American spelling (neighbor, liter,
+kilometer, centered, color, behavior), as the paper does. Function names
+(`dgp_centres()`), the area label "Centre" of the pre-treatment data and
+`run-simulations.R` (runs in progress) are unchanged. `fuels-analysis.R` was
+rerun: the tables differ from the previous ones only in their captions.
+
+**The centering figure picks stations further apart.** The figure of the two
+steps from posted to relative prices (Rome gasoline) took an Eni station at
+the third quartile of the premiums of its group and an independent one at the
+first. In Rome the premiums are small relative to the weekly fluctuations,
+and the second step was hard to see. The figure now takes the ninth and the
+first decile (premiums +0.8 and -2.7 cents).
+
 ### 2026-10-17
 
 **The likelihood-ratio test of the fuel application, on converged fits.** The

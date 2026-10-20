@@ -10,11 +10,11 @@
 ##
 ## The questions the outputs answer:
 ##   Q1 local leadership: in which regimes do the lagged relative prices of the
-##      neighbouring pump X predict those of pump Y (bootstrap Wald test of the
+##      neighboring pump X predict those of pump Y (bootstrap Wald test of the
 ##      eight lags of X), how strongly (the long-run pass-through of a
 ##      permanent deviation of X), and what the pooled model would have said;
 ##   Q2 what the regimes are: their number, spatial penalty, brands, distance
-##      to the neighbour, stability under the bootstrap;
+##      to the neighbor, stability under the bootstrap;
 ##   Q3 the pass-through of the excise duties, regime by regime (the pulses);
 ##   Q4 the small samples of setting 2 (the independents, 6 to 71 per city);
 ## and the checks: the pump-by-pump tests, the residual diagnostics, the
@@ -228,13 +228,13 @@ plot.new()
 graphics::legend("bottom", horiz = TRUE, bty = "n", cex = 1.05, pt.cex = 1.4, pt.lwd = 1.6,
                  legend = c("gasoline", "diesel", "pooled model: X leads", "pooled model: no"),
                  pch = c(19, 19, 19, 1), col = c(PAL3[1], PAL3[3], "grey30", "grey30"))
-graphics::mtext("Share of the pumps Y in the regimes where the neighbour X leads (bootstrap Wald test, 5%)",
+graphics::mtext("Share of the pumps Y in the regimes where the neighbor X leads (bootstrap Wald test, 5%)",
                 side = 3, line = -1.2, cex = 0.95)
 fig_close("fig_app_leadership.png")
 
 
 ## ===========================================================================
-## 4. Figure: how much passes through -- from the neighbour, from the excise
+## 4. Figure: how much passes through -- from the neighbor, from the excise
 ## ===========================================================================
 fig_open("fig_app_passthrough.png", 9.6, 4.8)
 graphics::layout(matrix(1:2, 1), widths = c(1, 1.4))
@@ -255,7 +255,7 @@ eg <- interaction(ev$fuel, ev$pulse, sep = " ", lex.order = TRUE)
 eg <- factor(eg, c(t(outer(names(EVENTS), c("gasoline", "diesel"), function(a, b) paste(b, a)))))
 bs <- graphics::boxplot(ev$est ~ eg, plot = FALSE)
 graphics::boxplot(ev$est ~ eg, outline = FALSE, col = rep(c(PAL3[1], PAL3[3]), length(EVENTS)), border = "grey25",
-                  xaxt = "n", ylab = "cents per litre", xlab = "", ylim = range(bs$stats),
+                  xaxt = "n", ylab = "cents per liter", xlab = "", ylim = range(bs$stats),
                   main = "(b) Relative price in the week of an excise change", cex.main = 1, font.main = 1)
 graphics::abline(h = 0, lty = 2)
 graphics::abline(v = seq(2.5, 2 * length(EVENTS) - 1, 2), col = "grey85")
@@ -330,7 +330,7 @@ for (s in 1:3) {
   tex_write(c("\\begin{longtable}{llrrlrrrrrr}",
     lt_head(paste(sprintf("The regimes of setting %d.", s),
                   "Brand: the most frequent brand of the stations $Y$ of the regime, with its share; X: median distance",
-                  "to the neighbour, in kilometres; $p$-values of the bootstrap Wald test of the eight lags of $X$, of its",
+                  "to the neighbor, in kilometers; $p$-values of the bootstrap Wald test of the eight lags of $X$, of its",
                   "four lags on the same fuel, of its four lags on the other fuel, and of the four lags of the other fuel",
                   "of $Y$; long-run pass-through from $X$ on the same fuel, with its bootstrap 95\\% interval."),
             sprintf("tab:sc:reg%d", s),
@@ -376,7 +376,7 @@ if (!is.null(TW)) {
   tex_write(c("\\begin{longtable}{llrrrrrr}",
     lt_head(paste("The Wald test of the eight lags of $X$ in all the regimes of a model at once: statistic and degrees",
                   "of freedom; $p$-value against the chi-square and against the bootstrap distribution of the statistic",
-                  "centred at the estimate (its smallest value is $1/101$); $p$-value of the same test on the pooled",
+                  "centered at the estimate (its smallest value is $1/101$); $p$-value of the same test on the pooled",
                   "STEM model."), "tab:sc:joint",
             "setting & city & fuel & regimes & $W$ (df) & $p_{\\chi^2}$ & $p_{\\mathrm{boot}}$ & pooled $p$ \\\\"),
     sprintf("%d & %s & %s & %d & %.1f (%d) & %s & %s & %s \\\\", j$setting, en(j$city), j$fuel, j$df %/% 8, j$statistic, j$df,
@@ -424,6 +424,57 @@ csv_write(small, "tab_app_small.csv")
 ## pump by pump against the regimes: the Dumitrescu-Hurlin test
 dh <- DH[DH$block == "nb_both", c("setting", "city", "fuel", "pumps", "reject_F_pct", "reject_hc1_pct", "p_F", "p_hc1")]
 csv_write(dh, "tab_app_dh.csv")
+
+## ===========================================================================
+## 7. Figure: from the posted price to the relative price, two stations of Rome
+## ===========================================================================
+## Needs the daily series of the pre-treatment (fuels-data.R, stage 1):
+## <root>/pretreatment, or fuels/pretreatment beside the scripts.
+PRE <- Filter(function(p) file.exists(file.path(p, "metro_series.rds")),
+              c(file.path(ROOT, "pretreatment"), file.path(HERE, "fuels", "pretreatment")))
+if (length(PRE)) {
+  ms <- readRDS(file.path(PRE[1], "metro_series.rds"))$RM
+  nat <- readRDS(file.path(PRE[1], "means.rds"))$national
+  sun <- fu_sundays(ms$days); days <- ms$days[sun]
+  ref <- nat$g[match(days, nat$date)]
+  inw <- days >= as.Date("2022-01-03")
+  C <- 100 * sweep(ms$G[, sun, drop = FALSE], 2, ref)          # cents above the national mean
+  Z <- C - rowMeans(C[, inw, drop = FALSE], na.rm = TRUE)       # the relative price of the models
+  full <- rowSums(is.na(C[, inw])) == 0
+  ## an Eni station and an independent one, with ordinary dynamics (largest
+  ## deviation below the median of their group) and premiums apart, so that the
+  ## second step shows: the Eni station at the ninth decile of the premiums of
+  ## its group, the independent at the first
+  pick <- function(brand, q) {
+    i <- which(ms$meta$brand_end == brand & full)
+    dev <- apply(abs(Z[i, inw]), 1, max); i <- i[dev <= stats::median(dev)]
+    prem <- rowMeans(C[i, inw]); i[which.min(abs(prem - stats::quantile(prem, q)))]
+  }
+  st <- c(pick("Agip Eni", 0.9), pick("Pompe Bianche", 0.1))
+  lab <- c("Eni station", "independent station")
+  colst <- PAL3[c(1, 3)]
+  ev <- FU_EVENTS$date
+  w <- which(inw)
+  fig_open("fig_app_centring.png", 9, 7.6)
+  graphics::par(mfrow = c(3, 1), mar = c(2.4, 4.6, 2.4, 1), mgp = c(2.6, 0.7, 0))
+  pan <- function(Y, ylab, title, extra = NULL) {
+    plot(days[w], Y[1, w], type = "n", ylim = range(Y[, w], extra, na.rm = TRUE), xlab = "", ylab = ylab,
+         main = title, cex.main = 1.05, font.main = 1, las = 1)
+    graphics::abline(v = ev, lty = 3, col = "grey60")
+    for (j in 1:2) graphics::lines(days[w], Y[j, w], col = colst[j], lwd = 1.3)
+  }
+  pan(rbind(ms$G[st[1], sun], ms$G[st[2], sun]), "euro per liter", "(a) Sunday price of gasoline", ref[w])
+  graphics::lines(days[w], ref[w], col = "grey20", lty = 2, lwd = 1.2)
+  graphics::legend("topright", bty = "n", lty = c(1, 1, 2), col = c(colst, "grey20"), lwd = 1.3,
+                   legend = c(lab, "national mean"), cex = 1)
+  pan(C[st, , drop = FALSE], "cents per liter", "(b) Net of the national mean of the week")
+  graphics::abline(h = rowMeans(C[st, inw]), col = colst, lty = 2)
+  pan(Z[st, , drop = FALSE], "cents per liter", "(c) Net of the mean of the station: the relative price of the models")
+  graphics::abline(h = 0, lty = 2)
+  fig_close("fig_app_centring.png")
+  csv_write(data.frame(site = ms$meta$site[st], brand = ms$meta$brand_end[st],
+                       premium = rowMeans(C[st, inw])), "app_centring_stations.csv")
+} else message("no pre-treatment data: fig_app_centring.png not drawn")
 
 ## the numbers quoted in the text
 key_numbers <- list(
