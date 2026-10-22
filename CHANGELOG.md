@@ -18,6 +18,20 @@ between the reference papers and the code, see
 
 ### 2026-10-22
 
+**The paper gets its own folder: `papers/sc-stem-local-leader`.** The
+replication package below moves there (`git mv`, history kept), with the
+scripts under `code/application` and `code/simulations`, beside `data/`,
+`results/` and a new `manuscript/` that holds the PDFs of the paper and of its
+supplements, never their sources (user's decision: Zenodo or Mendeley only at
+publication; until then the repository of the package hosts the paper).
+`dev/sync-paper.R` compiles the PDFs from the Overleaf project on a temporary
+copy in which the notes are dropped and the changes marked in orange are
+printed in black, and reports any text still in red. `papers/` replaces
+`replication/` in `.Rbuildignore`, and the default folders of the scripts and
+of the two `dev/replication/fuels-make-replication-*.R` follow the move. The
+data availability and code availability statements of the manuscript now
+point to the folder.
+
 **The replication package of the paper.** A new top-level folder,
 `replication/`, reproduces the application and the simulation study of the
 paper with few, condensed scripts. It is excluded from the package build

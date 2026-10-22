@@ -2,7 +2,7 @@
 ## APPLICATION, SCRIPT 3 OF 3: THE TABLES, FIGURES AND NUMBERS OF THE PAPER
 ##
 ## Reads the compact results of the 66 models (02-models.R; by default those
-## shipped in replication/results/application) and writes the tables (.tex and
+## shipped in results/application) and writes the tables (.tex and
 ## .csv), the figures (.png) and the numbers quoted in the text of Section 5 of
 ## the paper and of Supplement C. Nothing is fitted: it runs in a minute.
 ##
@@ -11,13 +11,13 @@
 ##     Rscript 03-results.R
 ##
 ## or open it in RStudio and press Source. Options (command line):
-##   --results=<folder>  the compact results (default: ../results/application;
-##                       ../output/application/results after a run of
+##   --results=<folder>  the compact results (default: ../../results/application;
+##                       ../../output/application/results after a run of
 ##                       02-models.R)
 ##   --eda=<folder>      the exploratory tables of 01-data-and-eda.R, for the
 ##                       stickiness of the prices quoted in Section 5.4
-##                       (default: ../output/application/eda; skipped if absent)
-##   --out=<folder>      the outputs (default: ../output/application/paper)
+##                       (default: ../../output/application/eda; skipped if absent)
+##   --out=<folder>      the outputs (default: ../../output/application/paper)
 ##
 ## Every output is listed below with the place of the paper it reproduces
 ## ("Section", "Table", "Figure" of the paper; "Section C.., Table C.." of
@@ -57,9 +57,9 @@ HERE <- local({
 source(file.path(HERE, "functions.R"))
 
 OPT <- fu_options(list(
-  results = file.path(HERE, "..", "results", "application"),
-  eda     = file.path(HERE, "..", "output", "application", "eda"),
-  out     = file.path(HERE, "..", "output", "application", "paper")
+  results = file.path(HERE, "..", "..", "results", "application"),
+  eda     = file.path(HERE, "..", "..", "output", "application", "eda"),
+  out     = file.path(HERE, "..", "..", "output", "application", "paper")
 ))
 OUT <- OPT$out; dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 options(width = 160)

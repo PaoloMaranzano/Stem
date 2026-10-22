@@ -2,9 +2,9 @@
 ## APPLICATION, SCRIPT 1 OF 3: THE DATA OF THE MODELS AND THE EXPLORATORY
 ## ANALYSIS
 ##
-## From the three files of replication/data to the data of the 66 models, and
-## the exploratory analysis that describes the data and motivates the choice
-## of the lags. The steps:
+## From the three files of data/ (in the folder of the paper) to the data of the
+## 66 models, and the exploratory analysis that describes the data and
+## motivates the choice of the lags. The steps:
 ##
 ##   1. the data: Sunday prices of the stations of the eleven cities, the
 ##      national mean of every Sunday, and the pulses of the excise duties;
@@ -25,8 +25,8 @@
 ##     Rscript 01-data-and-eda.R
 ##
 ## or open it in RStudio and press Source. Options (command line):
-##   --data=<folder>    the data (default: ../data)
-##   --out=<folder>     the outputs (default: ../output/application)
+##   --data=<folder>    the data (default: ../../data)
+##   --out=<folder>     the outputs (default: ../../output/application)
 ##   --cities=RM,MI     a subset of the cities (default: all eleven); the
 ##                      exploratory tables then describe that subset only
 ##
@@ -57,8 +57,8 @@ HERE <- local({
 source(file.path(HERE, "functions.R"))
 
 OPT <- fu_options(list(
-  data   = file.path(HERE, "..", "data"),
-  out    = file.path(HERE, "..", "output", "application"),
+  data   = file.path(HERE, "..", "..", "data"),
+  out    = file.path(HERE, "..", "..", "output", "application"),
   cities = names(FU_CITY)
 ))
 OUT_DATA <- file.path(OPT$out, "data"); OUT_EDA <- file.path(OPT$out, "eda")

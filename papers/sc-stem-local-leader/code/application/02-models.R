@@ -30,13 +30,13 @@
 ##
 ## or open it in RStudio and press Source. Options (command line):
 ##   --cases=<file>      the data of the settings (default:
-##                       ../output/application/data/cases.rds)
+##                       ../../output/application/data/cases.rds)
 ##   --out=<folder>      the compact results (default:
-##                       ../output/application/results); 03-results.R reads
+##                       ../../output/application/results); 03-results.R reads
 ##                       the results shipped with the package unless told
 ##                       otherwise (--results=)
 ##   --cache=<folder>    the intermediate fits (default:
-##                       ../output/application/cache)
+##                       ../../output/application/cache)
 ##   --settings=1,2,3    --cities=RM,MI,...   --fuels=g,d   a subset of the models
 ##   --cores=1           R processes the draws of a bootstrap are shared among;
 ##                       the draws do not depend on it
@@ -86,9 +86,9 @@ HERE <- local({
 source(file.path(HERE, "functions.R"))
 
 OPT <- fu_options(list(
-  cases    = file.path(HERE, "..", "output", "application", "data", "cases.rds"),
-  out      = file.path(HERE, "..", "output", "application", "results"),
-  cache    = file.path(HERE, "..", "output", "application", "cache"),
+  cases    = file.path(HERE, "..", "..", "output", "application", "data", "cases.rds"),
+  out      = file.path(HERE, "..", "..", "output", "application", "results"),
+  cache    = file.path(HERE, "..", "..", "output", "application", "cache"),
   settings = FU_SETTINGS$setting,
   cities   = names(FU_CITY),
   fuels    = names(FU_FUEL),

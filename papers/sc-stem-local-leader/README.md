@@ -1,11 +1,14 @@
-# Replication package
+# Latent spatial regimes and local price leadership: paper, data and code
 
-This folder reproduces the application to Italian fuel prices (Section 5,
-Appendix C and Supplement C) and the simulation study (Section 4, Appendix B
-and Supplement B) of the paper
+This folder holds the paper
 
 > P. Maranzano, *Latent Spatial Regimes in Spatio-Temporal State-Space Models,
-> with an Application to Local Price Leadership in Fuel Markets*.
+> with an Application to Local Price Leadership in Fuel Markets*
+
+with its supplementary material, the data of its application and the code
+that reproduces the application to Italian fuel prices (Section 5,
+Appendix C and Supplement C) and the simulation study (Section 4, Appendix B
+and Supplement B).
 
 The methods are implemented in the R package **Stem**
 (<https://github.com/PaoloMaranzano/Stem>). The scripts here use Stem as an
@@ -15,26 +18,34 @@ from its builds.
 ## Contents
 
 ```
-replication/
-  README.md                this file
-  data/                    the data of the application
-    fuel_stations.csv        the 3,136 stations of the eleven cities
-    fuel_prices.csv.gz       their Sunday prices, January 2021 to June 2026
-    fuel_national_means.csv  the national mean price of every Sunday
-  application/             the scripts of the application
-    functions.R              auxiliary functions, sourced by the scripts
-    01-data-and-eda.R        the data of the models and the exploratory analysis
-    02-models.R              the 66 SC-STEM models, their bootstrap and the tests
-    03-results.R             the tables, figures and numbers of the paper
-  simulations/             the scripts of the simulation study
-    functions.R              the generator, the Monte Carlo, the runner
-    01-design.R              the design
-    02-run.R                 the run
-    03-results.R             the tables, figures and numbers of the paper
-  results/application/     the compact results of the 66 models (02-models.R),
-                           so that 03-results.R runs without refitting
-  results/simulations/     the results of the simulation study (02-run.R)
-  output/                  everything the scripts write (not versioned)
+papers/sc-stem-local-leader/
+  README.md                    this file
+  manuscript/                  the paper and its supplements (PDF)
+    sc-stem-local-leader.pdf     the manuscript
+    supplement-A-estimation.pdf  Supplement A: estimation and computation
+    supplement-B-simulations.pdf Supplement B: the simulation study
+    supplement-C-application.pdf Supplement C: the application
+    code-supplement.pdf          the implementation in Stem
+  data/                        the data of the application
+    fuel_stations.csv            the 3,136 stations of the eleven cities
+    fuel_prices.csv.gz           their Sunday prices, January 2021 to June 2026
+    fuel_national_means.csv      the national mean price of every Sunday
+  code/
+    application/               the scripts of the application
+      functions.R                auxiliary functions, sourced by the scripts
+      01-data-and-eda.R          the data of the models and the exploratory analysis
+      02-models.R                the 66 SC-STEM models, their bootstrap and the tests
+      03-results.R               the tables, figures and numbers of the paper
+    simulations/               the scripts of the simulation study
+      functions.R                the generator, the Monte Carlo, the runner
+      01-design.R                the design
+      02-run.R                   the run
+      03-results.R               the tables, figures and numbers of the paper
+  results/
+    application/               the compact results of the 66 models (02-models.R),
+                               so that 03-results.R runs without refitting
+    simulations/               the results of the simulation study (02-run.R)
+  output/                      everything the scripts write (not versioned)
 ```
 
 ## Requirements
@@ -97,7 +108,7 @@ the code of Naples is the string `NA`.
 ### Quick path: the tables and figures from the shipped results
 
 ```
-cd replication/application
+cd papers/sc-stem-local-leader/code/application
 Rscript 03-results.R
 ```
 
@@ -107,10 +118,10 @@ numbers of the paper into `output/application/paper` in about a minute.
 ### Full path
 
 ```
-cd replication/application
+cd papers/sc-stem-local-leader/code/application
 Rscript 01-data-and-eda.R
 Rscript 02-models.R --cores=7
-Rscript 03-results.R --results=../output/application/results
+Rscript 03-results.R --results=../../output/application/results
 ```
 
 1. `01-data-and-eda.R` builds the relative prices, completes the missing weeks
@@ -189,11 +200,11 @@ which `02-run.R` installs when another version is installed. 332 cells, 200
 replications each, in two streams of 100 run on two machines:
 
 ```
-cd replication/simulations
+cd papers/sc-stem-local-leader/code/simulations
 Rscript 01-design.R                                 # prints the design
 Rscript 02-run.R --stream=1 --nrep=100 --cores=7    # machine 1
 Rscript 02-run.R --stream=2 --nrep=100 --cores=7    # machine 2
-Rscript 03-results.R --results=../output/simulations/results
+Rscript 03-results.R --results=../../output/simulations/results
 ```
 
 The seed of a replication depends only on its stream and number, so the

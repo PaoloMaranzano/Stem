@@ -2,9 +2,9 @@
 ## SC-STEM fuel application: THE RESULTS OF THE REPLICATION PACKAGE
 ##
 ## Writes the compact results of the 66 models shipped with the replication
-## package (replication/results/application in the repository) from the
+## package (papers/sc-stem-local-leader/results/application) from the
 ## outputs of the original runs (fuels-main-setting*.R, stage "final";
-## fuels-check-optima.R), in the format that replication/application/
+## fuels-check-optima.R), in the format that papers/sc-stem-local-leader/code/application/
 ## 02-models.R writes, with its functions. A full run of 02-models.R gives the
 ## same files: this script only spares the days of computing.
 ##
@@ -21,7 +21,7 @@
 ## The Wald tests are computed again with fu_wald() and checked against those
 ## of the original runs (wald_bootstrap.csv, test_wald.csv).
 ##
-##     Rscript fuels-make-replication-results.R --root=<the fuels folder> --out=<replication/results/application>
+##     Rscript fuels-make-replication-results.R --root=<the fuels folder> --out=<papers/sc-stem-local-leader/results/application>
 ##
 ## The estimates of the pooled fits are saved in <out>/../pooled_phi.rds while
 ## the grids are read (some GB each), so that a second run skips the reading;
@@ -34,11 +34,11 @@ HERE <- local({
   a <- commandArgs(trailingOnly = FALSE); m <- grep("^--file=", a, value = TRUE)
   if (length(m)) dirname(normalizePath(sub("^--file=", "", m[1]), winslash = "/")) else getwd()
 })
-source(file.path(HERE, "..", "..", "replication", "application", "functions.R"))
+source(file.path(HERE, "..", "..", "papers", "sc-stem-local-leader", "code", "application", "functions.R"))
 args <- commandArgs(trailingOnly = TRUE)
 opt <- function(k, d) { a <- grep(paste0("^--", k, "="), args, value = TRUE); if (length(a)) sub("^--[^=]+=", "", a[1]) else d }
 ROOT <- normalizePath(opt("root", file.path(HERE, "fuels")), winslash = "/", mustWork = TRUE)
-OUT <- normalizePath(opt("out", file.path(HERE, "..", "..", "replication", "results", "application")),
+OUT <- normalizePath(opt("out", file.path(HERE, "..", "..", "papers", "sc-stem-local-leader", "results", "application")),
                      winslash = "/", mustWork = FALSE)
 SETTINGS <- as.integer(strsplit(opt("settings", "1,2,3"), ",")[[1]])
 SHA7 <- "09e9cdb"; KEY <- "L1t4-1t4-1t4-1t4"

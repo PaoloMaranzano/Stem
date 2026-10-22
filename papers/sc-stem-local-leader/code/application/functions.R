@@ -213,7 +213,7 @@ fu_write <- function(d, file) {
 ## 2. The data: reading, relative prices, pulses, coordinates
 ## ===========================================================================
 
-## The three files of the data (see the README of the replication package):
+## The three files of the data (see the README of the folder of the paper):
 ## the stations, their Sunday prices and the national mean prices. The empty
 ## field marks a missing value, so that the code of Naples, "NA", is read as a
 ## string. Returns a list: stations (a data.frame, in the order of the file,

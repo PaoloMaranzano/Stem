@@ -34,7 +34,7 @@
 ## reference, as in  Rscript 02-run.R --TN=60,120,365 --mode=dry
 ##
 ## OUTPUTS per stream, in <out> (default: output/simulations/results in the
-## replication folder), keyed on (cell, rep); rep is unique across the
+## folder of the paper), keyed on (cell, rep); rep is unique across the
 ## streams, so the outputs of all the streams stack. <tag> stands for
 ## <tag>_s<stream>:
 ##
@@ -131,14 +131,14 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     cap_attempts   = 3L,
 
     ## Bookkeeping. `out` defaults to output/simulations/results in the
-    ## replication folder.
+    ## folder of the paper.
     ## "main3": the design of October 2026 (new values of the strong level,
     ## the fourth geometry) with the estimator of the commit pinned above
     ## (SQUAREM, tolerances 1e-3, no regularization). "main2", the same design
     ## with the EM algorithm at regularization 0.01, and "main", the first pass
     ## of September, are not comparable with it.
     tag      = "main3",
-    out      = file.path(SIM_HERE, "..", "output", "simulations", "results")
+    out      = file.path(SIM_HERE, "..", "..", "output", "simulations", "results")
   )))
 
 ## Margins given on the command line replace the blocks with one factorial

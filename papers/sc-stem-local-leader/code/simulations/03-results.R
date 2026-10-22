@@ -2,17 +2,17 @@
 ## SIMULATIONS, SCRIPT 3 OF 3: THE TABLES AND FIGURES OF THE PAPER
 ##
 ## Reads the results of the run (02-run.R; by default the compact results
-## shipped in replication/results/simulations) and writes the tables (.tex,
+## shipped in results/simulations) and writes the tables (.tex,
 ## .csv) and the figures (.png) of Section 4 and Appendix B of the paper and of
 ## Supplement B. Part A analyses the results; part B draws the figures and
 ## tables that describe the design, from its definitions (01-design.R), and
 ## needs no result. Nothing is fitted.
 ##
 ##     Rscript 03-results.R
-##     Rscript 03-results.R --results=../output/simulations/results
+##     Rscript 03-results.R --results=../../output/simulations/results
 ##
 ## Options (command line): --results (the folder of the results), --out (the
-## outputs; default: output/simulations/paper in the replication folder),
+## outputs; default: output/simulations/paper in the folder of the paper),
 ## --tag (default "main3", the study of the paper), --upto (at most this many
 ## replications of each stream, e.g. --upto=100,100), --balanced.
 ##
@@ -101,8 +101,8 @@ source(SIM_FILE, local = globalenv())
 ## ---------------------------------------------------------------------------
 AN <- sim_config(list(
   tag      = "main3",
-  results  = file.path(ana_here, "..", "results", "simulations"),
-  out      = file.path(ana_here, "..", "output", "simulations", "paper"),
+  results  = file.path(ana_here, "..", "..", "results", "simulations"),
+  out      = file.path(ana_here, "..", "..", "output", "simulations", "paper"),
   balanced = TRUE,
   ## at most this many replications of each stream (one value per stream, in
   ## order; NA: all those complete), e.g. --upto=100,42

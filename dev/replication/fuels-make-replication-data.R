@@ -1,8 +1,9 @@
 ## ===========================================================================
 ## SC-STEM fuel application: THE DATA OF THE REPLICATION PACKAGE
 ##
-## Writes the minimal data set of the replication package (replication/data/
-## in the repository) from the output of the pre-treatment (stage 1 of
+## Writes the minimal data set of the replication package
+## (papers/sc-stem-local-leader/data in the repository) from the output of the
+## pre-treatment (stage 1 of
 ## fuels-data.R), which needs the full station-level file and is not part of
 ## the package. Three files:
 ##
@@ -15,7 +16,7 @@
 ##   fuel_national_means.csv  the national mean price of every Sunday, over all
 ##                            the reporting non-highway stations of Italy
 ##
-##     Rscript fuels-make-replication-data.R --root=<the fuels folder> --out=<replication/data>
+##     Rscript fuels-make-replication-data.R --root=<the fuels folder> --out=<papers/sc-stem-local-leader/data>
 ##
 ## This is part of the development material, not of the replication package.
 ## ===========================================================================
@@ -28,7 +29,7 @@ source(file.path(HERE, "fuels-functions.R"))
 args <- commandArgs(trailingOnly = TRUE)
 opt <- function(k, d) { a <- grep(paste0("^--", k, "="), args, value = TRUE); if (length(a)) sub("^--[^=]+=", "", a[1]) else d }
 ROOT <- normalizePath(opt("root", file.path(HERE, "fuels")), winslash = "/", mustWork = TRUE)
-OUT <- normalizePath(opt("out", file.path(HERE, "..", "..", "replication", "data")), winslash = "/", mustWork = FALSE)
+OUT <- normalizePath(opt("out", file.path(HERE, "..", "..", "papers", "sc-stem-local-leader", "data")), winslash = "/", mustWork = FALSE)
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 ser <- readRDS(file.path(ROOT, "pretreatment", "metro_series.rds"))
