@@ -1,0 +1,7 @@
+"setting","model","y_site","y_brand","y_group","y_type","y_municipality","y_lon","y_lat","x_site","x_brand","x_dist_km","regime","theta_bound"
+2,"FI_gasoline","10938","Pompe Bianche","independent","Stradale","FUCECCHIO",10.8210732042789,43.7244807180352,"25351","Tamoil",1.763,1,"upper"
+2,"FI_gasoline","25218","Pompe Bianche","independent","Stradale","GAMBASSI TERME",10.9652888774872,43.5824539116862,"24982","Agip Eni",1.21,1,"upper"
+2,"FI_gasoline","28211","Pompe Bianche","independent","Stradale","FIRENZE",11.2869905873886,43.7748041814097,"43670","Agip Eni",0.085,1,"upper"
+2,"FI_gasoline","30603","Pompe Bianche","independent","Stradale","EMPOLI",10.8981330135613,43.7203406449447,"20729","Api-Ip",0.346,1,"upper"
+2,"FI_gasoline","38452","Pompe Bianche","independent","Stradale","BARBERINO DI MUGELLO",11.2280107754631,43.9892159848167,"48080","Api-Ip",0.284,1,"upper"
+2,"FI_gasoline","50843","Pompe Bianche","independent","Stradale","EMPOLI",10.9119064773805,43.6878659986589,"39113","Q8",3.622,1,"upper"

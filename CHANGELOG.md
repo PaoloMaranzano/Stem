@@ -16,6 +16,60 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-22
+
+**The replication package of the paper.** A new top-level folder,
+`replication/`, reproduces the application and the simulation study of the
+paper with few, condensed scripts. It is excluded from the package build
+(`.Rbuildignore`), and what its scripts write (`replication/output/`) is not
+versioned. The development scripts in `dev/replication` stay as they are: the
+package is the reader-facing version of them.
+
+- `replication/data`: the minimal data of the application, the Sunday prices of
+  the 3,136 stations of the eleven cities (2021 to June 2026), their registry
+  and the national mean prices. They are written from the output of the
+  pre-treatment by `dev/replication/fuels-make-replication-data.R`; the full
+  station-level file stays out. The coordinates and the national means are
+  written with 17 significant digits: with 15, the distances changed in the
+  14th digit and the completed series in the 11th, enough to break the exact
+  reproduction of the fits.
+- `replication/application`: `functions.R`, `01-data-and-eda.R` (relative
+  prices, Kalman completion, pairs, exploratory analysis), `02-models.R` (the
+  66 models: grid and two-step rule, bootstrap of the selected and pooled fits,
+  Wald tests, station-by-station benchmark, diagnostics, local maxima) and
+  `03-results.R` (every table, figure and number of Section 5 and Supplement C,
+  each labeled with its place in the paper). The radius r*, the ridge and the
+  likelihood-ratio test of the development scripts are left out, as in the
+  paper.
+- `replication/results/application`: the compact results of the 66 models, in
+  the format of `02-models.R`, converted from the original runs by
+  `dev/replication/fuels-make-replication-results.R` (the Wald tests are
+  recomputed and checked against the original ones; the pooled estimates are
+  read from the cached grids at full precision, since the bootstrap summary
+  rounds them to five digits).
+- `replication/simulations`: `run-simulations.R`, `analyse-simulations.R` and
+  `design-figures.R` split into `functions.R`, `01-design.R`, `02-run.R` and
+  `03-results.R`, the code moved as it is (seeds unchanged); the worker
+  processes now load `02-run.R`, told its path, and Stem is checked against the
+  pinned commit without asking GitHub.
+
+Checks: the data rebuild the relative prices, the completed series and the
+data of the three settings of the original pipeline exactly; `02-models.R` on
+one model (setting 2, Messina, gasoline) gives the same partition and
+estimates as the original run, the grid within 5e-12 and the bootstrap draws
+within 2e-11; `03-results.R` on the shipped results reproduces the eight
+tables and the five figures of the paper byte for byte; `02-run.R` reproduces a
+stored replication of the simulation study exactly. Its numbers showed seven
+statements of the text to be corrected: the median adjusted Rand index between
+regimes and brands (0.23); the partition reproduced in the median draw in all
+models but four; the sign changes at the local maxima; Naples among the cities
+where half or fewer of the independents follow; and three descriptive figures
+that came from an older exploratory script on daily prices carried forward,
+now computed on the relative prices of the models (the ADF test rejects for 96
+to 100% of the stations, the median first-order autocorrelation is 0.52 to
+0.71, 12% of the major-brand stations have an independent within one
+kilometer).
+
 ### 2026-10-20
 
 **The likelihood-ratio test leaves the replication material.** The bootstrap

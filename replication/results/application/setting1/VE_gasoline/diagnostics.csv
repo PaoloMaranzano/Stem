@@ -1,0 +1,6 @@
+"setting","model","regime","pumps","ljung_box_reject_pct","ljung_box_sq_reject_pct","acf1_median","kurtosis_median"
+1,"VE_gasoline",1,9,66.7,77.8,-0.048,11.06
+1,"VE_gasoline",2,17,52.9,70.6,0.007,8.09
+1,"VE_gasoline",3,20,25,70,-0.01,12.35
+1,"VE_gasoline",4,18,22.2,61.1,0.01,13.21
+1,"VE_gasoline",5,36,33.3,83.3,0.024,6.77

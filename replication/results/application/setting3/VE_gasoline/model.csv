@@ -1,0 +1,2 @@
+"setting","model","city","fuel","pumps","weeks","K_max","K","phi","BIC","sizes","B_valid","B_valid_pooled","ari_regimes_brands","ari_draws_median","minutes_grid","minutes_boot","minutes_boot_pooled","minutes_optima","stem"
+3,"VE_gasoline","VE","gasoline",100,234,5,5,0.2,93415.1107038073,"37/12/10/21/20",100,100,0.22879986181199,1,7.84,25.93,14.63,0.55,"09e9cdb"

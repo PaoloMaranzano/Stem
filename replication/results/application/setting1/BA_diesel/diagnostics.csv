@@ -1,0 +1,5 @@
+"setting","model","regime","pumps","ljung_box_reject_pct","ljung_box_sq_reject_pct","acf1_median","kurtosis_median"
+1,"BA_diesel",1,79,36.7,77.2,0.008,8.86
+1,"BA_diesel",2,17,76.5,82.4,0.026,27.56
+1,"BA_diesel",3,44,38.6,54.5,0.01,15.51
+1,"BA_diesel",4,60,26.7,55,0.007,6.17

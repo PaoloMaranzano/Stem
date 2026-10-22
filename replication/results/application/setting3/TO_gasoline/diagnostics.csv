@@ -1,0 +1,6 @@
+"setting","model","regime","pumps","ljung_box_reject_pct","ljung_box_sq_reject_pct","acf1_median","kurtosis_median"
+3,"TO_gasoline",1,49,32.7,77.6,-0.039,8.27
+3,"TO_gasoline",2,52,46.2,78.8,-0.029,12.9
+3,"TO_gasoline",3,123,40.7,81.3,0.01,6.32
+3,"TO_gasoline",4,41,53.7,85.4,0.06,12.34
+3,"TO_gasoline",5,67,41.8,83.6,0.03,6.71

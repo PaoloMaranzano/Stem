@@ -24,3 +24,5 @@ dev/replication/output/
 dev/replication/fuels/
 dev/replication/ridge-experiment/
 dev/replication/application/
+# What the scripts of the replication package write (regenerable)
+replication/output/

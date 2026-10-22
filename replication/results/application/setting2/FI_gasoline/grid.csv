@@ -1,0 +1,2 @@
+"setting","model","K","phi","K_eff","admissible","loglik","df","AIC","BIC","KIC","min_size","convergence"
+2,"FI_gasoline",1,0,1,TRUE,-3067.78819632334,33,6201.57639264668,6374.73005193801,6234.57639264668,6,"Pooled model (K = 1): no clustering performed"
