@@ -16,6 +16,32 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-23
+
+**The simulation study is complete: 200 replications per cell.** The second
+stream ended (100 replications of the 332 cells, as the first), and the
+analysis runs on the 66,383 replications that ended normally (17 failed for
+reasons unrelated to the estimator: R processes that could not start). The
+tables and figures of Section 4 and Supplement B were rebuilt with
+`papers/sc-stem-local-leader/code/simulations/03-results.R`, and the numbers
+of the text updated; the conclusions are unchanged. The numbers were computed
+by one script on the outputs of the analysis at 142 and at 200 replications:
+it reproduces the 142-replication values of the text, so the update uses the
+definitions of the text. One number of the text was not reproducible even at
+142 replications (the regression coefficients "up to three times" more
+dispersed when K is wrong: the ratio of the interquartile ranges reaches 3.8)
+and is corrected. The design tables and figures differ from those of the
+paper only in spelling (center, neighbors).
+
+`papers/sc-stem-local-leader/results/simulations` holds the results of the two
+streams compressed (63 MB): the replications, the parameters and the grids,
+cleaned of the lines broken by the synchronization client by
+`dev/replication/sims-make-replication-results.R`; the per-location records
+and the full observations are left out. `03-results.R` now reads `.csv.gz`
+files; run on them it gives the same tables and the same 19 tables of numbers
+as on the original files, and the same figures (four PNG files differ in their
+bytes only, from the rendering of the mathematical labels).
+
 ### 2026-10-22
 
 **The paper gets its own folder: `papers/sc-stem-local-leader`.** The

@@ -236,11 +236,13 @@ legacy_names <- function(d) {
 ## that does not, the remainder of a row whose beginning was lost, is dropped,
 ## and so is a last line without its end of line (a file still being written).
 an_read_file <- function(f) {
-  L <- readLines(f, warn = FALSE)
+  L <- readLines(f, warn = FALSE)                  # a .csv.gz file is read as it is
   if (length(L) < 2L) return(NULL)
-  sz <- file.size(f)
-  con <- file(f, "rb"); seek(con, sz - 1); last <- readBin(con, "raw", 1L); close(con)
-  if (last != as.raw(10L)) L <- L[-length(L)]
+  if (!grepl("[.]gz$", f)) {
+    sz <- file.size(f)
+    con <- file(f, "rb"); seek(con, sz - 1); last <- readBin(con, "raw", 1L); close(con)
+    if (last != as.raw(10L)) L <- L[-length(L)]
+  }
   n_quote <- nchar(L) - nchar(gsub("\"", "", L, fixed = TRUE))
   bare <- gsub("\"[^\"]*\"", "", L)
   n_field <- nchar(bare) - nchar(gsub(",", "", bare, fixed = TRUE)) + 1L
@@ -256,7 +258,7 @@ an_read_file <- function(f) {
 ## a replication with fewer rows than the others of its cell lost some of them
 ## and is dropped.
 an_read_streams <- function(dir, tag, suffix = "") {
-  pat <- sprintf("^%s(_s[0-9]+)?%s[.]csv$", gsub(".", "[.]", tag, fixed = TRUE), suffix)
+  pat <- sprintf("^%s(_s[0-9]+)?%s[.]csv([.]gz)?$", gsub(".", "[.]", tag, fixed = TRUE), suffix)
   f <- list.files(dir, pattern = pat, full.names = TRUE)
   if (!length(f)) return(NULL)
   d <- lapply(f, an_read_file)

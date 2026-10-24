@@ -209,6 +209,22 @@ Rscript 03-results.R --results=../../output/simulations/results
 
 The seed of a replication depends only on its stream and number, so the
 results do not depend on the cores or on the machine; a stopped run resumes
-where it stopped. `03-results.R` without options reads the results shipped in
-`results/simulations` and writes into `output/simulations/paper`; its header
-lists every output with its place in the paper.
+where it stopped. The 66,400 replications took about 2,170 core-hours, that
+is, about a week on two desktop computers.
+
+`results/simulations` holds the results of the two streams, compressed:
+`main3_s<stream>.csv.gz` (one row per replication: the selected number of
+regimes and penalty, the recovery of the partition, the error of the fitted
+signal, the times), `main3_s<stream>-params.csv.gz` (one row per replication,
+regime and parameter: the truth and the estimate at the true number of
+regimes) and `main3_s<stream>-grid.csv.gz` (one row per replication and
+configuration of the grid). The per-location records and the full
+observations that `02-run.R` also writes are left out: the analysis does not
+use them, and any replication can be drawn again from its seed. A few lines
+broken by the synchronization client while the runs appended to the files
+were dropped, and 17 replications failed for reasons unrelated to the
+estimator (Section B9 of Supplement B).
+
+`03-results.R` without options reads `results/simulations` and writes into
+`output/simulations/paper` in about half an hour; its header lists every
+output with its place in the paper.

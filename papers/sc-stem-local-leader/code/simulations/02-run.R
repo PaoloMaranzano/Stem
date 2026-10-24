@@ -17,7 +17,8 @@
 ## Stem at the commit pinned in functions.R (SIM_STEM_REF). A stream draws its
 ## own data, with seeds no other stream uses: replication r of stream s is
 ## recorded as rep = 1000 (s - 1) + r, and its seed is 1000 rep + 1. Never run
-## the same stream on two machines at once. TIME_OF_THE_STUDY
+## the same stream on two machines at once. The 66,400 replications took
+## about 2,170 core-hours (the cost by n and T is in Supplement B, Table B8).
 ##
 ## THE TIME LIMIT. Every replication runs in a separate R process (package
 ## callr) under a time limit set from the times already recorded: cap_mult
