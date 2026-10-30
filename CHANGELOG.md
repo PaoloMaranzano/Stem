@@ -16,7 +16,32 @@ between the reference papers and the code, see
 
 ## Unreleased
 
-### 2026-10-30 (evening)
+### 2026-10-30 (night)
+
+**ECME and the bootstrap explained step by step.** `docs/computational-aspects.md`
+now builds ECME as it builds SQUAREM: why EM is slow on the intercept and on the
+initial level of the latent process, why on the observed likelihood the update
+is a regression, how the augmented Kalman filter computes the GLS step without
+the $dT \times dT$ covariance, the update, the order that keeps it monotone,
+and one iteration line by line with the lines that differ from EM marked. The
+section on the refit-with-clustering bootstrap gains a flowchart (Mermaid,
+drawn by GitHub), the pseudocode of the draws and of the alignment, and every
+output with its formula: bootstrap mean, bias, standard error, the normal,
+basic, percentile and bias-corrected intervals, the percentile tests between
+regimes, the adjusted Rand index and the co-clustering matrix, the diagnostics
+of the draws, and the software notes (seeds, cores, settings of the refits).
+Supplement A has the same construction of ECME and the algorithm of the
+bootstrap; the list of the outputs moved from Supplement A to this page, and
+Supplement A no longer refers to the package (the model or the algorithm
+instead), at the author's request.
+
+**The exploratory analysis inside the replication package.**
+`dev/replication` is now `papers/sc-stem-local-leader/internal/`, so the
+package on GitHub has the structure of its copy on the Drive. The script finds
+the package in the folder above its own; `AppFuels_04_Analysis.R` and the
+README point to it; `dev/sync-gdrive.R` delivers it with the rest of the
+package. The sentences on the version of Stem and on the seeds, which the
+supplements no longer carry, are in the README of the package.
 
 **The documentation aligned with the supplements of the paper.** The rule, at
 the author's request: the supplements of the paper are a subset of what the

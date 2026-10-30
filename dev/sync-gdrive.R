@@ -108,8 +108,9 @@ message("mirror now at commit ", sha)
 ## The replication package of the paper, papers/sc-stem-local-leader, is also
 ## delivered to a folder of its own on the Drive, SC-STEM-replication, BESIDE
 ## the mirror rather than inside it, with the structure it has in the
-## repository (README.md, manuscript/, data/, code/, results/); the internal
-## material of dev/replication goes into its subfolder internal/. The folder is
+## repository (README.md, manuscript/, data/, code/, internal/, results/). The
+## Drive copy also keeps, untracked, the daily file of the fuel data in
+## internal/App_FuelsITA and the archive of the paper in _archive/. The folder is
 ## used differently from the mirror: its scripts are run, from the other
 ## machine too, and write their outputs in output/. So this second copy follows
 ## opposite rules.
@@ -125,7 +126,7 @@ message("mirror now at commit ", sha)
 ## its path in the folder), which is how an edit made on the Drive is told
 ## apart from a stale copy.
 ## ===========================================================================
-repl_map <- c("papers/sc-stem-local-leader/" = "", "dev/replication/" = "internal/")
+repl_map <- c("papers/sc-stem-local-leader/" = "")
 repl_dst <- if (length(args) >= 2) args[2] else
   file.path(dirname(dest), "SC-STEM-replication")
 if (dir.exists(file.path(repo, "papers", "sc-stem-local-leader"))) {

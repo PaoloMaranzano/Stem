@@ -13,7 +13,7 @@
 ## table, figure and number of the application: those of Section 5 of the
 ## paper and of Supplement C, computed here, and those of Appendix C and of the
 ## description of the data (Sections 5.1, 5.2, C1 and C2), which come from the
-## exploratory analysis of the weekly data, kept outside this package, and are
+## exploratory analysis of the weekly data (internal/AppFuels_Internal_EDA.R) and are
 ## stored in results/application/eda. Nothing is fitted: it runs in a minute.
 ##
 ## Outputs, in <out> (output/application by default), with the place of
@@ -696,8 +696,8 @@ print(NUM, right = FALSE, row.names = FALSE)
 ##    the stored outputs of the exploratory analysis
 ## ===========================================================================
 ## These outputs describe the weekly data of data/ before any model is fitted.
-## They were computed by the exploratory analysis of the data, kept outside
-## this package, and are stored in results/application/eda. They are copied
+## They were computed by internal/AppFuels_Internal_EDA.R, the exploratory
+## analysis of the data, and are stored in results/application/eda. They are copied
 ## here into <out>/eda, so that every output of the application is in one
 ## place:
 ##   eda_stations_by_city.csv        Section 5.1 (3,136 stations, 264

@@ -327,34 +327,107 @@ maximum, and selected the same models.
 
 ### 1.8 ECME
 
-ECME (Liu and Rubin 1994) lets some conditional maximizations of the M-step
-maximize the observed log-likelihood $\ell$ instead of $Q$. It remains
-monotone when the steps on $\ell$ follow those on $Q$ within an iteration
-(otherwise the E-step has to be recomputed in between, as in the AECM
-algorithm of Meng and van Dyk 1997). `Stem` updates
-$\delta = (\beta^\top, m_0^\top)^\top$ in this way: an iteration runs the
-E-step, updates $\Sigma_\eta$, $G$, $\sigma^2_\omega$ and $(\theta, \gamma)$
-on $Q$ as EM does, and then maximizes $\ell$ over $\delta$ given all of them.
-Given the other parameters $\ell$ depends on $\delta$ only through the mean of
-the data, $E(z_t) = X_t \beta + A G^t m_0$, which is linear in $\delta$, so its
-maximizer is a generalized least-squares estimator under the covariance the
-model implies. The augmented Kalman filter (de Jong 1991; Durbin and Koopman
-2012, Ch. 6) computes it without forming the $dT \times dT$ covariance: the
-filter of the current parameters is run on every column of
-$[\,z_t,\ X_t,\ A G^t\,]$, the first with the current $m_0$ as initial mean and
-the others with zero; the columns share the gains and $F_t$, and with
-$[\,e_t,\ E_t\,]$ their innovations,
+ECME, "expectation / conditional maximization either" (Liu and Rubin 1994),
+keeps the E-step of EM and almost all of its M-step: it changes **one block of
+the M-step**, the update of the regression coefficients and of the initial level
+of the latent process, $\delta = (\beta^\top, m_0^\top)^\top$, which it takes
+on the observed log-likelihood $\ell$ instead of on the expected complete-data
+log-likelihood $Q$. Five steps build it.
+
+**Step 1: why EM is slow on $\delta$.** EM updates $\beta$ and $m_0$ given the
+smoothed states $y_{t|T}$ (Section 1.3). Suppose the current intercept is too
+low by some amount. The E-step attributes most of that error to the latent
+process, whose smoothed path moves up to absorb it; the M-step then updates
+$\beta$ and $m_0$ given that path, and corrects only the small part of the
+error that the path did not absorb. Each iteration removes a small fraction of
+the error: this is the second slow direction of Section 1.6, with a rate close
+to one. The cause is that $Q$ looks at $\delta$ through the states, and the
+states and $\delta$ explain the same level of the data.
+
+**Step 2: on the observed likelihood the problem is a regression.** Given all
+the other parameters, $\ell$ depends on $\delta$ only through the mean of the
+data,
 
 ```math
-\ell = c - \tfrac12 \sum_t (e_t - E_t \delta)^\top F_t^{-1} (e_t - E_t \delta), \qquad
-\hat\delta = \Big(\sum_t E_t^\top F_t^{-1} E_t\Big)^{-1} \sum_t E_t^\top F_t^{-1} e_t ,
+E(z_t) = X_t \beta + A G^t m_0 ,
 ```
 
-with $F_t^{-1}$ applied through the Woodbury identity and the missing rows
-dropped. Without a latent process there is no $m_0$ column. An ECME iteration
-costs one more filter pass than an EM iteration, about 25% more time. The step
-removes the second slow direction of Section 1.6 at once, and with it the ridge
-between $G$ and $m_0$; it does not change the first.
+which is linear in $\delta$, while the covariance of the data does not depend
+on $\delta$ at all. So $\ell$, as a function of $\delta$, is the log-likelihood
+of a Gaussian linear regression with a known covariance (the one the model
+implies, latent process and spatial field included): it is a quadratic in
+$\delta$, and its maximizer is the generalized least-squares (GLS) estimator.
+Integrating the states out is what removes the trade between the states and the
+level: the GLS step finds the right level at once.
+
+**Step 3: GLS without the $dT \times dT$ covariance.** The covariance of all the
+data is $dT \times dT$ and cannot be formed on a real network. The augmented
+Kalman filter (de Jong 1991; Durbin and Koopman 2012, Ch. 6) computes the same
+estimator from the filter. Two facts make it work: the gains $K_t$ and the
+innovation covariances $F_t$ do not depend on the data, and the filter is
+linear in its data and in its initial mean. Run the filter of the current
+parameters on every column of the $d \times (1 + r + p)$ matrix
+
+```math
+\bigl[\, z_t,\ X_t,\ A G^t \,\bigr],
+```
+
+the first column with the current $m_0$ as initial mean and the others with
+zero (the last block stands for a change $\Delta m_0$ of $m_0$). All columns
+share $K_t$ and $F_t$; call $[\,e_t,\ E_t\,]$ their innovations. By linearity
+the innovations of $z_t$ at $(\beta, m_0 + \Delta m_0)$ are $e_t - E_t\delta$
+with $\delta = (\beta^\top, \Delta m_0^\top)^\top$, and by the prediction-error
+decomposition
+
+```math
+\ell(\delta) = c - \tfrac12 \sum_t (e_t - E_t \delta)^\top F_t^{-1} (e_t - E_t \delta) .
+```
+
+**Step 4: the update.** Setting the gradient to zero gives the GLS normal
+equations,
+
+```math
+\hat\delta = M^{-1} v, \qquad M = \sum_t E_t^\top F_t^{-1} E_t, \qquad v = \sum_t E_t^\top F_t^{-1} e_t ,
+```
+
+with $F_t^{-1}$ applied through the Woodbury identity (Section 1.2) and the
+missing rows dropped (Section 2). Then $m_0 \leftarrow m_0 + \Delta m_0$.
+Without a latent process there is no $m_0$ column. With a penalty on $\beta$,
+$m_0$ is profiled out of the quadratic and the penalized update of
+[the page on the penalty](regularization.md) is applied to what is left in
+$\beta$ (`stem_update_mean_observed()` in `R/mstep-ecme.R`).
+
+**Step 5: the order keeps it monotone.** Within an iteration the updates of
+$\Sigma_\eta$, $G$, $\sigma^2_\omega$ and $(\theta, \gamma)$ on $Q$ come
+first, exactly as in EM, and the update of $\delta$ on $\ell$ comes last. The
+steps on $Q$ do not decrease $\ell$ (the EM argument), and the last step
+maximizes $\ell$ over $\delta$ given the rest, so it does not decrease it
+either: the algorithm is monotone (Liu and Rubin 1994). Had the step on $\ell$
+come before steps on $Q$, the E-step would have to be recomputed in between, as
+in the AECM algorithm of Meng and van Dyk (1997).
+
+**One iteration, line by line** (`stem_mstep_ecme()` in `R/mstep-ecme.R`). The
+lines marked ★ are those that differ from an iteration of EM.
+
+```text
+  E-step: Kalman filter and smoother at psi          # as EM: S11, S10, S00, W
+  update Sigma_eta and G from S11, S10, S00          # as EM
+  update sigma2_omega from W                         # as EM
+  update (theta, gamma): safeguarded Newton-Raphson  # as EM (limits of Section 1.10)
+★ run the filter at the new parameters on [z_t, X_t, A G^t]  -> innovations e_t, E_t, and F_t
+★ M <- sum_t E_t' F_t^-1 E_t ;  v <- sum_t E_t' F_t^-1 e_t
+★ (beta, Delta m0) <- M^-1 v ;  m0 <- m0 + Delta m0  # maximizes the observed loglik over (beta, m0)
+                                                     # EM instead: m0 <- y_{0|T}; beta <- GLS given y_{t|T}
+```
+
+**What it buys and what it costs.** The step removes the second slow
+direction of Section 1.6 at once, and with it the ridge between $G$ and $m_0$
+(when $G$ is near zero, $m_0$ enters only through $G m_0$); it does not change
+the first slow direction, the split of the variance, which sets the number of
+iterations. An ECME iteration costs one more filter pass than an EM iteration,
+about 25% more time. ECME therefore buys accuracy rather than speed: at the
+same tolerance it stops closer to the maximum on the intercepts, on $m_0$ and on
+$G$ near zero (Section 1.7).
 
 ### 1.9 SQUAREM
 
@@ -889,36 +962,114 @@ two-step rule of Section 3; the paper uses the BIC.
 
 ## 7. Inference under the refit-with-clustering bootstrap
 
-**Uncertainty includes the partition.** `SCSTEM_Bootstrap()` draws $B$ samples
-from the fitted model, regime by regime (each regime's covariance and latent
-dynamics are reproduced, the observed pattern of gaps reimposed), and re-runs
-the whole procedure at $(\hat K, \hat\phi)$, clustering included, on every draw,
-so the intervals are not conditional on a partition that is itself estimated.
+**Uncertainty includes the partition.** The partition of SC-STEM is estimated
+on the same data as the parameters, so intervals and tests that treat it as
+known are too optimistic wherever locations lie near the border between two
+regimes. The refit-with-clustering bootstrap draws new data from the fitted
+model and re-runs the **whole** procedure on every draw, clustering included:
+every draw has its own partition, and the spread of the draws carries the
+uncertainty of the memberships.
 
-**The aligned draws** (`SCSTEM_BootInference()`). The labels of a refit are
-arbitrary: each refit regime is mapped onto the original regime with which it
-shares most locations, conflicts resolved greedily by decreasing overlap
-(`scstem_align_labels()`). Draws whose refit failed or did not recover all
-$\hat K$ regimes are recorded and excluded, and the share of usable draws is a
-diagnostic in its own right. The outputs:
+**The procedure.** The flowchart and the pseudocode below are what
+`SCSTEM_Bootstrap()` (the draws) and `SCSTEM_BootInference()` (alignment and
+summaries) do.
 
-- the aligned draws of every regime-specific parameter, a
-  $B_{\mathrm{valid}} \times \hat K \times n_{\mathrm{par}}$ array, from which any
-  further statistic can be computed without refitting;
-- for every regime and parameter: the estimate, the bootstrap mean and bias,
-  the bootstrap standard error, the ratio of the estimate to it with its
-  normal-approximation $p$-value, and the normal, basic, percentile and
-  bias-corrected intervals of Davison and Hinkley (1997) (studentized intervals
-  are not computed: they would need an asymptotic standard error at every
-  draw);
-- for every parameter and pair of regimes, the percentile test of their
-  difference;
-- the stability of the partition: the adjusted Rand index between every draw
-  and the estimated partition, and the co-clustering matrix (share of usable
-  draws in which two locations share a regime);
-- the diagnostics of the draws: $B_{\mathrm{valid}}$ out of $B$ and, for every
-  draw, whether its refit succeeded, how many regimes it recovered, its
-  log-likelihood and its number of iterations.
+```mermaid
+flowchart TD
+    A["Selected fit at (K̂, φ̂):<br/>partition ĝ, regime parameters Ψ̂_k"] --> B["Draw B seeds<br/>from seed"]
+    B --> C{"for b = 1, ..., B<br/>(in parallel, each under its own seed)"}
+    C --> D["Simulate each regime k from its STEM model at Ψ̂_k,<br/>on its observed covariates, coordinates, loading rows"]
+    D --> E["Put the locations back in their original order;<br/>reimpose the observed pattern of missing values"]
+    E --> F["Re-run SC-STEM at (K̂, φ̂) with the settings of the original fit:<br/>start, scale of the penalty, algorithm, tolerances"]
+    F --> G["Record ĝ*_b, Ψ̂*_b, log-likelihood, iterations;<br/>usable if the refit succeeded with K̂ regimes"]
+    G --> C
+    C -->|all draws done| H["Align the labels of every usable draw<br/>to ĝ (majority rule)"]
+    H --> I["Summaries: bias, standard errors, intervals,<br/>tests between regimes, stability of the partition"]
+    H --> J["Aligned draws: any further test<br/>(e.g. Wald) without refitting"]
+```
+
+```text
+input : the selected fit at (K_hat, phi_hat): partition g_hat, parameters Psi_hat_k
+        of every regime; number of draws B; seed
+seeds <- B integers drawn from seed                    # a draw depends on its seed only
+for b in 1..B, in parallel, each under seeds[b]:
+    for every regime k:
+        z*[, C_k] <- simulate the STEM model of regime k at Psi_hat_k,
+                     with the covariates, coordinates and loading rows of its locations
+    z*[missing in the data] <- NA                     # the observed pattern of gaps
+    fit*_b <- SC-STEM on z* at (K_hat, phi_hat), with the start, the scale of the
+              penalty, the algorithm and the tolerances of the original fit
+              (phi_hat > 0: the fit at phi = 0 first, as in the original fit)
+    usable_b <- the refit succeeded and has K_hat admissible regimes
+    record g*_b, Psi*_b, its log-likelihood and its iterations
+for every usable draw b:
+    map_b <- align the labels of g*_b to g_hat          # majority rule, greedy by overlap
+    aligned[b, map_b(k), ] <- Psi*_{b,k}
+summaries of the aligned draws (below)
+```
+
+**Alignment.** The labels of a refit are arbitrary. Each refit regime is mapped
+onto the original regime with which it shares the most locations, conflicts
+resolved greedily by decreasing overlap (`scstem_align_labels()`). Draws whose
+refit failed, or did not recover all $\hat K$ regimes, are excluded from the
+summaries but recorded; the share of usable draws, $B_{\mathrm{valid}}/B$, is a
+diagnostic in its own right: a low share says that the selected configuration
+is not reproducible.
+
+**The outputs, analytically.** Write $\hat\vartheta$ for the estimate of one
+regime-specific parameter of regime $k$, and $\vartheta^*_b$,
+$b = 1, \dots, B_{\mathrm{valid}}$, for its aligned draws; $q^*_a$ is the
+$a$-quantile of the draws, $z = \Phi^{-1}(1 - a/2)$ for a confidence level
+$1 - a$ (`level`, default 0.95), and $\Phi$ the standard normal distribution
+function.
+
+- **The aligned draws** (`$aligned` of `SCSTEM_BootInference()`): a
+  $B_{\mathrm{valid}} \times \hat K \times n_{\mathrm{par}}$ array, from which
+  any further statistic is computed without refitting (the Wald test below, in
+  the application of the paper).
+- **The summary of every regime and parameter** (`$summary`):
+
+  | quantity | definition |
+  |---|---|
+  | bootstrap mean | $\bar\vartheta^* = B_{\mathrm{valid}}^{-1}\sum_b \vartheta^*_b$ |
+  | bias | $\bar\vartheta^* - \hat\vartheta$ |
+  | standard error | $\mathrm{se}^* = \{(B_{\mathrm{valid}} - 1)^{-1}\sum_b (\vartheta^*_b - \bar\vartheta^*)^2\}^{1/2}$ |
+  | ratio and $p$-value | $t = \hat\vartheta/\mathrm{se}^*$, $\; p = 2\{1 - \Phi(\lvert t\rvert)\}$ |
+  | normal interval | $\hat\vartheta - \mathrm{bias} \mp z\,\mathrm{se}^*$ |
+  | basic interval | $[\,2\hat\vartheta - q^*_{1-a/2},\ 2\hat\vartheta - q^*_{a/2}\,]$ |
+  | percentile interval | $[\,q^*_{a/2},\ q^*_{1-a/2}\,]$ |
+  | bias-corrected interval | $[\,q^*_{a_1},\ q^*_{a_2}\,]$, $\; a_{1,2} = \Phi(2 z_0 \mp z)$, $\; z_0 = \Phi^{-1}\bigl(\#\{b : \vartheta^*_b < \hat\vartheta\}/B_{\mathrm{valid}}\bigr)$ |
+
+  The intervals are those of Davison and Hinkley (1997, Ch. 5). Studentized
+  intervals are not computed: they would need an asymptotic standard error at
+  every draw.
+- **The tests between regimes** (`$tests`): for every parameter and pair of
+  regimes $(g, h)$, the draws of the difference
+  $\Delta^*_b = \vartheta^*_{g,b} - \vartheta^*_{h,b}$ give the percentile
+  interval $[q^*_{a/2}(\Delta), q^*_{1-a/2}(\Delta)]$ and the two-sided
+  percentile $p$-value
+  $p = \min\{1,\ 2\min(\Pr^*(\Delta \le 0), \Pr^*(\Delta \ge 0))\}$, with
+  $\Pr^*$ the share of the draws. They say whether the regimes differ, and in
+  which components of $\Psi_k$.
+- **The stability of the partition** (`$stability`, `$coclustering`): the
+  adjusted Rand index between the partition of every usable draw and the
+  estimated one, and the co-clustering matrix
+  $C_{ij} = B_{\mathrm{valid}}^{-1}\sum_b \mathbf{1}\{g^*_{i,b} = g^*_{j,b}\}$,
+  the share of usable draws in which locations $i$ and $j$ share a regime
+  (it does not need the alignment).
+- **The diagnostics of the draws** (`$info` and `B_valid` of
+  `SCSTEM_Bootstrap()`): $B_{\mathrm{valid}}$ out of $B$ and, for every draw,
+  whether its refit succeeded, how many regimes it recovered, its
+  log-likelihood, its number of iterations and its convergence message.
+
+**Software notes.** Every draw is evaluated under its own seed, drawn once
+from `seed` (or from the current random stream), and the random stream is
+restored on exit (`scstem_with_seed()`): a draw depends on its seed only, not
+on the draws before it, so the results do not depend on `cores`, the number of
+R processes the draws are shared among. The refits take the settings of the
+original fit (start, penalty on the scale actually applied, algorithm,
+tolerances), which can be overridden through `...`; no refit is shared between
+draws.
 
 **A bootstrap-based Wald test.** For $q$ linear restrictions
 $H_0^{(k)}: R\beta_k = c$ on the coefficients of regime $k$ (for instance a

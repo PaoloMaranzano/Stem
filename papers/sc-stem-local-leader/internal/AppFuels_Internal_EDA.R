@@ -8,8 +8,10 @@
 ##          the application (Sections 5.1 and 5.2 of the paper, Appendix C,
 ##          Sections C1 and C2 of Supplement C)
 ##
-## INTERNAL: this script is not part of the replication package
-## (papers/sc-stem-local-leader); its outputs are, in results/application/eda.
+## In internal/ of the replication package: it is not needed to reproduce the
+## models or the tables and figures of the application, which
+## AppFuels_04_Analysis.R draws from its stored outputs (results/application/eda);
+## it is the script that computed those outputs.
 ##
 ## What it does: describes the weekly data of the package (data/ in
 ## papers/sc-stem-local-leader) and motivates the choice of the lags. It builds
@@ -40,8 +42,8 @@
 ##     Rscript AppFuels_Internal_EDA.R
 ##
 ## or open it in RStudio and press Source. Options (command line):
-##   --pkg=<folder>     the folder of the package (default: found from this
-##                      folder, in the repository of Stem or on the Drive)
+##   --pkg=<folder>     the folder of the package (default: the folder above
+##                      this one)
 ##   --cities=RM,MI     a subset of the cities (default: all eleven); the
 ##                      exploratory tables then describe that subset only
 ##
@@ -64,13 +66,12 @@ HERE <- local({
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
 
-## The package: dev/replication -> papers/sc-stem-local-leader in the
-## repository of Stem; on the Drive, internal/ sits inside the copy of the
-## package (SC-STEM-replication). --pkg= overrides both.
+## The package: the folder above internal/ (papers/sc-stem-local-leader in the
+## repository of Stem, SC-STEM-replication on the Drive). --pkg= overrides it.
 PKG <- local({
   a <- grep("^--pkg=", commandArgs(trailingOnly = TRUE), value = TRUE)
   cand <- if (length(a)) sub("^--pkg=", "", a[1]) else
-    c(file.path(HERE, "..", "..", "papers", "sc-stem-local-leader"), file.path(HERE, ".."))
+    file.path(HERE, "..")
   ok <- cand[file.exists(file.path(cand, "code", "AppFuels_00_Setup.R"))]
   if (!length(ok)) stop("the replication package is not where expected; give it with --pkg=", call. = FALSE)
   normalizePath(ok[1], winslash = "/")

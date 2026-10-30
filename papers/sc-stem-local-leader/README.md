@@ -41,6 +41,10 @@ papers/sc-stem-local-leader/
                                     the runner and the design
     Sims_01_Run.R                   simulations: the run
     Sims_02_Analysis.R              simulations: every table, figure and number
+  internal/
+    AppFuels_Internal_EDA.R         the exploratory analysis of the data, which
+                                    computed results/application/eda (not
+                                    needed to reproduce the paper)
   results/                        the results of the runs of the paper (read by
                                   the analysis scripts)
     application/                    the compact results of the 66 models, and
@@ -84,6 +88,18 @@ the table or figure of the paper it produces.
 Every script runs from a terminal (`Rscript <script>`, in `code/`) or from
 RStudio (open it and press *Source*). Options are given on the command line as
 `--name=value`; the header of every script lists them.
+
+The scripts use Stem as an ordinary dependency: they check that the installed
+version is the one the results were computed with, and install it otherwise.
+Every routine that uses randomness takes an explicit seed and restores the
+state of the random number generator on exit: the seed of a model of the
+application depends only on its city and fuel, the seed of a replication of
+the simulation study only on its stream and number, and the seed of a
+bootstrap draw only on the seed of the bootstrap and on the draw. The results
+therefore do not depend on the number of cores, on the order in which models
+or replications are run, or on the machine; they reproduce exactly for the
+simulation study and up to the numerical precision of the platform for the
+application.
 
 The scripts were checked on R 4.5.1 and R 4.6.1 (Windows): the two analysis
 scripts, a model of the application run from the weekly data (completion of
@@ -206,9 +222,10 @@ given in its header.
 | `eda/fig_app_centring.png`, `eda/fig_app_centring_stations.csv` | Appendix C, Figure C1 and its text |
 
 The `eda/` outputs describe the weekly data before any model is fitted. They
-come from the exploratory analysis of the data, which is not part of this
-folder; they are stored in `results/application/eda` and
-`AppFuels_04_Analysis.R` copies them among its outputs.
+were computed by the exploratory analysis of the data,
+`internal/AppFuels_Internal_EDA.R` (see `internal/README.md`); they are stored
+in `results/application/eda` and `AppFuels_04_Analysis.R` copies them among
+its outputs.
 
 ### The compact results
 
