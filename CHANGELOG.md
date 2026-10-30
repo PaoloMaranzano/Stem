@@ -16,6 +16,43 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-29
+
+**A vignette for the numerical experiments on the estimation algorithms.** The
+experiments that support the estimation algorithms and their defaults (the
+checks of correctness and exactness, the four algorithms at three tolerances,
+the accuracy against the true values, the time of whole grids, the effect of
+the limits of the range) were Section A1.13 of the paper's Computational and
+Algorithmic Supplement. At the author's request they now live in the package
+documentation, as `vignettes/estimation-experiments.Rmd` ("5. Numerical
+experiments on the estimation algorithms"), text and tables unchanged; the
+supplement points to it. Two more parts of that section of the supplement
+moved to the vignettes: the account of the jitter of $0.01 I$ that the earlier
+versions added to the matrices they inverted, with its table (Section 8 of the
+same vignette), and the organization of the iterations, with the functions and
+the settings of `STEM_control()` that run them (vignette "3. Map of the
+package", section "2. The estimation engine"). `dev/sync-paper.R` builds Supplement A from
+`supplement-computational.tex`, its new name in the Overleaf project.
+
+### 2026-10-27
+
+**The regimes of the application against a purely spatial partition.** The
+paper says that the regimes of the fuel application are groups of brands
+rather than districts, on the strength of an adjusted Rand index of 0.23
+(median) between the regimes and the brands. A reader asked for a benchmark,
+and `papers/sc-stem-local-leader/code/application/03-results.R` now gives one:
+the same index between the regimes and the k-means partition of the
+coordinates of the stations into as many groups (`fu_ari_space()` in
+`functions.R`). It is -0.02 to 0.10 (median 0.01) and below the index with the
+brands in all 44 models of settings 1 and 3. The new column "ARI space" of
+Table C1 and two rows of `app_numbers.csv` carry it; the k-means restores the
+random stream, so every other table and figure is unchanged byte for byte.
+The script also reads the compressed draws through `readLines(gzfile())`:
+`fread` on a `.gz` file took about 17 seconds per file on Windows, and the
+script now runs in seconds again. The manuscript PDFs were rebuilt after the
+text revision that followed (predictive leadership, the limits of the
+evidence, the data source, the titles of the supplements).
+
 ### 2026-10-23
 
 **The simulation study is complete: 200 replications per cell.** The second

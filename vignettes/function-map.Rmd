@@ -75,6 +75,30 @@ and the lag-one covariance smoother at the current parameters. Underneath:
 Closed-form M-steps update $\beta$, $\sigma^2_\omega$, $G$, $\Sigma_\eta$ and
 $m_0$; the Newton-Raphson step handles $\theta$ and $\sigma^2_\varepsilon$.
 
+**How the iterations are organized.** Four algorithms are available, chosen by
+`STEM_control(algorithm = )`: `"SQUAREM"` (the default), `"EM"`, `"ECME"` and
+`"SQUAREM-ECME"`, which extrapolates the ECME iterations. One iteration is a
+*map*, the parameters in and the parameters out together with the
+log-likelihood at the parameters in, and the map is run either plainly or by
+SQUAREM until the stopping rule. `STEM_Estimation()` builds the data of the fit
+once (distances, covariates, the index of the observed rows), runs the
+algorithm, and calls `kalman()` once more at the estimates for the
+log-likelihood and the smoothed states it reports, so that estimates,
+log-likelihood and states always refer to the same parameters.
+
+The settings are those of `STEM_control()`: `em_tol_par`, `em_tol_loglik`,
+`em_maxit` and `em_stop` for the pooled fit and the final refits;
+`alt_em_tol_par`, `alt_em_tol_loglik` and `alt_em_maxit` inside the
+alternation of SC-STEM; `nr_maxit` for the Newton-Raphson step. Each fit
+reports in `convergence.par` the number of iterations, the Newton-Raphson
+iterations of each, the algorithm, whether the stopping rule was met, the
+limits of $\theta$ and whether the estimate sits at one of them
+(`convergence.par$theta.bound` in `STEM_Estimation()`, `theta_bound` in
+`SCSTEM_Estimation()`). The algorithms, the stopping rule and the limits of
+$\theta$ are described in Section A1 of the Computational and Algorithmic
+Supplement of the SC-STEM paper; the experiments behind the defaults are in the
+vignette "5. Numerical experiments on the estimation algorithms".
+
 ### 3. Simulation, prediction and uncertainty
 
 * `STEM_Simulation()` draws a new dataset from a `STEM_Model` at the parameter

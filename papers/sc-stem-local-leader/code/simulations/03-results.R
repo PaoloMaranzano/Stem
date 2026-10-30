@@ -21,31 +21,36 @@
 ##   Part A, the results
 ##     fig_sim_main.png               Figure 1 (Section 4.2)
 ##     fig_sim_signal.png             Figure 2 (Section 4.2)
-##     tab_sim_cost.tex               Supplement B, Table B8 (Section B8)
-##     tab_sim_reference.tex          Supplement B, Table B9 (Section B9)
-##     fig_sim_core_select.png        Supplement B, Figure B6
-##     tab_sim_core_select.tex        Supplement B, Table B10
-##     tab_sim_null.tex               Supplement B, Table B11
-##     tab_sim_core_ari.tex           Supplement B, Table B12
+##     tab_sim_reference.tex          Supplement B, Table B7 (Section B6.1)
+##     fig_sim_core_select.png        Supplement B, Figure B6 (Section B6.2)
+##     tab_sim_core_select.tex        Supplement B, Table B8
+##     tab_sim_null.tex               Supplement B, Table B9
+##     tab_sim_core_ari.tex           Supplement B, Table B10 (Section B6.3)
 ##     fig_sim_core_ari.png           Supplement B, Figure B7
-##     fig_sim_params.png             Supplement B, Figure B8
-##     tab_sim_params_reference.tex   Supplement B, Table B13
-##     tab_sim_params_relrmse.tex     Supplement B, Table B14
-##     fig_sim_robustness.png         Supplement B, Figure B9
-##     tab_sim_robustness_select.tex  Supplement B, Table B15
-##     tab_sim_robustness_ari.tex     Supplement B, Table B16
-##     fig_sim_penalty.png            Supplement B, Figure B10
-##     tab_sim_criteria_correct.tex   Supplement B, Table B17
+##     fig_sim_params.png             Supplement B, Figure B8 (Section B6.4)
+##     tab_sim_params_reference.tex   Supplement B, Table B11
+##     tab_sim_params_relrmse.tex     Supplement B, Table B12
+##     fig_sim_robustness.png         Supplement B, Figure B9 (Section B6.5)
+##     tab_sim_robustness_select.tex  Supplement B, Table B13
+##     tab_sim_robustness_ari.tex     Supplement B, Table B14
+##     fig_sim_penalty.png            Supplement B, Figure B10 (Section B6.6)
+##     tab_sim_criteria_correct.tex   Supplement B, Table B15 (Section B6.7)
+##     tab_sim_cost.tex               the time of a replication by d and T; no
+##                                    longer in the paper (Section B5 gives the
+##                                    total core-hours)
 ##   Part B, the design
-##     fig_sim_overview.png           Figure B1 of Appendix B; Supplement B, Figure B1
-##     tab_sim_geometry.tex           Supplement B, Table B2 (Section B3.2)
-##     fig_sim_geometry.png           Supplement B, Figure B2
-##     tab_sim_scenarios.tex          Supplement B, Table B4 (Section B5)
-##     fig_sim_variance.png           Supplement B, Figure B3
-##     fig_sim_correlation.png        Supplement B, Figure B4
-##     fig_sim_data.png               Supplement B, Figure B5
-##     tab_sim_separation.tex         Supplement B, Table B6 (Section B6)
-##     tab_sim_blocks.tex             Supplement B, Table B7 (Section B7)
+##     fig_sim_overview.png           Figure B1 of Appendix B; Supplement B,
+##                                    Figure B5 (Section B5)
+##     tab_sim_geometry.tex           Supplement B, Table B1 (Section B2.2)
+##     fig_sim_geometry.png           Supplement B, Figure B1
+##     fig_sim_variance.png           Supplement B, Figure B2 (Section B3.2)
+##     fig_sim_correlation.png        Supplement B, Figure B3
+##     fig_sim_data.png               Supplement B, Figure B4
+##     tab_sim_separation.tex         Supplement B, Table B5 (Section B4)
+##     tab_sim_blocks.tex             Supplement B, Table B6 (Section B5)
+##     tab_sim_scenarios.tex          every parameter value with the derived
+##                                    quantities; no longer in the paper (the
+##                                    values are in Table B2 of Supplement B)
 ## The other outputs (.csv, and the parts R1 to R11 below) are the tables
 ## behind them and the numbers quoted in the text of Section 4 and Supplement B.
 ##
@@ -1017,7 +1022,7 @@ if (nrow(sg)) {
 ## (c) the relative error of the parameters at the true K at the reference
 ##     cell, well and weakly separated scenario-variants apart.
 ## The scenario-variants run from the most to the least separated (the
-## separation measure of Supplementary Material B, Section B6).
+## separation measure of Supplementary Material B, Section B4).
 SEP_ORDER <- c("S2", "S1s-ind", "S3error-shr", "S3theta-shr", "S1s-shr", "S3Seta-shr",
                "S3G-shr", "S3beta-shr", "S1w-shr")
 WEAK <- c("S3beta-shr", "S1w-shr")

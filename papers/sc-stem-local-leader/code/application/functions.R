@@ -659,6 +659,27 @@ fu_ari <- function(a, b) {
   (s_ij - e) / (mx - e)
 }
 
+## The adjusted Rand index between a partition of the stations and a purely
+## spatial partition with the same number of groups: k-means on the
+## coordinates of the stations, projected on a plane in kilometers (longitude
+## scaled by the cosine of the mean latitude), with many random starts. It is
+## the benchmark of the index between the regimes and the brands: if the
+## regimes were districts, they would agree with the spatial partition more
+## than with the brands. The seed makes the random starts reproducible; the
+## random stream of the caller is restored on exit, so that the random jitter
+## of the figures drawn afterwards does not change.
+fu_ari_space <- function(regime, lon, lat, seed, nstart = 50L) {
+  K <- length(unique(regime))
+  if (K < 2L) return(NA_real_)
+  xy <- 111.2 * cbind(lon * cos(mean(lat) * pi / 180), lat)
+  if (exists(".Random.seed", envir = globalenv())) {
+    old <- get(".Random.seed", envir = globalenv())
+    on.exit(assign(".Random.seed", old, envir = globalenv()))
+  } else on.exit(rm(".Random.seed", envir = globalenv()))
+  set.seed(seed)
+  fu_ari(regime, stats::kmeans(xy, K, nstart = nstart, iter.max = 100L)$cluster)
+}
+
 
 ## ===========================================================================
 ## 8. The check of the local maxima of a selected fit

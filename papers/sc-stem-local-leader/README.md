@@ -2,8 +2,8 @@
 
 This folder holds the paper
 
-> P. Maranzano, *Latent Spatial Regimes in Spatio-Temporal State-Space Models,
-> with an Application to Local Price Leadership in Fuel Markets*
+> P. Maranzano, *Latent Spatial Regimes in Spatio-Temporal State-Space Models:
+> Evidence on Local Price Leadership in Italian Fuel Markets*
 
 with its supplementary material, the data of its application and the code
 that reproduces the application to Italian fuel prices (Section 5,
@@ -69,7 +69,9 @@ RStudio (open it and press *Source*). Options are given on the command line as
 
 The prices come from Osservaprezzi Carburanti, the platform on which every
 Italian fuel station posts its prices, published by the Italian Ministry of
-Enterprises and Made in Italy. The full file, one row per station and day
+Enterprises and Made in Italy as open data
+(<https://www.mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti>,
+license IODL 2.0). The full file, one row per station and day
 since 2016, is not included: the stations of the eleven metropolitan cities of
 the application were selected and pre-treated from it (codes of the same site
 linked, highway stations excluded, regular reporting and active price setting
@@ -223,8 +225,10 @@ observations that `02-run.R` also writes are left out: the analysis does not
 use them, and any replication can be drawn again from its seed. A few lines
 broken by the synchronization client while the runs appended to the files
 were dropped, and 17 replications failed for reasons unrelated to the
-estimator (Section B9 of Supplement B).
+estimator (Section B6 of Supplement B).
 
 `03-results.R` without options reads `results/simulations` and writes into
-`output/simulations/paper` in about half an hour; its header lists every
-output with its place in the paper.
+`output/simulations/paper` in about an hour and a half on a desktop computer,
+most of it for re-applying the selection rule with seven criteria to every
+replication (section R9 of the script); its header lists every output with
+its place in the paper.

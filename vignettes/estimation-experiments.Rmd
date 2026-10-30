@@ -1,0 +1,208 @@
+---
+title: "5. Numerical experiments on the estimation algorithms"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{5. Numerical experiments on the estimation algorithms}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+This vignette documents the numerical experiments behind the estimation
+algorithms of the package and their defaults. The algorithms themselves -- the
+EM algorithm and where it is slow, ECME, SQUAREM and SQUAREM-ECME, the stopping
+rule and the limits of the range -- are described in Section A1 of the
+Computational and Algorithmic Supplement of the paper *Latent Spatial Regimes
+in Spatio-Temporal State-Space Models: Evidence on Local Price Leadership in
+Italian Fuel Markets*. Until the version of 2026-10-29 Sections 1 to 7 below
+were Section A1.13 of that supplement, and Section 8, on the jitter that the
+earlier versions of the package added to the matrices they inverted, was
+Section A1.11.
+
+## 1. Design
+
+The experiments use the data-generating process of the simulation study of the
+paper (its Simulation Supplement). Single fits are those of the three regimes of
+the reference cell (S1s-ind, $n = 100$ locations, $T = 120$, $\omega = 0.7$;
+regimes of $33$ or $34$ locations), each on its true partition and from the
+least-squares start of its own locations, as a final refit would be, and of the
+pooled model on the $100$ locations; whole fits are the grid of
+$K \in \{1, \dots, 4\}$ and seven values of $\phi$ followed by the selection
+rule, on six cells chosen among the lightest and the heaviest of the design. The
+scripts are in the replication material of the paper.
+
+## 2. Correctness of the implementation
+
+With the plain EM algorithm and a jitter of $0.01\,I$, the current code
+reproduces the previous implementation of the package to $10^{-13}$, iteration
+by iteration and over whole fits, on complete and incomplete data, with the
+latent process or the spatial correlation switched off, under a ridge penalty
+and an elastic net on $\beta$, and with $p = 2$. The augmented filter of ECME
+reproduces, to $10^{-10}$, the generalized least-squares estimator computed on
+the explicit $dT \times dT$ covariance of the data, missing values included.
+Without the jitter, the iterations converge to the maximum of the exact
+log-likelihood found by BFGS (Section 8).
+
+## 3. Exactness of what the package reports
+
+The checks above compare the package with itself or with the filter. The
+quantities it reports were also compared with computations on the full
+covariance of the stacked observations, on a model of seven locations and
+thirty periods with twelve values missing: the log-likelihood returned is the
+Gaussian log-likelihood of the observed values to $10^{-14}$, under EM, ECME and
+SQUAREM; the estimates are the maximum of that log-likelihood found by a
+general-purpose optimizer, to a largest relative difference of
+$2 \cdot 10^{-5}$; the smoothed states and the fitted signal are the conditional
+means to $3 \cdot 10^{-15}$. The simulator used by both bootstraps reproduces
+the mean and the covariance of the model within Monte Carlo error over $20{,}000$
+data sets. These checks are part of the test suite of the package. They found
+one defect, inherited from the first version of the package: the log-likelihood
+returned by the pooled fit was four times the log-likelihood, since the EM loop
+stored $-2\ell$ and multiplied it by $-2$ again. The iterations were unaffected,
+but the information criteria computed from the returned value weighted the
+likelihood four times against the penalty; the current version returns $\ell$,
+and every result in the paper and in its supplements uses it.
+
+## 4. The four algorithms reach the same maximum
+
+On a small simulated model run to a tolerance of $10^{-7}$ on both criteria,
+the four algorithms stop at the same log-likelihood to $10^{-9}$ and the same
+range to $10^{-6}$, after $177$ (EM), $178$ (ECME), $39$ (SQUAREM) and $30$
+(SQUAREM-ECME) iterations. On the single fits of ten replications, the maximum
+was computed by SQUAREM-ECME at a tolerance of $10^{-10}$, and it coincides
+with the BFGS maximum wherever the latter was computed. At a given tolerance the
+algorithms stop at different distances from it (Table 1): at the default
+tolerances the median shortfall of the log-likelihood is $0.02$ units for EM
+and ECME and $0.003$ for SQUAREM and SQUAREM-ECME, and the median of the largest
+relative distance of a parameter from the maximum is $3.8\%$, $3.2\%$, $1.4\%$
+and $1.1\%$. The largest distances are those of parameters near zero (the
+persistence of a regime with $G \approx 0.02$, the innovation variance of a
+pooled fit with $\Sigma_\eta \approx 0$), whose relative error is large while
+the absolute one is small.
+
+**Table 1.** Single fits (three regimes and the pooled model, ten replications
+of the reference cell) at three tolerances on both criteria. Time: seconds per
+replication (four fits); iterations: mean per fit; shortfall:
+$\ell(\hat\psi) - \ell$ at the stop, median and maximum; error: largest
+relative distance of a parameter other than $m_0$ from the maximum, median and
+90th percentile (%).
+
+| tolerance | algorithm | time | iterations | shortfall, median | shortfall, max | error, median | error, p90 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| $10^{-2}$ | EM | 5.5 | 38.5 | 0.12 | 18 | 8.0 | 97 |
+| | ECME | 6.5 | 36.2 | 0.11 | 18 | 7.2 | 92 |
+| | SQUAREM | 2.4 | 18.1 | 0.065 | 18 | 6.2 | 92 |
+| | SQUAREM-ECME | 2.8 | 15.8 | 0.10 | 18 | 7.3 | 69 |
+| $10^{-3}$ (default) | EM | 12.7 | 89.0 | 0.020 | 4.2 | 3.8 | 28 |
+| | ECME | 15.2 | 83.5 | 0.017 | 4.3 | 3.2 | 20 |
+| | SQUAREM | 4.6 | 34.3 | 0.0027 | 0.17 | 1.4 | 9.6 |
+| | SQUAREM-ECME | 5.2 | 29.6 | 0.0023 | 4.3 | 1.1 | 6.5 |
+| $10^{-4}$ | EM | 23.6 | 165.7 | 0.0026 | 0.23 | 1.3 | 10 |
+| | ECME | 26.7 | 148.8 | 0.0020 | 0.23 | 1.1 | 6.3 |
+| | SQUAREM | 6.7 | 50.2 | 0.00028 | 0.053 | 0.38 | 4.5 |
+| | SQUAREM-ECME | 7.6 | 42.8 | 0.000032 | 0.050 | 0.10 | 1.2 |
+
+The maxima of the shortfall at $10^{-3}$ come from one regime, where EM, ECME
+and SQUAREM-ECME stopped on a plateau on which the field takes the place of the
+latent process ($\theta = 0.21$ against $2.45$ at the maximum, $4$ units short)
+and SQUAREM, extrapolating, crossed it.
+
+## 5. Accuracy against the true values
+
+The numerical error adds to the statistical one. Table 2 gives the relative
+root mean squared error of the estimates of the three regimes against the true
+values of the simulation: at the default tolerances SQUAREM matches the exact
+maximum on every parameter, while EM, ECME and SQUAREM-ECME, which stop farther
+from it, lose accuracy on the range ($24.5\%$ to $24.9\%$ against $18.5\%$) and
+on $\sigma^2_\epsilon$. At $10^{-4}$ every algorithm is within $0.3$ points of
+the maximum on every parameter. The regression coefficients are unaffected
+throughout.
+
+**Table 2.** Relative root mean squared error (%) against the true values,
+three regimes of the reference cell, ten replications, at the default
+tolerances. "Maximum": the exact maximum of the likelihood.
+
+| parameter | maximum | EM | ECME | SQUAREM | SQUAREM-ECME |
+|---|---:|---:|---:|---:|---:|
+| $\beta_0$ | 5.3 | 5.4 | 5.3 | 5.4 | 5.3 |
+| $\beta_1$ | 2.1 | 2.1 | 2.1 | 2.1 | 2.1 |
+| $G$ | 34.2 | 31.1 | 33.6 | 32.1 | 33.6 |
+| $\sigma^2_\eta$ | 16.4 | 17.0 | 17.2 | 16.4 | 17.1 |
+| $\sigma^2_\epsilon$ | 6.8 | 8.9 | 8.9 | 6.8 | 9.3 |
+| $\sigma^2_\omega$ | 12.3 | 10.7 | 10.7 | 12.1 | 11.7 |
+| $\theta$ | 18.5 | 24.5 | 24.6 | 18.8 | 24.9 |
+
+## 6. Computing time on whole fits
+
+On a machine with cores of different speed, wall times are comparable only
+within one process. Each job of this experiment ran the whole grid and the
+selection under the four algorithms one after the other, in the same process
+and in an order rotated across jobs, and the time relative to EM was estimated
+net of the position in the job by a regression of the log-time on the job, the
+algorithm and the position (Table 3). SQUAREM took $0.53$ times the time of EM
+($95\%$ interval $0.45$ to $0.64$), $0.58$ on the light cells and $0.46$ on the
+heavy ones; SQUAREM-ECME $0.62$; ECME $1.17$. No fit reached the limit on the
+iterations, every algorithm selected the same number of regimes in every job,
+and at the true number of regimes SQUAREM was at most $0.10$ units of
+log-likelihood from the best of the four. EM was up to $3.4$ units short, ECME
+and SQUAREM-ECME up to $10.9$, in the weak scenario at $n = 40$.
+
+**Table 3.** Whole SC-STEM grids, two replications per cell: time relative to
+EM (geometric mean over the replications) and seconds of EM per replication.
+
+| cell | EM (s) | ECME | SQUAREM | SQUAREM-ECME |
+|---|---:|---:|---:|---:|
+| S1s-ind, $n = 40$, $T = 60$ | 21 | 1.12 | 0.75 | 0.90 |
+| S1w-shr, $n = 40$, $T = 60$ | 30 | 1.36 | 0.53 | 0.74 |
+| S1s-ind, $n = 100$, $T = 120$ | 68 | 1.17 | 0.49 | 0.55 |
+| S3Seta-shr, $n = 200$, $T = 365$ | 239 | 1.25 | 0.51 | 0.59 |
+| S1s-ind, $n = 200$, $T = 365$, $\omega = 0$ | 399 | 1.15 | 0.30 | 0.35 |
+| S2, $n = 400$, $T = 120$ | 293 | 1.02 | 0.78 | 0.78 |
+| all, net of the position | | 1.17 | 0.53 | 0.62 |
+
+## 7. The limits of the range
+
+The same grids were run before and after the limits and the safeguards of the
+range (Section A1.10 of the supplement). On the $24$ single fits of three
+replications of the reference cell, where nothing binds, the results are
+identical to $10^{-9}$, iterations included. On the whole grids, the fits at
+the true number of regimes are unchanged in $40$ of $48$ cases and better in
+the other $8$, all in the weak scenario at $n = 40$, by $0.3$ to $16.5$ units
+of log-likelihood; the selected models are unchanged. The total time of the
+grids fell from $2585$ to $2102$ seconds for EM and from $1747$ to $1057$ for
+SQUAREM; on the replication that had cost most, a small cell whose regimes ran
+toward the boundary, from $362$ to $29$ seconds for EM and from $1416$ to $25$
+for SQUAREM, where two regimes had reached the limit of $500$ iterations.
+
+## 8. Why the iterations add no jitter
+
+The earlier versions of the package added a jitter of $0.01\,I$ to every matrix
+the iterations inverted, that is, a small constant on the diagonal for
+numerical stability, not a penalty on the parameters, while the filter that
+computes $\ell$ added nothing. The iterations then converge to a fixed point
+$\psi_r$ that is not $\hat\psi$: a perturbation $\delta$ of the map moves its
+fixed point by $(I - J)^{-1}\delta$, with $J$ the Jacobian of the EM map at the
+maximum (Section A1.6 of the supplement), so a perturbation of $1\%$ of the
+update of $\sigma^2_\omega$ is amplified along the split of the variance, the
+slowest direction of these fits, whose rate is about $0.93$, by
+$1/(1 - 0.93) \approx 14$. On replication 1 of the reference cell the variance
+parameters were off by $3$ to $13\%$ in the regimes and $\Sigma_\eta$ of the
+pooled fit by $84\%$, at any tolerance (Table 4). Every matrix inverted is
+positive definite at admissible parameters, and the current version adds no
+jitter.
+
+**Table 4.** The fixed point of the iterations with a jitter of $0.01\,I$
+against the maximum of the likelihood (BFGS on the exact log-likelihood),
+replication 1 of the reference cell: shortfall of the log-likelihood and
+relative difference of the parameters (%). Without the jitter the same
+iterations converge to the maximum.
+
+| fit | $d$ | $\ell(\hat\psi) - \ell(\psi_r)$ | $G$ | $\sigma^2_\eta$ | $\sigma^2_\omega$ | $\sigma^2_\epsilon$ | $\theta$ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| regime 1 | 34 | 0.43 | $-0.3$ | $+1.6$ | $-7.6$ | $+3.8$ | $-1.7$ |
+| regime 2 | 33 | 0.31 | $-0.3$ | $+0.3$ | $-9.6$ | $+3.1$ | $-4.7$ |
+| regime 3 | 33 | 0.52 | $+77.9$ | $+0.0$ | $-12.9$ | $+6.9$ | $-9.1$ |
+| pooled | 100 | 1.73 | $-6.4$ | $+84.3$ | $-13.3$ | $+0.3$ | $+13.4$ |

@@ -97,9 +97,13 @@ num <- function(place, quantity, value)
 ## ===========================================================================
 ## 1. The results of every model
 ## ===========================================================================
+## A compressed file is decompressed by R and handed to fread as text: on some
+## systems fread decompresses through a temporary file, which is far slower.
 rd <- function(s, m, f, ...) {
   p <- file.path(OPT$results, sprintf("setting%d", s), m, f)
-  if (file.exists(p)) as.data.frame(data.table::fread(p, na.strings = c("", "NA"), ...)) else NULL
+  if (!file.exists(p)) return(NULL)
+  if (grepl("[.]gz$", p)) as.data.frame(data.table::fread(text = readLines(gzfile(p)), na.strings = c("", "NA"), ...))
+  else as.data.frame(data.table::fread(p, na.strings = c("", "NA"), ...))
 }
 SM <- do.call(rbind, lapply(1:3, function(s)
   utils::read.csv(file.path(OPT$results, sprintf("setting%d", s), "models.csv"), stringsAsFactors = FALSE)))
@@ -109,6 +113,17 @@ SM$city <- factor(FU_CITY[sub("_.*$", "", SM$model)], FU_CITY_ORDER)
 ## the models in the order of the runs (setting, city as in FU_CITY, gasoline
 ## first), which the random jitter of Figure 5 follows
 SM <- SM[order(SM$setting, match(sub("_.*$", "", SM$model), names(FU_CITY)), match(SM$fuel, FU_FUEL)), ]
+## The benchmark of the adjusted Rand index between the regimes and the brands
+## (column ari_regimes_brands, written by 02-models.R): the same index between
+## the regimes and a purely spatial partition of the stations Y with as many
+## groups (k-means on their coordinates; see fu_ari_space). The regimes are
+## groups of brands rather than districts if the first index exceeds the
+## second. The seed of a model is the one of its fit.
+SM$ari_regimes_space <- vapply(seq_len(nrow(SM)), function(i) {
+  cc <- sub("_.*$", "", SM$model[i])
+  g <- rd(SM$setting[i], SM$model[i], "regimes.csv")
+  fu_ari_space(g$regime, g$y_lon, g$y_lat, seed = fu_seed(cc, names(FU_FUEL)[match(SM$fuel[i], FU_FUEL)]))
+}, numeric(1))
 
 ## One row per regime of the selected fits: size, brands, distance to X, the
 ## p-values of the four bootstrap Wald tests, and the long-run pass-through
@@ -354,16 +369,18 @@ num("Section 5.3, Figure 4 caption", "Milan, diesel, setting 3: size, Eni share 
 ## --- Table C1 (Section C3): the selected models -----------------------------
 mod <- SM[order(SM$setting, SM$city, SM$fuel), ]
 csv_write(mod, "tab_app_models.csv")
-tex_write(c("\\begin{longtable}{llrrrlrrr}",
+tex_write(c("\\begin{longtable}{llrrrlrrrr}",
   lt_head(paste("The selected models. $K_{\\max}$, the largest number of regimes of the grid; $\\hat K$, $\\hat\\phi$",
                 "and the sizes of the regimes of the selected fit; ARI brands, the adjusted Rand index between the regimes",
-                "and the brands of the stations $Y$ (not defined in setting 2, where they are all independent); usable",
-                "draws, of $B = 100$; ARI draws, the median adjusted Rand index between the partitions of the bootstrap",
-                "draws and the estimated one."), "tab:sc:models",
-          "setting & city & fuel & pumps & $K_{\\max}$ & $\\hat K$, $\\hat\\phi$, sizes & ARI brands & usable draws & ARI draws \\\\"),
-  sprintf("%d & %s & %s & %d & %d & %d, %s, %s & %s & %d & %.2f \\\\", mod$setting, en(mod$city), mod$fuel, mod$pumps,
+                "and the brands of the stations $Y$ (not defined in setting 2, where they are all independent); ARI space,",
+                "the same index between the regimes and the $k$-means partition of the coordinates of the stations $Y$",
+                "into $\\hat K$ groups; usable draws, of $B = 100$; ARI draws, the median adjusted Rand index between the",
+                "partitions of the bootstrap draws and the estimated one."), "tab:sc:models",
+          "setting & city & fuel & pumps & $K_{\\max}$ & $\\hat K$, $\\hat\\phi$, sizes & ARI brands & ARI space & usable draws & ARI draws \\\\"),
+  sprintf("%d & %s & %s & %d & %d & %d, %s, %s & %s & %s & %d & %.2f \\\\", mod$setting, en(mod$city), mod$fuel, mod$pumps,
           mod$K_max, mod$K, format(mod$phi), mod$sizes,
           ifelse(is.na(mod$ari_regimes_brands), "--", sprintf("%.2f", mod$ari_regimes_brands)),
+          ifelse(is.na(mod$ari_regimes_space), "--", sprintf("%.2f", mod$ari_regimes_space)),
           mod$B_valid, mod$ari_draws_median),
   "\\bottomrule", "\\end{longtable}"), "tab_app_models.tex")
 
@@ -492,6 +509,10 @@ num("Section 5.3, Q2", "setting 2: range of K", range(SM$K[SM$setting == 2]))
 num("Section 5.3, Q2, and Section C3", "models with phi = 0; with phi <= 0.2 (of 66)", c(sum(SM$phi == 0), sum(SM$phi <= 0.2)))
 num("Section 5.3, Q2, and Section C3", "ARI between regimes and brands, settings 1 and 3: min, max, median",
     round(c(range(s13$ari_regimes_brands), stats::median(s13$ari_regimes_brands)), 3))
+num("Section 5.3, Q2, and Section C3", "ARI between regimes and the k-means partition of the coordinates, settings 1 and 3: min, max, median",
+    round(c(range(s13$ari_regimes_space), stats::median(s13$ari_regimes_space)), 3))
+num("Section 5.3, Q2, and Section C3", "settings 1 and 3: models where the ARI with the brands exceeds the ARI with space, of 44",
+    sum(s13$ari_regimes_brands > s13$ari_regimes_space))
 eni1 <- REG[REG$setting != 2 & REG$top_share == 1 & REG$top_brand == "Agip Eni", ]
 num("Section 5.3, Q2, and Section C3", "settings 1 and 3: models with a regime of Eni stations only; their sizes",
     c(length(unique(paste(eni1$setting, eni1$model))), range(eni1$pumps)))

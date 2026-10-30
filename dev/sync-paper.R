@@ -32,7 +32,7 @@ dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 ## the documents, and the name of each PDF in the repository
 DOCS <- c("main"                   = "sc-stem-local-leader.pdf",
-          "supplement"             = "supplement-A-estimation.pdf",
+          "supplement-computational" = "supplement-A-estimation.pdf",
           "supplement-simulations" = "supplement-B-simulations.pdf",
           "supplement-application" = "supplement-C-application.pdf",
           "code-supplement"        = "code-supplement.pdf")
