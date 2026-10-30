@@ -1,0 +1,7 @@
+"setting","fuel","order_q25","order_median","order_q75"
+1,"diesel",2,3,5
+2,"diesel",2,4,6
+3,"diesel",2,3,5
+1,"gasoline",2,3,6
+2,"gasoline",2,4,6
+3,"gasoline",2,3,6

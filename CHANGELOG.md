@@ -16,6 +16,46 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-30
+
+**The replication package of the paper in eight numbered scripts.** At the
+author's request, `papers/sc-stem-local-leader/code` is now one folder of
+scripts named after the part of the paper they reproduce, with the code
+unchanged: `AppFuels_00_Setup.R` (the settings and the functions of the
+application), `AppFuels_01_RunSetting1.R` to `AppFuels_03_RunSetting3.R` (the
+22 models of each setting), `AppFuels_04_Analysis.R` (every table, figure and
+number of Section 5 and Supplement C), `Sims_00_Setup.R` (the generator, the
+Monte Carlo, the runner and the design), `Sims_01_Run.R` and
+`Sims_02_Analysis.R`. Every script opens with the title of the paper, its
+author, what it does and what it writes, and every section of the two analysis
+scripts names the table or figure it produces. The run scripts start from the
+weekly dataset of `data/`, the dataset of the paper: `fu_setting_data()` builds
+the data of a setting (relative prices, completion of the missing weeks by a
+pooled STEM model, cached and shared by the settings, pairs, pulses), which the
+old `01-data-and-eda.R` wrote to `cases.rds`. The exploratory analysis of the
+data (Sections 5.1 and 5.2, Figure C1 of Appendix C, Sections C1 and C2 of
+Supplement C) is no longer part of the package: it is
+`dev/replication/AppFuels_Internal_EDA.R`, and its outputs are stored in
+`results/application/eda`, from where `AppFuels_04_Analysis.R` copies them.
+Checked against the old scripts: the data of the three settings are identical
+(`identical()`); the stored exploratory outputs are identical byte for byte;
+the analysis writes the same 28 files byte for byte; setting 2, Messina,
+gasoline, run again from the weekly data matches the shipped results within
+5e-12; the design printed by `Sims_00_Setup.R` is identical; one replication
+of the simulation study run by `Sims_01_Run.R` on Stem `0f7b744` matches the
+stored one exactly; and `Sims_02_Analysis.R` writes the same 38 tables and csv files byte for byte, its figures differing from those of the old script only in the anti-aliasing (at most 679 of 28 million pixel values), as two runs of the same script do. The scripts of the original pipeline that
+were in `dev/replication`, with their outputs, are archived in
+`dev/archive/replication-pipeline-2026-10` (its README maps them to the new
+scripts); `dev/lr-bootstrap/fuels-lr-bootstrap.R` finds its functions there.
+`results/` keeps the results of the runs of the paper, which the analysis
+scripts read; `output/` (not versioned) receives the tables and figures of the
+two analysis scripts directly in `output/application` and `output/simulations`,
+and the results of a new run of the models or of the simulations in
+`output/runs`. `dev/sync-gdrive.R` now delivers the package itself to
+`SC-STEM-replication` on the Drive, with the structure it has here, and
+`dev/replication` to its subfolder `internal/`; the original pipeline and the
+raw outputs of the runs are in `_archive/` there.
+
 ### 2026-10-29
 
 **A vignette for the numerical experiments on the estimation algorithms.** The

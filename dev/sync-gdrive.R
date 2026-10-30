@@ -75,7 +75,8 @@ existing <- list.files(dest, recursive = TRUE, all.files = TRUE,
 ## STEM_CACHE pointing inside the mirror would still put them here, and deleting
 ## somebody's simulation output to keep a mirror tidy is not a trade worth making.
 protect <- grepl(paste0("^\\.Rproj\\.user/|^\\.Rhistory$|^\\.RData$|^dev/paper/cache/|",
-                        "^dev/replication/(results|output|application)/"),
+                        "^dev/replication/(results|output|application)/|",
+                        "^papers/sc-stem-local-leader/output/"),
                  existing)
 stale <- setdiff(existing[!protect], tracked)
 if (length(stale)) {
@@ -102,28 +103,32 @@ message("mirror now at commit ", sha)
 
 
 ## ===========================================================================
-## THE REPLICATION MATERIAL
+## THE REPLICATION PACKAGE
 ##
-## dev/replication is also delivered to a folder of its own on the Drive,
-## BESIDE the mirror rather than inside it, because it is used differently:
-## the scripts there are run, from the other machine too, and they write their
-## results beside themselves. So this second copy follows opposite rules.
+## The replication package of the paper, papers/sc-stem-local-leader, is also
+## delivered to a folder of its own on the Drive, SC-STEM-replication, BESIDE
+## the mirror rather than inside it, with the structure it has in the
+## repository (README.md, manuscript/, data/, code/, results/); the internal
+## material of dev/replication goes into its subfolder internal/. The folder is
+## used differently from the mirror: its scripts are run, from the other
+## machine too, and write their outputs in output/. So this second copy follows
+## opposite rules.
 ##
-##   * nothing is ever deleted there: results, logs and whatever else a run
+##   * nothing is ever deleted there: outputs, logs and whatever else a run
 ##     leaves are the point of the folder;
-##   * a script is updated from the repository only if nobody has edited it
-##     there since the last sync. The setup block of run-simulations.R is meant
-##     to be edited, and an edit made on the other machine must not be silently
-##     overwritten. When both sides changed, the repository version is written
-##     beside it as <name>.from-repo and the conflict is reported.
+##   * a file is updated from the repository only if nobody has edited it there
+##     since the last sync: an edit made on the other machine must not be
+##     silently overwritten. When both sides changed, the repository version is
+##     written beside it as <name>.from-repo and the conflict is reported.
 ##
-## What was delivered last time is recorded in .synced, one md5 per script,
-## which is how an edit made on the Drive is told apart from a stale copy.
+## What was delivered last time is recorded in .synced, one md5 per file (by
+## its path in the folder), which is how an edit made on the Drive is told
+## apart from a stale copy.
 ## ===========================================================================
-repl_src <- file.path(repo, "dev", "replication")
+repl_map <- c("papers/sc-stem-local-leader/" = "", "dev/replication/" = "internal/")
 repl_dst <- if (length(args) >= 2) args[2] else
   file.path(dirname(dest), "SC-STEM-replication")
-if (dir.exists(repl_src)) {
+if (dir.exists(file.path(repo, "papers", "sc-stem-local-leader"))) {
   if (!dir.exists(repl_dst)) dir.create(repl_dst, recursive = TRUE)
   manifest <- file.path(repl_dst, ".synced")
   last <- if (file.exists(manifest)) {
@@ -131,12 +136,15 @@ if (dir.exists(repl_src)) {
     stats::setNames(m$md5, m$file)
   } else character(0)
 
-  files <- tracked[startsWith(tracked, "dev/replication/")]
-  files <- sub("^dev/replication/", "", files)
+  ## the tracked files of the two sources, each with its path in the folder
+  from <- unlist(lapply(names(repl_map), function(p) tracked[startsWith(tracked, p)]))
+  pre <- vapply(from, function(g) names(repl_map)[startsWith(g, names(repl_map))][1], "")
+  files <- stats::setNames(paste0(repl_map[pre], substring(from, nchar(pre) + 1L)), from)
   n_new <- 0L; conflicts <- character(0); kept <- character(0)
   now <- character(0)
-  for (f in files) {
-    src <- file.path(repl_src, f)
+  for (g in names(files)) {
+    f <- files[[g]]
+    src <- file.path(repo, g)
     tgt <- file.path(repl_dst, f)
     if (!dir.exists(dirname(tgt))) dir.create(dirname(tgt), recursive = TRUE)
     md5_src <- unname(tools::md5sum(src))
@@ -165,8 +173,8 @@ if (dir.exists(repl_src)) {
   }
   utils::write.csv(data.frame(file = names(now), md5 = unname(now)),
                    manifest, row.names = FALSE)
-  message("\nreplication material: ", repl_dst)
-  message("updated ", n_new, " of ", length(files), " script(s); nothing deleted")
+  message("\nreplication package: ", repl_dst)
+  message("updated ", n_new, " of ", length(files), " file(s); nothing deleted")
   if (length(kept))
     message("edited on the Drive and unchanged in the repository, kept: ",
             paste(kept, collapse = ", "))

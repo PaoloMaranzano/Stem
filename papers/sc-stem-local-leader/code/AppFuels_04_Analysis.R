@@ -1,47 +1,62 @@
 ## ===========================================================================
-## APPLICATION, SCRIPT 3 OF 3: THE TABLES, FIGURES AND NUMBERS OF THE PAPER
+## Latent Spatial Regimes in Spatio-Temporal State-Space Models: Evidence on
+## Local Price Leadership in Italian Fuel Markets
 ##
-## Reads the compact results of the 66 models (02-models.R; by default those
-## shipped in results/application) and writes the tables (.tex and
-## .csv), the figures (.png) and the numbers quoted in the text of Section 5 of
-## the paper and of Supplement C. Nothing is fitted: it runs in a minute.
+## Author:  Paolo Maranzano (University of Milano-Bicocca; Fondazione Eni Enrico
+##          Mattei)
+## Script:  AppFuels_04_Analysis.R, the analysis of the application (Section 5
+##          of the paper, Appendix C, Supplement C)
+##
+## What it does: reads the compact results of the 66 models (written by
+## AppFuels_01_RunSetting1.R to AppFuels_03_RunSetting3.R; by default those of
+## the run of the paper, shipped in results/application) and writes every
+## table, figure and number of the application: those of Section 5 of the
+## paper and of Supplement C, computed here, and those of Appendix C and of the
+## description of the data (Sections 5.1, 5.2, C1 and C2), which come from the
+## exploratory analysis of the weekly data, kept outside this package, and are
+## stored in results/application/eda. Nothing is fitted: it runs in a minute.
+##
+## Outputs, in <out> (output/application by default), with the place of
+## the paper each reproduces ("Section", "Table", "Figure" of the paper;
+## "Section C.., Table C.., Figure C.." of Supplement C) and the section of
+## this script that writes it:
+##
+##   tab_app_main.tex/.csv          Table 1 (Section 5.3)                     [2]
+##   fig_app_leadership.png         Figure 3 (Section 5.3)                    [3]
+##   fig_app_passthrough.png        Figure 5 (Section 5.3)                    [4]
+##   fig_app_maps.png               Figure 4 (Section 5.3)                    [5]
+##   fig_app_map_s1_RM_gasoline.png Supplement C, Figure C1 (Section C4), left [5]
+##   fig_app_map_s3_NA_gasoline.png Supplement C, Figure C1 (Section C4), right [5]
+##   tab_app_models.tex/.csv        Supplement C, Table C1 (Section C3)       [6]
+##   tab_app_regimes_s1/2/3.tex     Supplement C, Tables C2 to C4 (Section C4) [6]
+##   tab_app_joint.tex/.csv         Supplement C, Table C5 (Section C4)       [6]
+##   tab_app_distance.tex/.csv      Supplement C, Table C6 (Section C5)       [6]
+##   tab_app_pulses.tex/.csv        Supplement C, Table C7 (Section C7)       [6]
+##   app_numbers.csv                every other number quoted in Sections 5.3
+##                                  and 5.4 and in Sections C3 to C8, one row
+##                                  each, with its place in the paper         [7]
+##   app_*.csv                      the tables behind them (one row per regime,
+##                                  per city, per pulse...)                [1-7]
+##   eda/fig_app_centring.png       Figure C1 of Appendix C                   [8]
+##   eda/fig_app_centring_stations.csv  the premiums quoted in its text      [8]
+##   eda/eda_*.csv                  the numbers of Sections 5.1 and 5.2 of the
+##                                  paper and of Sections C1 and C2 of
+##                                  Supplement C (the map is in section 8)    [8]
+## ===========================================================================
 ##
 ## Run from a terminal, in the folder of this script,
 ##
-##     Rscript 03-results.R
+##     Rscript AppFuels_04_Analysis.R
 ##
 ## or open it in RStudio and press Source. Options (command line):
-##   --results=<folder>  the compact results (default: ../../results/application;
-##                       ../../output/application/results after a run of
-##                       02-models.R)
-##   --eda=<folder>      the exploratory tables of 01-data-and-eda.R, for the
-##                       stickiness of the prices quoted in Section 5.4
-##                       (default: ../../output/application/eda; skipped if absent)
-##   --out=<folder>      the outputs (default: ../../output/application/paper)
+##   --results=<folder>  the compact results (default: ../results/application;
+##                       ../output/runs/application after a run of the
+##                       AppFuels_0<s>_RunSetting<s>.R scripts)
+##   --eda=<folder>      the stored outputs of the exploratory analysis
+##                       (default: ../results/application/eda)
+##   --out=<folder>      the outputs (default: ../output/application)
 ##
-## Every output is listed below with the place of the paper it reproduces
-## ("Section", "Table", "Figure" of the paper; "Section C.., Table C.." of
-## Supplement C):
-##
-##   tab_app_main.tex/.csv          Table 1 (Section 5.3), synthesis of the models
-##   fig_app_leadership.png         Figure 3 (Section 5.3), leadership by city
-##   fig_app_maps.png               Figure 4 (Section 5.3), two partitions
-##   fig_app_passthrough.png        Figure 5 (Section 5.3), the two pass-throughs
-##   tab_app_models.tex/.csv        Supplement C, Table C1 (Section C3)
-##   fig_app_map_s1_RM_gasoline.png Supplement C, Figure C1 (Section C4), left
-##   fig_app_map_s3_NA_gasoline.png Supplement C, Figure C1 (Section C4), right
-##   tab_app_regimes_s1/2/3.tex     Supplement C, Tables C2 to C4 (Section C4)
-##   tab_app_joint.tex/.csv         Supplement C, Table C5 (Section C4)
-##   tab_app_distance.tex/.csv      Supplement C, Table C6 (Section C5)
-##   tab_app_pulses.tex/.csv        Supplement C, Table C7 (Section C7)
-##   app_numbers.csv                every other number quoted in Sections 5.3
-##                                  and 5.4 and in Sections C3 to C8, one row
-##                                  each, with its place in the paper
-##   app_*.csv                      the tables behind them (one row per regime,
-##                                  per city, per pulse...)
-##
-## Figure C1 of Appendix C and the numbers of Sections 5.1, 5.2, C1 and C2 come
-## from 01-data-and-eda.R.
+## Requirements: R (>= 4.2) with data.table; Stem is not needed.
 ## ===========================================================================
 
 suppressPackageStartupMessages(library(data.table))
@@ -54,12 +69,12 @@ HERE <- local({
   }
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
-source(file.path(HERE, "functions.R"))
+source(file.path(HERE, "AppFuels_00_Setup.R"))
 
 OPT <- fu_options(list(
-  results = file.path(HERE, "..", "..", "results", "application"),
-  eda     = file.path(HERE, "..", "..", "output", "application", "eda"),
-  out     = file.path(HERE, "..", "..", "output", "application", "paper")
+  results = file.path(HERE, "..", "results", "application"),
+  eda     = file.path(HERE, "..", "results", "application", "eda"),
+  out     = file.path(HERE, "..", "output", "application")
 ))
 OUT <- OPT$out; dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 options(width = 160)
@@ -94,6 +109,9 @@ num <- function(place, quantity, value)
                                         value = paste(format(value, digits = 3), collapse = "; "))
 
 
+
+
+
 ## ===========================================================================
 ## 1. The results of every model
 ## ===========================================================================
@@ -114,7 +132,7 @@ SM$city <- factor(FU_CITY[sub("_.*$", "", SM$model)], FU_CITY_ORDER)
 ## first), which the random jitter of Figure 5 follows
 SM <- SM[order(SM$setting, match(sub("_.*$", "", SM$model), names(FU_CITY)), match(SM$fuel, FU_FUEL)), ]
 ## The benchmark of the adjusted Rand index between the regimes and the brands
-## (column ari_regimes_brands, written by 02-models.R): the same index between
+## (column ari_regimes_brands, written by the run scripts): the same index between
 ## the regimes and a purely spatial partition of the stations Y with as many
 ## groups (k-means on their coordinates; see fu_ari_space). The regimes are
 ## groups of brands rather than districts if the first index exceeds the
@@ -202,6 +220,9 @@ OPTC <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) rd(SM$setting[i], S
 csv_write(REG, "app_regimes.csv"); csv_write(PUL, "app_pulses.csv")
 
 
+
+
+
 ## ===========================================================================
 ## 2. Table 1 (Section 5.3): one row per setting and fuel
 ## ===========================================================================
@@ -241,6 +262,9 @@ num("Section 5.3, Q1, per pump", "F test: share of stations rejecting, median ov
     range(main_rows$F))
 
 
+
+
+
 ## ===========================================================================
 ## 3. Figure 3 (Section 5.3): leadership city by city
 ## ===========================================================================
@@ -276,6 +300,9 @@ graphics::legend("bottom", horiz = TRUE, bty = "n", cex = 1.05, pt.cex = 1.4, pt
 graphics::mtext("Share of the pumps Y in the regimes where the neighbor X leads (bootstrap Wald test, 5%)",
                 side = 3, line = -1.2, cex = 0.95)
 fig_close("fig_app_leadership.png")
+
+
+
 
 
 ## ===========================================================================
@@ -321,6 +348,9 @@ graphics::legend("bottom", horiz = TRUE, bty = "n", cex = 0.9, fill = c(PAL3[1],
 fig_close("fig_app_passthrough.png")
 
 
+
+
+
 ## ===========================================================================
 ## 5. Figure 4 (Section 5.3) and Figure C1 of Supplement C: maps of regimes
 ## ===========================================================================
@@ -360,6 +390,9 @@ r <- REG[REG$setting == 3 & REG$model == "RM_gasoline", ]
 num("Section 5.3, Figure 4 caption", "Rome, gasoline, setting 3: regimes; regimes where X leads", c(nrow(r), sum(r$lead)))
 r <- REG[REG$setting == 3 & REG$model == "MI_diesel", ]
 num("Section 5.3, Figure 4 caption", "Milan, diesel, setting 3: size, Eni share of regime 3", c(r$pumps[3], r$eni_share[3]))
+
+
+
 
 
 ## ===========================================================================
@@ -451,6 +484,9 @@ tex_write(c("\\begin{tabular}{llrrrrr}", "\\toprule",
   sprintf("%s & %s & %d & %.1f & %.1f & %.1f & %.1f \\\\", pul_tab$fuel, gsub("_", " ", sub("^pulse_", "", pul_tab$pulse)),
           pul_tab$sig, pul_tab$q10, pul_tab$med, pul_tab$q90, pul_tab$spread_med), "\\bottomrule", "\\end{tabular}"),
   "tab_app_pulses.tex")
+
+
+
 
 
 ## ===========================================================================
@@ -650,4 +686,49 @@ num("Section C8", "setting 2: regimes with the range at a bound; regimes", c(sum
 NUM <- do.call(rbind, NUM)
 csv_write(NUM, "app_numbers.csv")
 print(NUM, right = FALSE, row.names = FALSE)
+
+
+
+
+
+## ===========================================================================
+## 8. Figure C1 of Appendix C and the numbers of Sections 5.1, 5.2, C1 and C2:
+##    the stored outputs of the exploratory analysis
+## ===========================================================================
+## These outputs describe the weekly data of data/ before any model is fitted.
+## They were computed by the exploratory analysis of the data, kept outside
+## this package, and are stored in results/application/eda. They are copied
+## here into <out>/eda, so that every output of the application is in one
+## place:
+##   eda_stations_by_city.csv        Section 5.1 (3,136 stations, 264
+##                                   independent); Supplement C, Section C1
+##                                   (the table of the stations by city)
+##   eda_window.csv                  Section 5.1 and Supplement C, Section C1
+##                                   (234 weeks in the window; the stations
+##                                   behind the national mean of a Sunday)
+##   eda_missing_weeks.csv           Supplement C, Section C2 (the missing
+##                                   station-weeks of the lagged series)
+##   eda_unit_roots_and_stickiness.csv  Section 5.1 (ADF test); Supplement C,
+##                                   Section C1 (ADF test, autocorrelation,
+##                                   unchanged prices); Section 5.4 (read in
+##                                   section 7 above)
+##   eda_pairs.csv                   Section 5.1 and Supplement C, Section C1
+##                                   (the stations Y, their distances to X)
+##   eda_pacf_share_outside_band.csv, eda_ar_order.csv
+##                                   Section 5.2 and Supplement C, Section C2
+##                                   (the choice of the lags)
+##   completion_fits.csv             the pooled STEM models that completed the
+##                                   lagged series (not quoted in the paper)
+##   fig_app_centring.png            Figure C1 of Appendix C
+##   fig_app_centring_stations.csv   the premiums of its two stations, quoted
+##                                   in its text
+EDA_FILES <- c("eda_stations_by_city.csv", "eda_window.csv", "eda_missing_weeks.csv",
+               "eda_unit_roots_and_stickiness.csv", "eda_pairs.csv", "eda_pacf_share_outside_band.csv",
+               "eda_ar_order.csv", "completion_fits.csv", "fig_app_centring.png",
+               "fig_app_centring_stations.csv")
+if (all(file.exists(file.path(OPT$eda, EDA_FILES)))) {
+  dir.create(file.path(OUT, "eda"), showWarnings = FALSE)
+  file.copy(file.path(OPT$eda, EDA_FILES), file.path(OUT, "eda"), overwrite = TRUE, copy.date = TRUE)
+  message("copied the stored outputs of the exploratory analysis into ", file.path(OUT, "eda"))
+} else message("the stored outputs of the exploratory analysis are not in ", OPT$eda, ": skipped")
 message("done: outputs in ", OUT)

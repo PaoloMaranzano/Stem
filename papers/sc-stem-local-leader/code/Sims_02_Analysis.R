@@ -1,58 +1,68 @@
 ## ===========================================================================
-## SIMULATIONS, SCRIPT 3 OF 3: THE TABLES AND FIGURES OF THE PAPER
+## Latent Spatial Regimes in Spatio-Temporal State-Space Models: Evidence on
+## Local Price Leadership in Italian Fuel Markets
 ##
-## Reads the results of the run (02-run.R; by default the compact results
-## shipped in results/simulations) and writes the tables (.tex,
-## .csv) and the figures (.png) of Section 4 and Appendix B of the paper and of
-## Supplement B. Part A analyses the results; part B draws the figures and
-## tables that describe the design, from its definitions (01-design.R), and
-## needs no result. Nothing is fitted.
+## Author:  Paolo Maranzano (University of Milano-Bicocca; Fondazione Eni Enrico
+##          Mattei)
+## Script:  Sims_02_Analysis.R, the analysis of the simulation study (Section 4
+##          of the paper, Appendix B, Supplement B)
 ##
-##     Rscript 03-results.R
-##     Rscript 03-results.R --results=../../output/simulations/results
+## What it does: reads the results of the run (Sims_01_Run.R; by default the
+## compact results of the study of the paper, shipped in results/simulations)
+## and writes every table (.tex, .csv), figure (.png) and number of Section 4
+## and Appendix B of the paper and of Supplement B. Part A analyses the
+## results; part B draws the figures and tables that describe the design, from
+## its definitions (Sims_00_Setup.R), and needs no result. Nothing is fitted.
 ##
-## Options (command line): --results (the folder of the results), --out (the
-## outputs; default: output/simulations/paper in the folder of the paper),
-## --tag (default "main3", the study of the paper), --upto (at most this many
-## replications of each stream, e.g. --upto=100,100), --balanced.
-##
-## The outputs, with the place of the paper each reproduces:
+## Outputs, in <out> (output/simulations by default), with the place of
+## the paper each reproduces and the part of this script that writes it:
 ##
 ##   Part A, the results
-##     fig_sim_main.png               Figure 1 (Section 4.2)
-##     fig_sim_signal.png             Figure 2 (Section 4.2)
-##     tab_sim_reference.tex          Supplement B, Table B7 (Section B6.1)
-##     fig_sim_core_select.png        Supplement B, Figure B6 (Section B6.2)
-##     tab_sim_core_select.tex        Supplement B, Table B8
-##     tab_sim_null.tex               Supplement B, Table B9
-##     tab_sim_core_ari.tex           Supplement B, Table B10 (Section B6.3)
-##     fig_sim_core_ari.png           Supplement B, Figure B7
-##     fig_sim_params.png             Supplement B, Figure B8 (Section B6.4)
-##     tab_sim_params_reference.tex   Supplement B, Table B11
-##     tab_sim_params_relrmse.tex     Supplement B, Table B12
-##     fig_sim_robustness.png         Supplement B, Figure B9 (Section B6.5)
-##     tab_sim_robustness_select.tex  Supplement B, Table B13
-##     tab_sim_robustness_ari.tex     Supplement B, Table B14
-##     fig_sim_penalty.png            Supplement B, Figure B10 (Section B6.6)
-##     tab_sim_criteria_correct.tex   Supplement B, Table B15 (Section B6.7)
-##     tab_sim_cost.tex               the time of a replication by d and T; no
-##                                    longer in the paper (Section B5 gives the
-##                                    total core-hours)
+##     fig_sim_main.png               Figure 1 (Section 4.2)                   R11
+##     fig_sim_signal.png             Figure 2 (Section 4.2)                   R10
+##     tab_sim_reference.tex          Supplement B, Table B7 (Section B6.1)     R1
+##     fig_sim_core_select.png        Supplement B, Figure B6 (Section B6.2)    R2
+##     tab_sim_core_select.tex        Supplement B, Table B8                    R2
+##     tab_sim_null.tex               Supplement B, Table B9                    R3
+##     tab_sim_core_ari.tex           Supplement B, Table B10 (Section B6.3)    R2
+##     fig_sim_core_ari.png           Supplement B, Figure B7                   R2
+##     fig_sim_params.png             Supplement B, Figure B8 (Section B6.4)   R10
+##     tab_sim_params_reference.tex   Supplement B, Table B11                   R5
+##     tab_sim_params_relrmse.tex     Supplement B, Table B12                   R5
+##     fig_sim_robustness.png         Supplement B, Figure B9 (Section B6.5)    R4
+##     tab_sim_robustness_select.tex  Supplement B, Table B13                   R4
+##     tab_sim_robustness_ari.tex     Supplement B, Table B14                   R4
+##     fig_sim_penalty.png            Supplement B, Figure B10 (Section B6.6)   R6
+##     tab_sim_criteria_correct.tex   Supplement B, Table B15 (Section B6.7)    R9
+##     tab_sim_cost.tex               the time of a replication by d and T; not
+##                                    in the paper (Section B5 gives the total
+##                                    core-hours)                               R7
 ##   Part B, the design
-##     fig_sim_overview.png           Figure B1 of Appendix B; Supplement B,
-##                                    Figure B5 (Section B5)
 ##     tab_sim_geometry.tex           Supplement B, Table B1 (Section B2.2)
-##     fig_sim_geometry.png           Supplement B, Figure B1
+##     fig_sim_geometry.png           Supplement B, Figure B1 (Section B2.2)
 ##     fig_sim_variance.png           Supplement B, Figure B2 (Section B3.2)
-##     fig_sim_correlation.png        Supplement B, Figure B3
-##     fig_sim_data.png               Supplement B, Figure B4
+##     fig_sim_correlation.png        Supplement B, Figure B3 (Section B3.2)
+##     fig_sim_data.png               Supplement B, Figure B4 (Section B3.2)
 ##     tab_sim_separation.tex         Supplement B, Table B5 (Section B4)
 ##     tab_sim_blocks.tex             Supplement B, Table B6 (Section B5)
+##     fig_sim_overview.png           Figure B1 of Appendix B; Supplement B,
+##                                    Figure B5 (Section B5)
 ##     tab_sim_scenarios.tex          every parameter value with the derived
-##                                    quantities; no longer in the paper (the
-##                                    values are in Table B2 of Supplement B)
-## The other outputs (.csv, and the parts R1 to R11 below) are the tables
-## behind them and the numbers quoted in the text of Section 4 and Supplement B.
+##                                    quantities; not in the paper (the values
+##                                    are in Table B2 of Supplement B)
+## The other outputs (.csv) are the tables behind them and the numbers quoted
+## in the text of Section 4 and Supplement B; every part below names what it
+## writes.
+## ===========================================================================
+##
+##     Rscript Sims_02_Analysis.R
+##     Rscript Sims_02_Analysis.R --results=../output/runs/simulations
+##
+## or open it in RStudio and press Source. Options (command line): --results
+## (the folder of the results), --out (the outputs; default:
+## ../output/simulations), --tag (default "main3", the study of the
+## paper), --upto (at most this many replications of each stream, e.g.
+## --upto=100,100), --balanced.
 ##
 ## Part A, by part:
 ##   R1  the reference cell: every scenario-variant at the reference levels
@@ -74,6 +84,11 @@
 ## left with fewer rows than the others of its cell. A stream still running
 ## counts only the replications that every one of its cells has reached
 ## (--balanced=FALSE keeps them all).
+##
+## Requirements: R (>= 4.2) with spdep and Stem; nothing is fitted, so any
+## version of Stem with the function names of 2.0.0 will do (Sims_00_Setup.R
+## checks them). Time: about an hour and a half on a desktop computer, most of
+## it for R9.
 ## ===========================================================================
 
 ## ---------------------------------------------------------------------------
@@ -94,11 +109,11 @@ ana_here <- local({
 })
 
 ## ---------------------------------------------------------------------------
-## The design and the functions: 02-run.R in definitions-only mode, which loads
-## functions.R and 01-design.R
+## The design and the functions: Sims_01_Run.R in definitions-only mode, which
+## loads Sims_00_Setup.R
 ## ---------------------------------------------------------------------------
 SIM_DEFINE_ONLY <- TRUE
-SIM_FILE <- file.path(ana_here, "02-run.R")
+SIM_FILE <- file.path(ana_here, "Sims_01_Run.R")
 source(SIM_FILE, local = globalenv())
 
 ## ---------------------------------------------------------------------------
@@ -106,8 +121,8 @@ source(SIM_FILE, local = globalenv())
 ## ---------------------------------------------------------------------------
 AN <- sim_config(list(
   tag      = "main3",
-  results  = file.path(ana_here, "..", "..", "results", "simulations"),
-  out      = file.path(ana_here, "..", "..", "output", "simulations", "paper"),
+  results  = file.path(ana_here, "..", "results", "simulations"),
+  out      = file.path(ana_here, "..", "output", "simulations"),
   balanced = TRUE,
   ## at most this many replications of each stream (one value per stream, in
   ## order; NA: all those complete), e.g. --upto=100,42
@@ -354,6 +369,7 @@ cat("replications:", nrow(S), "in", length(unique(S$cell)), "cells;",
 
 ## ===========================================================================
 ## R1. The reference cell: every scenario-variant at the reference levels
+## Writes: tab_sim_reference.tex, Supplement B, Table B7 (Section B6.1)
 ## ===========================================================================
 ref <- S[at_ref(S), , drop = FALSE]
 if (nrow(ref)) {
@@ -379,6 +395,9 @@ if (nrow(ref)) {
 
 ## ===========================================================================
 ## R2. The core: selection and recovery against n, T and the geometry
+## Writes: tab_sim_core_select.tex and fig_sim_core_select.png, Supplement B,
+## Table B8 and Figure B6 (Section B6.2); tab_sim_core_ari.tex and
+## fig_sim_core_ari.png, Supplement B, Table B10 and Figure B7 (Section B6.3)
 ## ===========================================================================
 core <- S[S$in_core & S$K_true > 1, , drop = FALSE]
 if (nrow(core)) {
@@ -479,6 +498,7 @@ if (nrow(core)) {
 
 ## ===========================================================================
 ## R3. S2: how often a homogeneous network is split
+## Writes: tab_sim_null.tex, Supplement B, Table B9 (Section B6.2)
 ## ===========================================================================
 nul <- S[S$scenario == "S2", , drop = FALSE]
 if (nrow(nul)) {
@@ -503,6 +523,9 @@ if (nrow(nul)) {
 
 ## ===========================================================================
 ## R4. Robustness: balance, graph and n = 400 against the reference
+## Writes: tab_sim_robustness_select.tex, tab_sim_robustness_ari.tex and
+## fig_sim_robustness.png, Supplement B, Tables B13 and B14 and Figure B9
+## (Section B6.5)
 ## ===========================================================================
 arms <- list(reference     = at_ref(S),
              unbalanced    = at_ref(S, balance = "unbalanced") & S$scenario != "S2",
@@ -592,6 +615,8 @@ if (!is.null(rob) && length(unique(rob$arm)) > 1) {
 ## ===========================================================================
 ## R5. The parameters: bias and RMSE at the reference, the estimated regimes
 ## aligned on the true ones
+## Writes: tab_sim_params_reference.tex and tab_sim_params_relrmse.tex,
+## Supplement B, Tables B11 and B12 (Section B6.4)
 ## ===========================================================================
 ## how often the range of a regime ends at a limit of what its distances
 ## identify, by number of locations and length of the series (all cells)
@@ -657,6 +682,7 @@ if (!is.null(P) && nrow(P)) {
 
 ## ===========================================================================
 ## R6. The penalty: recovery against phi at the true k, and the phi selected
+## Writes: fig_sim_penalty.png, Supplement B, Figure B10 (Section B6.6)
 ## ===========================================================================
 if (!is.null(G) && "ari" %in% names(G)) {
   g <- G[G$K_true > 1 & G$K == G$K_true & G$admissible & G$cell %in% S$cell[at_ref(S)], ,
@@ -722,6 +748,8 @@ if (!is.null(G) && "ari" %in% names(G)) {
 
 ## ===========================================================================
 ## R7. The cost of a replication
+## Writes: tab_sim_cost.tex, not in the paper (Section B5 gives the total
+## core-hours)
 ## ===========================================================================
 tcost <- agg(S, c("n", "TN"), function(s)
   data.frame(runs = nrow(s), median = stats::median(s$secs_total, na.rm = TRUE),
@@ -754,6 +782,8 @@ cat("\n")
 
 ## ===========================================================================
 ## R8. The replications stopped by the time limit and drawn again
+## Writes: csv files only, behind the numbers of Section B6 on the
+## replications drawn again
 ## ===========================================================================
 ## Every timeout is logged by the runner in <tag>-timeouts.csv; the replication
 ## is then drawn again with another seed (attempt 2, 3, ...). A cell with many
@@ -783,6 +813,8 @@ if (!is.null(TO) && nrow(TO)) {
 
 ## ===========================================================================
 ## R9. The information criteria in the two-step rule
+## Writes: tab_sim_criteria_correct.tex, Supplement B, Table B15 (Section
+## B6.7)
 ## ===========================================================================
 ## The study selects (K, phi) by the two-step rule of SCSTEM_Select() on the
 ## BIC. The grid of every replication records, for every configuration, the
@@ -884,6 +916,8 @@ if (!is.null(G) && all(c("loglik", "df", "AIC", "BIC", "admissible") %in% names(
 ## ===========================================================================
 ## R10. The estimates against the truth, when K is selected correctly and when
 ## it is not
+## Writes: fig_sim_params.png, Supplement B, Figure B8 (Section B6.4), and
+## fig_sim_signal.png, Figure 2 of the paper (Section 4.2)
 ## ===========================================================================
 ## The runner records, in every replication, the parameters of the fit at the
 ## true K (phi = 0.05), the estimated regimes aligned on the true ones: they are
@@ -1015,6 +1049,7 @@ if (nrow(sg)) {
 
 ## ===========================================================================
 ## R11. The summary figure of the manuscript
+## Writes: fig_sim_main.png, Figure 1 of the paper (Section 4.2)
 ## ===========================================================================
 ## (a) the share of replications selecting the true K, by scenario-variant and
 ##     (T, d), over the four geometries of the core (S2: the share with K = 1);
@@ -1111,7 +1146,7 @@ cat("\ndone\n")
 ## ===========================================================================
 ## PART B: THE FIGURES AND TABLES OF THE DESIGN
 ## ===========================================================================
-## From the definitions of 01-design.R and the generator of functions.R, so
+## From the definitions and the generator of Sims_00_Setup.R, so
 ## that the description of the design cannot disagree with the design that is
 ## run. One data set is drawn for some of the figures; nothing is fitted.
 FG <- list(out = OUT)
@@ -1186,7 +1221,8 @@ ref_cell <- function(scen) {
 
 
 ## ===========================================================================
-## Figure: the four geometries
+## Figure B1 of Supplement B (Section B2.2), fig_sim_geometry.png: the four
+## geometries
 ## ===========================================================================
 fig_open("fig_sim_geometry.png", 10, 10)
 par_base(mfrow = c(2, 2), mar = c(3, 3, 3.8, 1))
@@ -1211,7 +1247,8 @@ fig_close("fig_sim_geometry.png")
 
 
 ## ===========================================================================
-## Figure: an overview of the design (appendix of the manuscript). Above, where
+## Figure B1 of Appendix B and Figure B5 of Supplement B (Section B5),
+## fig_sim_overview.png: an overview of the design. Above, where
 ## the regimes lie: the four geometries and the unbalanced sizes, at d = 100.
 ## Below, the series of every scenario-variant at the reference cell, from the
 ## first replication: three locations of every regime (thin) and the mean of
@@ -1274,7 +1311,8 @@ fig_close("fig_sim_overview.png")
 
 
 ## ===========================================================================
-## Figure: one data set in time and in space, at the two levels of separation
+## Figure B4 of Supplement B (Section B3.2), fig_sim_data.png: one data set in
+## time and in space, at the two levels of separation
 ## ===========================================================================
 draws <- list(`S1-strong-ind` = dgp_draw(ref_cell("S1s-ind"), 1L),
               `S1-weak-shr`   = dgp_draw(ref_cell("S1w-shr"), 1L))
@@ -1323,7 +1361,8 @@ fig_close("fig_sim_data.png")
 
 
 ## ===========================================================================
-## Figure: the correlations and their decay
+## Figure B3 of Supplement B (Section B3.2), fig_sim_correlation.png: the
+## correlations and their decay
 ## ===========================================================================
 ## nearest-neighbor spacing of a network of n locations at the reference
 nn_spacing <- vapply(SIM_BLOCKS$core$n, function(n) {
@@ -1364,7 +1403,8 @@ fig_close("fig_sim_correlation.png")
 
 
 ## ===========================================================================
-## Figure: the variance of the response by source, regime by regime
+## Figure B2 of Supplement B (Section B3.2), fig_sim_variance.png: the variance
+## of the response by source, regime by regime
 ## ===========================================================================
 VS <- do.call(rbind, lapply(names(PSI), function(nm) {
   p <- PSI[[nm]]
@@ -1392,7 +1432,8 @@ fig_close("fig_sim_variance.png")
 
 
 ## ===========================================================================
-## Table: the parameter values of every regime
+## tab_sim_scenarios.tex, not in the paper (the values are in Table B2 of
+## Supplement B): the parameter values of every regime
 ## ===========================================================================
 row_tex <- function(nm, p, g) {
   s2 <- p$se[g] + p$so[g]
@@ -1413,7 +1454,8 @@ tex_write(c(lines, "\\bottomrule", "\\end{tabular}"), "tab_sim_scenarios.tex")
 
 
 ## ===========================================================================
-## Table: the four geometries
+## Table B1 of Supplement B (Section B2.2), tab_sim_geometry.tex: the four
+## geometries
 ## ===========================================================================
 tex_write(c("\\begin{tabular}{lcl rrrrr}", "\\toprule",
             "geometry & $\\omega$ & fixed spread & center distance & regime sd & distance in sd & nearer another center & network sd \\\\",
@@ -1425,7 +1467,8 @@ tex_write(c("\\begin{tabular}{lcl rrrrr}", "\\toprule",
 
 
 ## ===========================================================================
-## Table: the separation of the regimes seen by the assignment step
+## Table B5 of Supplement B (Section B4), tab_sim_separation.tex: the
+## separation of the regimes seen by the assignment step
 ## ===========================================================================
 ## D_gh = 1/2 [ (s2_g + Delta2_gh) / s2_h - 1 - log(s2_g / s2_h) ],
 ## Delta2_gh = (b0_g - b0_h)^2 + (b1_g - b1_h)^2 + E b^2,
@@ -1464,7 +1507,8 @@ tex_write(c("\\begin{tabular}{lc rrrr r rr rrr}", "\\toprule",
 
 
 ## ===========================================================================
-## Table: the blocks of the design and their cells
+## Table B6 of Supplement B (Section B5), tab_sim_blocks.tex: the blocks of the
+## design and their cells
 ## ===========================================================================
 cfg_all <- CFG
 all_cells <- sim_cells(cfg_all, SIM_BLOCKS)

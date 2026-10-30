@@ -1,43 +1,21 @@
 ## ===========================================================================
-## SIMULATIONS, SCRIPT 2 OF 3: THE RUN
+## Latent Spatial Regimes in Spatio-Temporal State-Space Models: Evidence on
+## Local Price Leadership in Italian Fuel Markets
 ##
-## Runs the Monte Carlo study of Section 4 of the paper and Supplement B: for
-## every cell of the design (01-design.R) and every replication, one data set
-## is drawn and the whole procedure is run on it (sim_one() in functions.R).
+## Author:  Paolo Maranzano (University of Milano-Bicocca; Fondazione Eni Enrico
+##          Mattei)
+## Script:  Sims_01_Run.R, the run of the simulation study (Section 4 of the
+##          paper, Supplement B)
 ##
-##     Rscript 02-run.R --stream=1 --nrep=100 --cores=7
-##     Rscript 02-run.R --mode=dry                  the cells and the cost
-##     Rscript 02-run.R --nrep=1 --cores=7          one replication of every cell
+## What it does: runs the Monte Carlo study: for every cell of the design
+## (Sims_00_Setup.R) and every replication, one data set is drawn and the
+## whole procedure is run on it (sim_one() in Sims_00_Setup.R). No table or
+## figure of the paper is written here: Sims_02_Analysis.R draws them all from
+## the results.
 ##
-## or open it in RStudio, edit "3. THE RUN" below and press Source. The run can
-## be stopped at any moment and resumed: what is recorded is skipped.
-##
-## The study of the paper: 332 cells, 200 replications per cell, run as two
-## streams of 100 on two machines (--stream=1 and --stream=2, --nrep=100), on
-## Stem at the commit pinned in functions.R (SIM_STEM_REF). A stream draws its
-## own data, with seeds no other stream uses: replication r of stream s is
-## recorded as rep = 1000 (s - 1) + r, and its seed is 1000 rep + 1. Never run
-## the same stream on two machines at once. The 66,400 replications took
-## about 2,170 core-hours (the cost by n and T is in Supplement B, Table B8).
-##
-## THE TIME LIMIT. Every replication runs in a separate R process (package
-## callr) under a time limit set from the times already recorded: cap_mult
-## times the median of the cell once cap_after replications of it are done,
-## before that cap_first_mult times the median of the cells with the same
-## (n, T), and cap_first_min seconds when nothing is known yet. A replication
-## over its limit is stopped, written to <tag>_s<stream>-timeouts.csv, and
-## drawn again with the seed of the next attempt (1000 rep + 1 + 100 (attempt
-## - 1)), up to cap_attempts; the last one is recorded as failed. cap_mult = 0
-## removes the limit.
-##
-## Margins given on the command line (--n, --TN, --omega, --balance, --knn)
-## replace the blocks with one factorial block of those margins around the
-## reference, as in  Rscript 02-run.R --TN=60,120,365 --mode=dry
-##
-## OUTPUTS per stream, in <out> (default: output/simulations/results in the
-## folder of the paper), keyed on (cell, rep); rep is unique across the
-## streams, so the outputs of all the streams stack. <tag> stands for
-## <tag>_s<stream>:
+## Outputs, per stream, in <out> (output/runs/simulations by default),
+## keyed on (cell, rep); rep is unique across the streams, so the outputs of
+## all the streams stack. <tag> stands for <tag>_s<stream>:
 ##
 ##   <tag>.csv           one row per replication: the selected (K, phi), the
 ##                       recovery of the partition, the error of the fitted
@@ -54,9 +32,45 @@
 ##   <tag>-obs/*.rds     the full observations of the first keep_obs
 ##                       replications of every cell
 ##   <tag>-timeouts.csv  one row per replication stopped by the time limit
+## The results of the study of the paper (the first, second and fourth files,
+## compressed) are in results/simulations.
+## ===========================================================================
+##
+##     Rscript Sims_01_Run.R --stream=1 --nrep=100 --cores=7
+##     Rscript Sims_01_Run.R --mode=dry                  the cells and the cost
+##     Rscript Sims_01_Run.R --nrep=1 --cores=7          one replication of every cell
+##
+## or open it in RStudio, edit "THE RUN" below and press Source. The run can
+## be stopped at any moment and resumed: what is recorded is skipped.
+##
+## The study of the paper: 332 cells, 200 replications per cell, run as two
+## streams of 100 on two machines (--stream=1 and --stream=2, --nrep=100), on
+## Stem at the commit pinned in Sims_00_Setup.R (SIM_STEM_REF). A stream draws
+## its own data, with seeds no other stream uses: replication r of stream s is
+## recorded as rep = 1000 (s - 1) + r, and its seed is 1000 rep + 1. Never run
+## the same stream on two machines at once. The 66,400 replications took
+## about 2,170 core-hours.
+##
+## THE TIME LIMIT. Every replication runs in a separate R process (package
+## callr) under a time limit set from the times already recorded: cap_mult
+## times the median of the cell once cap_after replications of it are done,
+## before that cap_first_mult times the median of the cells with the same
+## (n, T), and cap_first_min seconds when nothing is known yet. A replication
+## over its limit is stopped, written to <tag>_s<stream>-timeouts.csv, and
+## drawn again with the seed of the next attempt (1000 rep + 1 + 100 (attempt
+## - 1)), up to cap_attempts; the last one is recorded as failed. cap_mult = 0
+## removes the limit.
+##
+## Margins given on the command line (--n, --TN, --omega, --balance, --knn)
+## replace the blocks with one factorial block of those margins around the
+## reference, as in  Rscript Sims_01_Run.R --TN=60,120,365 --mode=dry
+##
+## Requirements: R (>= 4.2) with spdep and callr, and Stem at the commit pinned
+## in Sims_00_Setup.R (installed from GitHub when another version is
+## installed).
 ## ===========================================================================
 
-## Definitions only? The worker processes, and 03-results.R, load this file
+## Definitions only? The worker processes, and Sims_02_Analysis.R, load this file
 ## with SIM_DEFINE_ONLY <- TRUE and SIM_FILE set to its path: they get the
 ## design, the generator and the functions, and nothing is run.
 if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) SIM_DEFINE_ONLY <- FALSE
@@ -70,11 +84,10 @@ if (!exists("SIM_FILE", inherits = FALSE)) SIM_FILE <- local({
   NULL
 })
 SIM_HERE <- if (is.null(SIM_FILE)) normalizePath(getwd(), winslash = "/") else dirname(SIM_FILE)
-source(file.path(SIM_HERE, "functions.R"), local = globalenv())
-source(file.path(SIM_HERE, "01-design.R"), local = globalenv())
+source(file.path(SIM_HERE, "Sims_00_Setup.R"), local = globalenv())
 
 ## ---------------------------------------------------------------------------
-## 3. THE RUN. What this invocation does.
+## THE RUN. What it does.
 ## ---------------------------------------------------------------------------
 CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE), c(
   list(scenario = SIM_SCENARIOS),
@@ -131,7 +144,7 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     cap_first_min  = 3600,
     cap_attempts   = 3L,
 
-    ## Bookkeeping. `out` defaults to output/simulations/results in the
+    ## Bookkeeping. `out` defaults to output/runs/simulations in the
     ## folder of the paper.
     ## "main3": the design of October 2026 (new values of the strong level,
     ## the fourth geometry) with the estimator of the commit pinned above
@@ -139,12 +152,12 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## with the EM algorithm at regularization 0.01, and "main", the first pass
     ## of September, are not comparable with it.
     tag      = "main3",
-    out      = file.path(SIM_HERE, "..", "..", "output", "simulations", "results")
+    out      = file.path(SIM_HERE, "..", "output", "runs", "simulations")
   )))
 
 ## Margins given on the command line replace the blocks with one factorial
 ## block of those margins around the reference, as in
-##   Rscript run-simulations.R --TN=60,365 --n=50
+##   Rscript Sims_01_Run.R --TN=60,365 --n=50
 SIM_CLI_MARGINS <- if (SIM_DEFINE_ONLY) character(0) else
   intersect(names(SIM_REFERENCE),
             sub("^--([^=]+)=.*$", "\\1", grep("^--[^=]+=.", commandArgs(TRUE), value = TRUE)))

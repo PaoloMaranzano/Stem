@@ -1,170 +1,28 @@
-# SC-STEM: replication material
+# Internal material of the replication package
 
-The scripts that produce the simulation study and the application of the paper.
-This folder is **not part of the Stem package** and is never shipped with it:
-Stem is a dependency like any other, and the scripts are deliberately
-disconnected from its sources.
+The replication package of the paper "Latent Spatial Regimes in
+Spatio-Temporal State-Space Models: Evidence on Local Price Leadership in
+Italian Fuel Markets" is `papers/sc-stem-local-leader` (data, code, results,
+manuscript). This folder holds what stays outside it.
 
-| script | what it does |
-|---|---|
-| `run-simulations.R` | runs the simulation study |
-| `analyse-simulations.R` | turns its results into tables (`.tex`, `.csv`) and figures (`.png`) in `output/`, the summary figure of Section 3 of the paper included |
-| `design-figures.R` | the figures and tables that describe the design (an overview of the regimes and the series for the appendix of the paper, geometries, data, correlations, parameter values, separation, blocks), from the definitions of `run-simulations.R`; they go into the paper and Supplementary Material B |
-| `run-application.R` | runs an application on the Po Valley data of the package, staged and cached |
-| `run-ridge-experiment.R` | the experiment on the ridge in SC-STEM: data with the collinear lags of the fuel application and some values blanked; the procedure of the paper (regimes selected at lambda = 0, then a path in lambda on that partition), lambda chosen by seven information criteria, against the MLE, the truth, the oracle partition and the oracle lambda, for the coefficients and for the interpolation of the blanked values; results in `ridge-experiment/` (Supplementary Material A) |
+- `AppFuels_Internal_EDA.R`: the exploratory analysis of the weekly data of
+  the application (Sections 5.1 and 5.2 of the paper, Figure C1 of Appendix C,
+  Sections C1 and C2 of Supplement C). It sources `AppFuels_00_Setup.R` of the
+  package, builds the data of the three settings as the run scripts do, and
+  writes its tables and figure into `results/application/eda` of the package,
+  where `AppFuels_04_Analysis.R` finds them. Run it again only if the weekly
+  data change: `Rscript AppFuels_Internal_EDA.R` from this folder.
 
-The fuel-price application of the paper: local leaders and followers among the
-pumps of the eleven metropolitan cities, in three settings (Y a major-brand pump
-and X its independent neighbor; Y independent and X a major; Y a major and X a
-major of another brand), on the weekly relative prices of the two fuels, with
-the pass-through of the excise duties by regime and the behavior on small
-samples from the same fits.
+The weekly dataset of the package (`data/`) was built from the daily file of
+Osservaprezzi Carburanti by the original pipeline, archived with its other
+scripts in `dev/archive/replication-pipeline-2026-10` (see its README).
 
-| script | what it does |
-|---|---|
-| `fuels-functions.R` | the auxiliary functions, sourced by the others |
-| `fuels-data.R` | data management, in five cached stages: the pre-treatment of the station-level file (the register of the notes), the weekly relative prices with their gaps, the Kalman completion of the gaps (for the lags), the radius r* and the pairs, and one data.frame per case, `fuels/<case>/data.RData` |
-| `fuels-main-setting1.R` | setting 1, Y a major, X its independent neighbor, in four stages: the pre-analysis of the lags (`--stage=lags`), which fixed the lags of every model (the last four weeks of each block, `LAGS`); at lambda = 0, the grid of (K, phi) and the two-step rule on the BIC (`--stage=grid`); on that partition, the ridge penalty chosen by the AIC (`--stage=lambda`); the bootstrap at lambda = 0, at lambda* and of the pooled model, the tests (all at lambda = 0), the ridge estimates beside the MLE and the completed response (`--stage=final`); outputs in the folder of the case |
-| `fuels-main-setting2.R` | the same, setting 2: Y independent, X its major-brand neighbor (also the case of the small samples) |
-| `fuels-main-setting3.R` | the same, setting 3: Y a major, X its neighbor of another major brand |
-| `fuels-run.R` | the launcher: choose in its setup the settings (1, 2, 3 or all), the cities, the fuels, the stage, the processes and whether to run the ridge (`ridge = FALSE`, the analysis of the paper, fits and bootstraps at lambda = 0 only), then press Source in RStudio (or `Rscript fuels-run.R`); every run is a main script in an R process of its own, with its log in `fuels/logs/`, and the tables of every setting are rebuilt at the end |
-| `fuels-wald-bootstrap.R` | the bootstrap Wald test of leadership, regime by regime and in all the regimes at once: the coefficients of the selected fit against the covariance of the refit-with-clustering bootstrap of stage `final` (read from its cache, or computed with the same seed), p-values from the chi-square and from the draws centered at the estimate; `test_wald.csv` per model, `test_wald_summary.csv` per setting |
-| `fuels-check-optima.R` | the check of the local maxima of the selected fits: every regime refitted from least squares beside the selected fit, with the coefficients and the Wald tests at both maxima (`fuels/checks/`) |
-
-Run `fuels-data.R` once, then each main script stage by stage, or all the
-stages at once with `--stage=all`; or edit the setup of `fuels-run.R` and
-source it, which does the same from R. To share the work among machines, give each
-its cities (`--cities=RM`, `--cities=MI,TO,NA`, and `--fuels=` to split one
-city by fuel) and as many processes for every bootstrap as it has cores
-(`--boot_cores=`); the seed of a model depends on its city and fuel only, so
-the split does not change the results. Then copy the folders `<case>/<xdef>/`
-of the machines into one and run `--stage=summary`, which rebuilds the tables
-of all the cities without fitting anything. The header of the main scripts
-gives the commands. The first scripts of the application are archived in
-`dev/archive/fuels-first-scripts/`.
-
-The design of the simulation study is described in full in
-`supplement-simulations.tex` (Supplementary Material B), in the Overleaf
-project of the paper. The analysis
-takes the design from `run-simulations.R`, which must sit beside it, and can be
-run while the study is in progress: each part produces what the results
-support so far. The analysis of the previous design is archived in
-`dev/archive/sim-design-generic`.
-
-```
-Rscript analyse-simulations.R                  # the results of tag "main3"
-Rscript analyse-simulations.R --tag=main,ref   # several tags, stacked
-Rscript analyse-simulations.R --upto=100,42    # at most 100 replications of stream 1, 42 of stream 2
-```
-
-The results are read defensively: a synchronization client (Google Drive)
-can lose blocks of the lines that the runner appends to the large files while
-it uploads them, and the analysis drops the broken lines and the replications
-left incomplete, and says how many. A stream still running counts only the
-replications that every one of its cells has reached (`--balanced=FALSE`
-keeps them all). Writing the results to a local folder and copying them at the
-end avoids the losses.
-
-## Requirements
-
-R, and nothing else to set up. `run-simulations.R` installs Stem from GitHub
-at the commit it is pinned to (`SIM_STEM_REF`, currently 0f7b744), and
-reinstalls it whenever the installed Stem is a different commit; the commit is
-read from the installed DESCRIPTION file, without loading the package. Restart
-R before the first run on a machine where Stem is already loaded in the
-session. Offline, an installed Stem that carries what the script uses is
-accepted as it is. `run-application.R` (`APP_STEM_REF`) is pinned to ddf90a8,
-the code of 0f7b744 with the BIC counting the observed values of the response
-instead of `d * T`; the scripts of the fuel application (`FU_STEM_REF` in
-`fuels-functions.R`) and of the ridge experiment (`RX_STEM_REF`) to 09e9cdb, which
-adds SQUAREM for the fits with a ridge (989790b) and the parallel draws of
-`SCSTEM_Bootstrap()` (`cores`, the option `--boot_cores` of the main scripts).
-On the simulated data, complete and without penalty, the three commits give
-identical results. The applications keep their caches in a folder named after
-the commit (`application/ddf90a8/`, `<case>/<xdef>/cache/09e9cdb/`), so that
-fits of an earlier Stem are never reused. All
-three run the computational settings of the package (`STEM_control()`:
-SQUAREM, tolerances 1e-3), passed explicitly so that a session option cannot
-change them.
-
-## Running the simulations from RStudio
-
-1. Open `run-simulations.R` in RStudio, from wherever it sits (the Google Drive
-   folder included).
-2. If you want, change the SETUP block near the top:
-   - "1. THE DESIGN": the scenario-variants (`SIM_SCENARIOS`), the reference
-     level of every margin (`SIM_REFERENCE`: `n`, `TN`, `omega`, `balance`,
-     `knn`) and the blocks (`SIM_BLOCKS`). Each block is the full factorial of
-     the margins it lists, every other margin at its reference level, crossed
-     with the scenario-variants; the design is the union of the blocks, and a
-     cell two blocks share is run once. The current design is a core crossing
-     `n`, `TN` and `omega`, plus blocks varying the balance, `knn` and a large
-     `n` one at a time around the reference, and a fourth geometry (`spread`):
-     332 cells;
-   - "2. THE PARAMETER VALUES": the baseline regime and the scenarios;
-   - "3. THE RUN": `mode` (`"run"`, or `"dry"` to print the cells and the cost
-     and run nothing), `cores`, `nrep`, `rep_from`, `rep_to`.
-3. Press **Source** (Ctrl+Shift+S).
-
-The replications are handed to the cores one at a time, as each core frees up,
-and every one prints a line with its time and an estimate of the time left. The
-results go to `results/` beside the script.
-
-The run can be stopped at any moment with the red Stop button and resumed by
-pressing Source again: everything is keyed on (cell, replication), so what was
-recorded is skipped. Keep the RStudio session open while it runs, and keep the
-machine from going to sleep.
-
-To know what a design costs before running it: run the first replication of
-every cell (`rep_to = 1`), then `mode = "dry"`. The cost printed is measured on
-those replications, for `nrep` replications on `cores` cores.
-
-To share the work between machines, give each machine its own `stream` and as
-many replications as it can carry, for instance
-
-```
-Rscript run-simulations.R --stream=1 --nrep=10 --cores=3   # machine 1
-Rscript run-simulations.R --stream=2 --nrep=40 --cores=7   # machine 2
-```
-
-Each stream draws its own data, with seeds no other stream uses, and writes its
-own files, `results/<tag>_s<stream>*`. Copy the `results/` files of one machine
-beside those of the other: the analysis stacks every stream of the tag (here 50
-replications per cell). Replication r of stream s is recorded as
-`rep = 1000 (s - 1) + r`, with seed `1000 rep + 1`. Never run the same stream on
-two machines at once: they would draw the same data. A stream can also be
-extended later, with `--rep_from` and `--rep_to` (at most 999 per stream).
-
-Every replication runs in its own R process (package `callr`, installed when
-missing) under a time limit that adapts to its cell; a replication over the
-limit is stopped, written to `results/<tag>-timeouts.csv` and drawn again with
-the seed of its next attempt. The settings are `cap_*` in "3. THE RUN";
-`cap_mult = 0` removes the limit.
-
-If R on that machine uses a multithreaded BLAS (MKL, OpenBLAS), set
-`OMP_NUM_THREADS=1` in `~/.Renviron` before starting, otherwise every core
-tries to use every core.
-
-## Running from a terminal
-
-Every SETUP setting of sections 1 and 3 can also be given on the command line,
-which overrides it; lists are separated by commas:
-
-```
-Rscript run-simulations.R --mode=dry                  # the cells and the cost
-Rscript run-simulations.R --cores=8                   # the whole study -> results/
-Rscript run-simulations.R --blocks=core               # some blocks only
-Rscript run-simulations.R --TN=60,120,365 --n=50,100  # one block of other margins
-Rscript run-application.R                             # the application -> application/<commit>/
-```
-
-Margins given on the command line replace the blocks with one factorial block
-of those margins around the reference.
-
-## The outputs
-
-For every stream, `results/<tag>_s<stream>.csv`, `-params.csv`, `-grid.csv`,
-`-stations.csv`, `-timeouts.csv` and the folder `-obs/` share the primary key
-(cell, rep) and join on it and on nothing else; `rep` is unique across the
-streams, so the files of all the streams stack. What each holds is described at
-the top of `run-simulations.R`.
+On the Drive, `dev/sync-gdrive.R` delivers the package to
+`STEM_Cameletti/SC-STEM-replication`, with the structure it has in the
+repository (`README.md`, `manuscript/`, `data/`, `code/`, `results/`, and
+`output/` for what the scripts write when they run there), and this folder to
+its subfolder `internal/`, beside the daily file of Osservaprezzi Carburanti
+(`internal/App_FuelsITA/`). The scripts of the original pipeline, the outputs
+of its 66 models (`_archive/fuels/`), the raw results of the simulation study
+(`_archive/results-simulations-raw/`, from which `results/simulations` of the
+package was compacted) and the superseded outputs are in `_archive/`.

@@ -112,8 +112,10 @@ HERE <- local({
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
 ## kept outside the replication material (dev/lr-bootstrap): the functions
-## and the fuels folder are those of dev/replication
-if (!file.exists(file.path(HERE, "fuels-functions.R"))) HERE <- file.path(dirname(HERE), "replication")
+## and the fuels folder are those of the original pipeline, archived in
+## dev/archive/replication-pipeline-2026-10
+if (!file.exists(file.path(HERE, "fuels-functions.R")))
+  HERE <- file.path(dirname(HERE), "archive", "replication-pipeline-2026-10")
 source(file.path(HERE, "fuels-functions.R"))
 RUN <- fu_bt_setup(RUN, HERE)
 SHA7 <- fu_require_stem()

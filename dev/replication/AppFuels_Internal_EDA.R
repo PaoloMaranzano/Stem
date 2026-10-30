@@ -1,46 +1,55 @@
 ## ===========================================================================
-## APPLICATION, SCRIPT 1 OF 3: THE DATA OF THE MODELS AND THE EXPLORATORY
-## ANALYSIS
+## Latent Spatial Regimes in Spatio-Temporal State-Space Models: Evidence on
+## Local Price Leadership in Italian Fuel Markets
 ##
-## From the three files of data/ (in the folder of the paper) to the data of the
-## 66 models, and the exploratory analysis that describes the data and
-## motivates the choice of the lags. The steps:
+## Author:  Paolo Maranzano (University of Milano-Bicocca; Fondazione Eni Enrico
+##          Mattei)
+## Script:  AppFuels_Internal_EDA.R, the exploratory analysis of the data of
+##          the application (Sections 5.1 and 5.2 of the paper, Appendix C,
+##          Sections C1 and C2 of Supplement C)
 ##
-##   1. the data: Sunday prices of the stations of the eleven cities, the
-##      national mean of every Sunday, and the pulses of the excise duties;
-##   2. the relative prices: Sunday price minus the national mean, minus the
-##      mean of the station over the window;
-##   3. the completion of the missing weeks of the lagged series, by a pooled
-##      STEM model of each city and fuel (the slow step: see below);
-##   4. the pairs (Y, X) of the three settings and the data of every setting,
-##      saved for 02-models.R;
-##   5. the exploratory analysis: the stations, the missing weeks, unit roots,
-##      persistence and stickiness of the prices, the distances between the
-##      pairs, the memory of the relative prices (partial autocorrelations and
-##      autoregressive orders), and the figure of the two steps of the
-##      centering.
+## INTERNAL: this script is not part of the replication package
+## (papers/sc-stem-local-leader); its outputs are, in results/application/eda.
+##
+## What it does: describes the weekly data of the package (data/ in
+## papers/sc-stem-local-leader) and motivates the choice of the lags. It builds
+## the data of the three settings as the run scripts of the package do, with
+## the functions of AppFuels_00_Setup.R, and then:
+##   - the stations by city;
+##   - the window and the missing weeks;
+##   - unit roots, persistence and stickiness of the prices;
+##   - the pairs (Y, X) and their distances;
+##   - the memory of the relative prices (partial autocorrelations and
+##     autoregressive orders), which led to four lags for every block;
+##   - Figure C1 of Appendix C, from posted prices to relative prices.
+##
+## Outputs, in results/application/eda of the package (AppFuels_04_Analysis.R
+## copies them among its outputs), each with the place of the paper it
+## reproduces in the section that writes it:
+##   eda_stations_by_city.csv, eda_window.csv, eda_missing_weeks.csv,
+##   eda_unit_roots_and_stickiness.csv, eda_pairs.csv,
+##   eda_pacf_share_outside_band.csv, eda_ar_order.csv, completion_fits.csv,
+##   fig_app_centring.png, fig_app_centring_stations.csv
+## The completed series of every city and fuel are cached in
+## output/runs/application/cache/completion of the package, where the run
+## scripts look for them too.
+## ===========================================================================
 ##
 ## Run from a terminal, in the folder of this script,
 ##
-##     Rscript 01-data-and-eda.R
+##     Rscript AppFuels_Internal_EDA.R
 ##
 ## or open it in RStudio and press Source. Options (command line):
-##   --data=<folder>    the data (default: ../../data)
-##   --out=<folder>     the outputs (default: ../../output/application)
+##   --pkg=<folder>     the folder of the package (default: found from this
+##                      folder, in the repository of Stem or on the Drive)
 ##   --cities=RM,MI     a subset of the cities (default: all eleven); the
 ##                      exploratory tables then describe that subset only
 ##
-## Outputs, in <out>:
-##   data/cases.rds         the data of the three settings, read by 02-models.R
-##   data/completed_*.rds   the completed series of every city and fuel (a cache:
-##                          a later run reads them instead of fitting again)
-##   eda/*.csv, eda/*.png   the tables and the figure listed in step 5, each with
-##                          the place of the paper it reproduces
-##
 ## Requirements: R (>= 4.2) with data.table, geodist, urca and Stem at the
-## commit pinned in functions.R (installed from GitHub when missing). Time:
-## step 3 fits 22 pooled STEM models, from a few minutes for the smaller cities
-## to about an hour for Rome on one core; the rest takes a few minutes.
+## commit pinned in AppFuels_00_Setup.R of the package (installed from GitHub
+## when another version is installed). Time: the completion fits 22 pooled STEM
+## models, from a few minutes for the smaller cities to about an hour for Rome
+## on one core; with the cache, the whole script takes a few minutes.
 ## ===========================================================================
 
 suppressPackageStartupMessages(library(data.table))
@@ -54,18 +63,68 @@ HERE <- local({
   }
   if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
 })
-source(file.path(HERE, "functions.R"))
 
-OPT <- fu_options(list(
-  data   = file.path(HERE, "..", "..", "data"),
-  out    = file.path(HERE, "..", "..", "output", "application"),
-  cities = names(FU_CITY)
-))
-OUT_DATA <- file.path(OPT$out, "data"); OUT_EDA <- file.path(OPT$out, "eda")
-dir.create(OUT_DATA, recursive = TRUE, showWarnings = FALSE)
+## The package: dev/replication -> papers/sc-stem-local-leader in the
+## repository of Stem; on the Drive, internal/ sits inside the copy of the
+## package (SC-STEM-replication). --pkg= overrides both.
+PKG <- local({
+  a <- grep("^--pkg=", commandArgs(trailingOnly = TRUE), value = TRUE)
+  cand <- if (length(a)) sub("^--pkg=", "", a[1]) else
+    c(file.path(HERE, "..", "..", "papers", "sc-stem-local-leader"), file.path(HERE, ".."))
+  ok <- cand[file.exists(file.path(cand, "code", "AppFuels_00_Setup.R"))]
+  if (!length(ok)) stop("the replication package is not where expected; give it with --pkg=", call. = FALSE)
+  normalizePath(ok[1], winslash = "/")
+})
+source(file.path(PKG, "code", "AppFuels_00_Setup.R"))
+
+OPT <- fu_options(list(pkg = PKG, cities = names(FU_CITY)))
+DATA_IN   <- file.path(PKG, "data")
+OUT_EDA   <- file.path(PKG, "results", "application", "eda")
+OUT_CACHE <- file.path(PKG, "output", "runs", "application", "cache", "completion")
 dir.create(OUT_EDA, recursive = TRUE, showWarnings = FALSE)
+dir.create(OUT_CACHE, recursive = TRUE, showWarnings = FALSE)
 CITIES <- intersect(names(FU_CITY), OPT$cities)
 options(width = 160)
+
+
+## ===========================================================================
+## Functions of the exploratory analysis
+## ===========================================================================
+## The functions that build the data are in AppFuels_00_Setup.R of the
+## package; these two are used here only.
+
+## The memory of the relative prices, station by station: on the completed own
+## series of every station Y of one city and fuel (presample and window), the
+## partial autocorrelation at the lags `lags`, and the order of the
+## autoregression chosen by the AIC (Yule-Walker, up to order 8). For each lag,
+## the share of the stations whose partial autocorrelation lies outside the
+## band +-2 / sqrt(T), about 5% by chance. Returns the shares by lag and the
+## orders by station.
+fu_memory <- function(dfc, fuel, lags = c(1:8, 52)) {
+  S <- fu_series(dfc, fuel)
+  Tn <- nrow(S$own); band <- 2 / sqrt(Tn)
+  pa <- vapply(seq_len(ncol(S$own)), function(i)
+    stats::pacf(S$own[, i], lag.max = max(lags), plot = FALSE)$acf[lags], numeric(length(lags)))
+  ord <- vapply(seq_len(ncol(S$own)), function(i)
+    stats::ar(S$own[, i], aic = TRUE, order.max = 8, method = "yule-walker", demean = TRUE)$order, 1)
+  list(pacf = data.frame(city = dfc$city[1], fuel = FU_FUEL[[fuel]], lag = lags,
+                         share_outside = rowMeans(abs(matrix(pa, nrow = length(lags))) > band)),
+       ar_order = data.frame(city = dfc$city[1], fuel = FU_FUEL[[fuel]], site = S$sites, order = ord))
+}
+
+## Unit roots, persistence and stickiness of the prices of one station and fuel
+## over the window. z: its relative prices; p: its Sunday prices. On the
+## observed weeks of z, the augmented Dickey-Fuller test with a drift and up to
+## eight lagged differences chosen by the BIC (rejection of the unit root at
+## 5%) and the first-order autocorrelation; on p, the share of the weeks whose
+## price is unchanged from the previous Sunday (both observed).
+fu_station_stats <- function(z, p) {
+  z <- z[is.finite(z)]
+  adf <- urca::ur.df(z, type = "drift", lags = 8, selectlags = "BIC")
+  data.frame(adf_reject = adf@teststat[1] < adf@cval[1, "5pct"],
+             ar1 = stats::acf(z, lag.max = 1, plot = FALSE)$acf[2],
+             unchanged = mean(diff(p) == 0, na.rm = TRUE))
+}
 
 
 ## ===========================================================================
@@ -74,7 +133,7 @@ options(width = 160)
 ## The Sundays run from January 2021 to June 2026: the 52 Sundays before
 ## FU_WINDOW_FROM are the presample, which provides the lags of the first weeks
 ## of the window only; every model is estimated on the weeks of the window.
-DAT <- fu_read_data(OPT$data)
+DAT <- fu_read_data(DATA_IN)
 WEEKS <- DAT$national$week
 IN_WINDOW <- WEEKS >= FU_WINDOW_FROM
 PULSES <- fu_pulses(WEEKS)
@@ -101,16 +160,17 @@ CITY <- lapply(stats::setNames(CITIES, CITIES), function(cc) {
 ## 3. Completion of the missing weeks of the lagged series
 ## ===========================================================================
 ## A pooled STEM model of every city and fuel fills the missing weeks of the
-## relative prices (fu_complete() in functions.R). The completed series give
-## the lags of the models; the response keeps its missing weeks. Each fit is
-## saved in <out>/data and read back on a later run.
+## relative prices (fu_complete() in AppFuels_00_Setup.R). The completed series
+## give the lags of the models; the response keeps its missing weeks. Each fit
+## is saved in output/runs/application/cache/completion of the package and read
+## back on a later run, by this script and by the run scripts.
 SHA7 <- fu_require_stem()
 COMP <- list(); comp_summary <- list()
 for (cc in CITIES) {
   COMP[[cc]] <- list()
   for (fu in c("g", "d")) {
     message(sprintf("completion: %s, %s (%d stations)", FU_CITY[[cc]], FU_FUEL[[fu]], nrow(CITY[[cc]]$meta)))
-    res <- fu_cached(OUT_DATA, sprintf("completed_%s_%s", cc, FU_FUEL[[fu]]),
+    res <- fu_cached(OUT_CACHE, sprintf("completed_%s_%s", cc, FU_FUEL[[fu]]),
                      fu_complete(CITY[[cc]]$rel[[fu]], CITY[[cc]]$meta, PULSES))
     COMP[[cc]][[fu]] <- res$completed
     comp_summary[[length(comp_summary) + 1]] <- cbind(city = cc, fuel = FU_FUEL[[fu]], res$summary,
@@ -125,8 +185,8 @@ fu_write(do.call(rbind, comp_summary), file.path(OUT_EDA, "completion_fits.csv")
 ## ===========================================================================
 ## For every setting and city, the nearest station X of every station Y
 ## (fu_pairs()), and one row per station Y and week with the response, the
-## completed series and the pulses (fu_case_frame()). The three data.frames
-## are saved together in <out>/data/cases.rds.
+## completed series and the pulses (fu_case_frame()): the data the run scripts
+## of the package build with fu_setting_data().
 CASES <- lapply(stats::setNames(FU_SETTINGS$setting, FU_SETTINGS$setting), function(s) {
   d <- do.call(rbind, lapply(CITIES, function(cc) {
     pr <- fu_pairs(CITY[[cc]]$meta, s)
@@ -136,9 +196,6 @@ CASES <- lapply(stats::setNames(FU_SETTINGS$setting, FU_SETTINGS$setting), funct
   rownames(d) <- NULL
   d
 })
-saveRDS(list(cases = CASES, weeks = WEEKS, in_window = IN_WINDOW, stem = SHA7),
-        file.path(OUT_DATA, "cases.rds"))
-message("wrote ", file.path(OUT_DATA, "cases.rds"))
 
 
 ## ===========================================================================
@@ -304,4 +361,4 @@ if ("RM" %in% CITIES) {
   fu_write(data.frame(site = meta$site[two], brand = meta$brand[two], premium_cents = round(rowMeans(C[two, IN_WINDOW]), 2)),
            file.path(OUT_EDA, "fig_app_centring_stations.csv"))
 }
-message("done: the data of the models in ", OUT_DATA, ", the exploratory analysis in ", OUT_EDA)
+message("done: the exploratory analysis in ", OUT_EDA)

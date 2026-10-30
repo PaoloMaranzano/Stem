@@ -1,14 +1,19 @@
 ## ===========================================================================
-## APPLICATION: AUXILIARY FUNCTIONS
+## Latent Spatial Regimes in Spatio-Temporal State-Space Models: Evidence on
+## Local Price Leadership in Italian Fuel Markets
 ##
-## Sourced by the three scripts of the application:
+## Author:  Paolo Maranzano (University of Milano-Bicocca; Fondazione Eni Enrico
+##          Mattei)
+## Script:  AppFuels_00_Setup.R, the setup of the application to Italian fuel
+##          prices (Section 5 of the paper, Appendix C, Supplement C)
 ##
-##   01-data-and-eda.R   the data of the models and the exploratory analysis
-##   02-models.R         the SC-STEM models, their bootstrap and the tests
-##   03-results.R        the tables, figures and numbers of the paper
+## What it does: defines the settings shared by the scripts of the application
+## and the functions they call. It is sourced by AppFuels_01_RunSetting1.R,
+## AppFuels_02_RunSetting2.R, AppFuels_03_RunSetting3.R and
+## AppFuels_04_Analysis.R, and nothing in it runs on its own.
 ##
-## Nothing in this file runs on its own: it defines the settings shared by the
-## three scripts and the functions they call.
+## Outputs: none.
+## ===========================================================================
 ##
 ## The application in brief. In each of eleven Italian cities, the weekly
 ## relative price of a fuel at a station Y is regressed on four blocks of lags
@@ -26,6 +31,10 @@
 ##              major brand
 ##
 ## A model is one setting, one city and one fuel of Y (3 x 11 x 2 = 66 models).
+## Every model starts from the weekly data of data/ (the Sunday prices of the
+## 3,136 stations, their registry and the national mean prices), from which
+## fu_setting_data() builds the data of a setting: the relative prices, their
+## missing weeks completed for the lags, the pairs (Y, X) and the pulses.
 ##
 ## Conventions. Prices are in cents per liter. A relative price is the Sunday
 ## price minus the national mean of that Sunday, minus the mean of the station
@@ -36,15 +45,18 @@
 ##
 ## Contents
 ##   0. Settings shared by the scripts
-##   1. Utilities: folders, options, the Stem version, caching
+##   1. Utilities: options, the Stem version, caching
 ##   2. The data: reading, relative prices, pulses, coordinates
 ##   3. Completion of the missing weeks of the lagged series
 ##   4. The pairs (Y, X) and the data of a setting
-##   5. Exploratory analysis
-##   6. The design and the model of one city and fuel
-##   7. Inference: Wald tests, benchmarks, diagnostics
-##   8. The check of the local maxima of a selected fit
+##   5. The series and the design of one city and fuel
+##   6. Inference: Wald tests, benchmarks, diagnostics
+##   7. The check of the local maxima of a selected fit
+##   8. One model: the steps of a run
 ## ===========================================================================
+
+
+
 
 
 ## ===========================================================================
@@ -124,22 +136,12 @@ fu_seed <- function(city, fuel)
 fu_kmax <- function(n) max(1L, min(FU_KCAP, n %/% FU_M))
 
 
-## ===========================================================================
-## 1. Utilities: folders, options, the Stem version, caching
-## ===========================================================================
 
-## The folder of the script that sources this file, both from Rscript and from
-## the Source button of RStudio.
-fu_here <- function() {
-  a <- commandArgs(trailingOnly = FALSE)
-  m <- grep("^--file=", a, value = TRUE)
-  f <- if (length(m)) normalizePath(sub("^--file=", "", m[1]), winslash = "/") else NULL
-  if (is.null(f)) for (i in rev(seq_len(sys.nframe()))) {
-    of <- sys.frame(i)$ofile
-    if (!is.null(of)) { f <- normalizePath(of, winslash = "/"); break }
-  }
-  if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
-}
+
+
+## ===========================================================================
+## 1. Utilities: options, the Stem version, caching
+## ===========================================================================
 
 ## The options of a script: the defaults, overridden by the command line in
 ## the form --name=value (lists separated by commas). The type of each option
@@ -209,8 +211,11 @@ fu_write <- function(d, file) {
 }
 
 
+
+
+
 ## ===========================================================================
-## 2. The data: reading, relative prices, pulses, coordinates
+## 2. Data: reading, relative prices, pulses, coordinates
 ## ===========================================================================
 
 ## The three files of the data (see the README of the folder of the paper):
@@ -276,6 +281,9 @@ fu_coords <- function(meta) {
 }
 
 
+
+
+
 ## ===========================================================================
 ## 3. Completion of the missing weeks of the lagged series
 ## ===========================================================================
@@ -324,6 +332,9 @@ fu_complete <- function(Y, meta, pulses) {
                             G = ph$G[1, 1], sigma2eps = ph$sigma2eps, sigma2omega = ph$sigma2omega,
                             range_km = 3 / ph$theta / 1000))
 }
+
+
+
 
 
 ## ===========================================================================
@@ -381,9 +392,44 @@ fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses
   do.call(rbind, lapply(seq_len(nrow(pairs)), one))
 }
 
+## The data of the models of setting s, from the weekly data in data_dir: for
+## every city of `cities`, the relative prices of its stations (fu_relative()),
+## their missing weeks completed by a pooled STEM model of each fuel
+## (fu_complete(); each completion is saved in cache_dir and read back on a
+## later run, and the three settings share it), the pairs (Y, X) of the setting
+## (fu_pairs()), and one row per station Y and week (fu_case_frame()). The 52
+## Sundays before FU_WINDOW_FROM are the presample, which provides the lags of
+## the first weeks of the window only. Returns the data.frame of the setting,
+## the cities in the order of FU_CITY.
+fu_setting_data <- function(s, data_dir, cache_dir, cities = names(FU_CITY)) {
+  dat <- fu_read_data(data_dir)
+  weeks <- dat$national$week
+  in_window <- weeks >= FU_WINDOW_FROM
+  pulses <- fu_pulses(weeks)
+  nat <- list(g = dat$national$gasoline, d = dat$national$diesel)
+  d <- do.call(rbind, lapply(intersect(names(FU_CITY), cities), function(cc) {
+    meta <- dat$stations[dat$stations$city == cc, ]
+    pairs <- fu_pairs(meta, s)
+    if (is.null(pairs)) return(NULL)
+    rel <- lapply(c(g = "g", d = "d"), function(fu)
+      fu_relative(fu_price_matrix(dat, cc, fu, weeks), nat[[fu]], in_window))
+    comp <- lapply(c(g = "g", d = "d"), function(fu) {
+      message(sprintf("completion: %s, %s (%d stations)", FU_CITY[[cc]], FU_FUEL[[fu]], nrow(meta)))
+      fu_cached(cache_dir, sprintf("completed_%s_%s", cc, FU_FUEL[[fu]]),
+                fu_complete(rel[[fu]], meta, pulses))$completed
+    })
+    fu_case_frame(cc, s, meta, rel, comp, weeks, pairs, pulses, !in_window)
+  }))
+  rownames(d) <- NULL
+  d
+}
+
+
+
+
 
 ## ===========================================================================
-## 5. Exploratory analysis
+## 5. The series and the design of one city and fuel
 ## ===========================================================================
 
 ## The series of the four blocks of one city and fuel of Y, weeks x stations Y
@@ -399,43 +445,6 @@ fu_series <- function(dfc, fuel) {
        nb_other = m(paste0("x", fo)), sites = unique(dfc$y_site))
 }
 
-## The memory of the relative prices, station by station: on the completed own
-## series of every station Y of one city and fuel (presample and window), the
-## partial autocorrelation at the lags `lags`, and the order of the
-## autoregression chosen by the AIC (Yule-Walker, up to order 8). For each lag,
-## the share of the stations whose partial autocorrelation lies outside the
-## band +-2 / sqrt(T), about 5% by chance. Returns the shares by lag and the
-## orders by station.
-fu_memory <- function(dfc, fuel, lags = c(1:8, 52)) {
-  S <- fu_series(dfc, fuel)
-  Tn <- nrow(S$own); band <- 2 / sqrt(Tn)
-  pa <- vapply(seq_len(ncol(S$own)), function(i)
-    stats::pacf(S$own[, i], lag.max = max(lags), plot = FALSE)$acf[lags], numeric(length(lags)))
-  ord <- vapply(seq_len(ncol(S$own)), function(i)
-    stats::ar(S$own[, i], aic = TRUE, order.max = 8, method = "yule-walker", demean = TRUE)$order, 1)
-  list(pacf = data.frame(city = dfc$city[1], fuel = FU_FUEL[[fuel]], lag = lags,
-                         share_outside = rowMeans(abs(matrix(pa, nrow = length(lags))) > band)),
-       ar_order = data.frame(city = dfc$city[1], fuel = FU_FUEL[[fuel]], site = S$sites, order = ord))
-}
-
-## Unit roots, persistence and stickiness of the prices of one station and fuel
-## over the window. z: its relative prices; p: its Sunday prices. On the
-## observed weeks of z, the augmented Dickey-Fuller test with a drift and up to
-## eight lagged differences chosen by the BIC (rejection of the unit root at
-## 5%) and the first-order autocorrelation; on p, the share of the weeks whose
-## price is unchanged from the previous Sunday (both observed).
-fu_station_stats <- function(z, p) {
-  z <- z[is.finite(z)]
-  adf <- urca::ur.df(z, type = "drift", lags = 8, selectlags = "BIC")
-  data.frame(adf_reject = adf@teststat[1] < adf@cval[1, "5pct"],
-             ar1 = stats::acf(z, lag.max = 1, plot = FALSE)$acf[2],
-             unchanged = mean(diff(p) == 0, na.rm = TRUE))
-}
-
-
-## ===========================================================================
-## 6. The design and the model of one city and fuel
-## ===========================================================================
 ## The design of one model: the response (weeks x stations Y, with its missing
 ## weeks), the covariates stacked by station (the layout of Stem::STEM_Model()),
 ## their names, and the columns of each block. Column names: intercept, the
@@ -494,8 +503,11 @@ fu_model <- function(des) {
 }
 
 
+
+
+
 ## ===========================================================================
-## 7. Inference: Wald tests, benchmarks, diagnostics
+## 6. Inference: Wald tests, benchmarks, diagnostics
 ## ===========================================================================
 
 ## The hypotheses, as sets of columns of the design; each is the null that the
@@ -681,8 +693,11 @@ fu_ari_space <- function(regime, lon, lat, seed, nstart = 50L) {
 }
 
 
+
+
+
 ## ===========================================================================
-## 8. The check of the local maxima of a selected fit
+## 7. The check of the local maxima of a selected fit
 ## ===========================================================================
 ## The likelihood of a regime may have more than one local maximum, and the EM
 ## algorithm reaches the one its start leads to. The selected partition is
@@ -722,4 +737,133 @@ fu_check_optima <- function(fit, des, inf, seed) {
     se_boot = sm$se[sm$cluster == g][match(p, sm$parameter[sm$cluster == g])],
     stringsAsFactors = FALSE)))
   list(regimes = regimes, coefficients = coefficients)
+}
+
+
+
+
+
+## ===========================================================================
+## 8. One model: the steps of a run
+## ===========================================================================
+## Fits one model (setting s, city cc, fuel fu) and writes its compact results
+## into <opt$out>/setting<s>/<city>_<fuel>/. cases: the data of the setting
+## (fu_setting_data()); opt: the options of the run script (out,
+## cache, cores); stem: the commit of Stem, recorded in model.csv. A model whose
+## model.csv is already there is skipped, and the grid, the bootstraps and the
+## check of the local maxima are cached in <opt$cache>/setting<s>, so a model
+## stopped halfway resumes from its last completed step. The seed depends on
+## the city and the fuel only (fu_seed()).
+##
+## The steps:
+##   1. the design: the response and the covariates (fu_design());
+##   2. the regimes: the grid of (K, phi) and the two-step rule on the BIC;
+##   3. the refit-with-clustering bootstrap of the selected fit and of the
+##      pooled model;
+##   4. the tests: the bootstrap Wald tests and the station-by-station
+##      benchmark;
+##   5. the residual diagnostics of the selected fit;
+##   6. the check of the local maxima of the selected fit;
+##   7. the compact results of the model, read by AppFuels_04_Analysis.R.
+fu_run_model <- function(s, cc, fu, cases, opt, stem) {
+  id <- sprintf("%s_%s", cc, FU_FUEL[[fu]])
+  od <- file.path(opt$out, sprintf("setting%d", s), id)
+  if (file.exists(file.path(od, "model.csv"))) { message("done already: setting ", s, ", ", id); return(invisible()) }
+  cache <- file.path(opt$cache, sprintf("setting%d", s))
+  seed <- fu_seed(cc, fu)
+
+  ## 1. The design
+  des <- fu_design(cases[cases$city == cc, , drop = FALSE], fu)
+  kmax <- fu_kmax(des$d)
+  message(sprintf("\n== setting %d, %s, %s: %d stations Y, %d weeks, K_max = %d", s, FU_CITY[[cc]],
+                  FU_FUEL[[fu]], des$d, des$Tn, kmax))
+
+  ## 2. The regimes: the grid of (K, phi) and the two-step rule on the BIC.
+  ## Only the table of the grid, the selected fit and the pooled fit are kept
+  ## (the grid of a large city takes some GB).
+  g <- fu_cached(cache, paste0(id, "_grid"), {
+    ic <- Stem::SCSTEM_Infocrit(fu_model(des), K_grid = seq_len(kmax), phi_grid = FU_PHI,
+                                knn = min(FU_KNN, des$d - 1L), distance = "geo", min_cluster_size = FU_M,
+                                seed = seed, verbose = TRUE, control = Stem::STEM_control())
+    sel <- Stem::SCSTEM_Select(ic, band = FU_BAND, criterion = "BIC")
+    list(table = ic$table, K = sel$K_selected, phi = sel$phi_selected, fit = sel$fit,
+         pooled = ic$fits[[which(ic$table$K == 1)[1]]])
+  })
+  K <- g$K
+  message(sprintf("   K = %d, phi = %s, regimes of %s stations", K, format(g$phi),
+                  paste(tabulate(g$fit$group, K), collapse = "/")))
+
+  ## 3. The refit-with-clustering bootstrap: each draw simulates the data from
+  ## the fitted model, regime by regime, and re-estimates SC-STEM at the
+  ## selected (K, phi), partition included; the regimes of a draw are matched
+  ## to the estimated ones (Stem::SCSTEM_BootInference()). The pooled model is
+  ## bootstrapped in the same way, with the same seed.
+  boot <- function(fit, name) fu_cached(cache, paste0(id, "_", name), {
+    bt <- Stem::SCSTEM_Bootstrap(fit, B = FU_B, seed = seed, verbose = TRUE, cores = opt$cores)
+    list(B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = FU_LEVEL))
+  })
+  b0 <- boot(g$fit, "boot")
+  bP <- if (K == 1L) b0 else boot(g$pooled, "boot_pooled")
+
+  ## 4. The tests
+  wald <- rbind(fu_wald(g$fit$phi_hat, g$fit$group, b0$inf, des, "selected"),
+                if (K > 1L) fu_wald(g$pooled$phi_hat, g$pooled$group, bP$inf, des, "pooled"))
+  pt <- fu_pump_tests(des)
+  dh <- fu_dh(pt)
+
+  ## 5. The residual diagnostics
+  dg <- fu_diagnostics(g$fit, des)
+
+  ## 6. The check of the local maxima (NULL for a pooled model)
+  opt_check <- fu_cached(cache, paste0(id, "_optima"), fu_check_optima(g$fit, des, b0$inf, seed))
+
+  ## 7. The compact results
+  dir.create(od, recursive = TRUE, showWarnings = FALSE)
+  w <- function(d, f) if (!is.null(d)) utils::write.csv(cbind(setting = s, model = id, d), file.path(od, f),
+                                                         row.names = FALSE)
+  w(g$table[, !vapply(g$table, is.list, TRUE)], "grid.csv")
+  w(data.frame(des$meta, regime = g$fit$group, theta_bound = g$fit$theta_bound[g$fit$group]), "regimes.csv")
+  w(rbind(fu_estimates(b0$inf, des$names, "selected"),
+          if (K > 1L) fu_estimates(bP$inf, des$names, "pooled")), "estimates.csv")
+  data.table::fwrite(cbind(setting = s, model = id, fu_draws(b0$inf, des$names)), file.path(od, "draws.csv.gz"))
+  w(wald, "wald.csv"); w(pt, "pump_tests.csv"); w(dh, "dumitrescu_hurlin.csv"); w(dg, "diagnostics.csv")
+  if (!is.null(opt_check)) { w(opt_check$regimes, "optima.csv"); w(opt_check$coefficients, "optima_coefficients.csv") }
+  brands <- des$meta$y_brand
+  row <- data.frame(
+    setting = s, model = id, city = cc, fuel = FU_FUEL[[fu]], pumps = des$d, weeks = des$Tn,
+    K_max = kmax, K = K, phi = g$phi, BIC = g$table$BIC[g$table$K == K & g$table$phi == g$phi][1],
+    sizes = paste(tabulate(g$fit$group, K), collapse = "/"),
+    B_valid = b0$B_valid, B_valid_pooled = bP$B_valid,
+    ari_regimes_brands = if (length(unique(brands)) > 1 && K > 1) fu_ari(g$fit$group, brands) else NA_real_,
+    ari_draws_median = stats::median(b0$inf$stability$ARI),
+    minutes_grid = fu_minutes(g), minutes_boot = fu_minutes(b0),
+    minutes_boot_pooled = if (K > 1L) fu_minutes(bP) else 0, minutes_optima = fu_minutes(opt_check),
+    stem = stem, stringsAsFactors = FALSE)
+  utils::write.csv(row, file.path(od, "model.csv"), row.names = FALSE)   # written last: the model is done
+  message(sprintf("   done: X leads Y (8 lags, 5%%) in %d of %d regimes", sum(wald$fit == "selected" &
+    wald$block == "nb_both" & wald$regime != "all" & wald$p_chisq < 0.05), K))
+  invisible()
+}
+
+## Every model of setting s in the cities and fuels of opt, the smaller first,
+## then the table of the models of the setting (<opt$out>/setting<s>/models.csv,
+## from the files of all its models). A model that fails is reported and the
+## run goes on.
+fu_run_setting <- function(s, cases, opt, stem) {
+  n <- tapply(cases$y_site, cases$city, function(v) length(unique(v)))
+  todo <- expand.grid(city = intersect(names(FU_CITY), intersect(opt$cities, names(n))),
+                      fuel = opt$fuels, stringsAsFactors = FALSE)
+  todo$n <- as.integer(n[todo$city])
+  todo <- todo[order(todo$n), ]
+  message(sprintf("setting %d: %d models; Stem %s; bootstrap on %d process(es)", s, nrow(todo), stem, opt$cores))
+  for (i in seq_len(nrow(todo))) {
+    r <- tryCatch(fu_run_model(s, todo$city[i], todo$fuel[i], cases, opt, stem), error = function(e) e)
+    if (inherits(r, "error"))
+      message("   FAILED: setting ", s, ", ", todo$city[i], ", ", todo$fuel[i], ": ", conditionMessage(r))
+  }
+  f <- Sys.glob(file.path(opt$out, sprintf("setting%d", s), "*", "model.csv"))
+  if (length(f)) fu_write(do.call(rbind, lapply(f, utils::read.csv, stringsAsFactors = FALSE)),
+                          file.path(opt$out, sprintf("setting%d", s), "models.csv"))
+  message("done: results of setting ", s, " in ", opt$out)
+  invisible()
 }

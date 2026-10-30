@@ -24,5 +24,9 @@ dev/replication/output/
 dev/replication/fuels/
 dev/replication/ridge-experiment/
 dev/replication/application/
+dev/archive/replication-pipeline-2026-10/results/
+dev/archive/replication-pipeline-2026-10/output/
+dev/archive/replication-pipeline-2026-10/fuels/
+dev/archive/replication-pipeline-2026-10/ridge-experiment/
 # What the scripts of the papers write (regenerable)
 papers/sc-stem-local-leader/output/
