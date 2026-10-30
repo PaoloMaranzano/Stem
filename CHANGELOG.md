@@ -16,6 +16,52 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-10-30 (evening)
+
+**The documentation aligned with the supplements of the paper.** The rule, at
+the author's request: the supplements of the paper are a subset of what the
+repository documents, with the same numbers. `docs/computational-aspects.md`
+now follows Supplement A section by section (estimation, missing responses,
+initialization and the scale of the penalty, degeneracy and the swap pass, the
+label update and the monotonicity of the alternation, the information
+criteria, the bootstrap and its tests, the Potts penalty on point-referenced
+data, scope), with the implementation details, the numerical evidence and the
+places in the code that the supplement leaves out; the design notes
+(`docs/sc-stem-design.md`) are merged into it. As in the paper, the comparison
+of the stopping rule with that of D-STEM is gone (from the page, the README,
+the help of `STEM_control()` and NEWS), and the $0.01 I$ that earlier versions
+added to the matrices they inverted is called a jitter, not a ridge; the
+paragraph on SQUAREM under a ridge moved to `docs/regularization.md`. SQUAREM
+is now explained step by step, for a reader who meets it for the first time
+(the geometric error of EM, Aitken's extrapolation from three iterates, the
+extrapolated point and why $\alpha = 1$ is EM, several directions, the scale,
+the safeguards, one cycle line by line), and a synoptic table sets the four
+algorithms side by side: what they share and where each departs from EM. The
+same explanation and table are in Section A1 of Supplement A.
+`inst/extdata/Stem-computational-supplement.pdf`, which still held the
+supplement of 2026-10-04, is now the current Supplement A.
+
+**`dev/` reduced to what the package and the paper need.** Kept: the sync
+scripts, `make-logo.R`, `code-changes-report.html`, `regularization/` and
+`replication/`. The archive of superseded material (`dev/archive/`), the paper
+scripts of early October (`dev/paper/`), the internal design document of the
+simulation study (`dev/simulation-design.tex`) and the private bootstrap of the
+likelihood-ratio tests (`dev/lr-bootstrap/`) moved to the Drive, into
+`SC-STEM-replication/_archive/` (indexed by its README), together with the
+1.4 GB of outputs of the original pipeline that were never versioned. The
+vignette `computational-notes` no longer points to `dev/paper/`.
+
+**The replication package checked on R 4.6.1.** On R 4.6.1, with Stem
+`09e9cdb` and `0f7b744` installed in temporary libraries:
+`AppFuels_04_Analysis.R` and `Sims_02_Analysis.R` write the same tables and
+csv files as on R 4.5.1, byte for byte; setting 2, Messina, gasoline, run from
+the weekly data with its completion, matches the shipped results within 5e-12
+(the completed series identical); the internal exploratory analysis gives the
+same tables; one replication of the simulation study matches the stored one
+exactly. The figures differ from those of R 4.5.1 only in the placement of the
+text, by a few pixels (1 to 4% of the pixel values), since the two versions
+render fonts slightly differently. The README of the package says so.
+
 ### 2026-10-30
 
 **The replication package of the paper in eight numbered scripts.** At the

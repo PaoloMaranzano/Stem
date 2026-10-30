@@ -15,7 +15,8 @@ manuscript). This folder holds what stays outside it.
 
 The weekly dataset of the package (`data/`) was built from the daily file of
 Osservaprezzi Carburanti by the original pipeline, archived with its other
-scripts in `dev/archive/replication-pipeline-2026-10` (see its README).
+scripts on the Drive, in `SC-STEM-replication/_archive/01_original-pipeline`
+(see its `README-archive-repo.md`).
 
 On the Drive, `dev/sync-gdrive.R` delivers the package to
 `STEM_Cameletti/SC-STEM-replication`, with the structure it has in the
@@ -23,6 +24,7 @@ repository (`README.md`, `manuscript/`, `data/`, `code/`, `results/`, and
 `output/` for what the scripts write when they run there), and this folder to
 its subfolder `internal/`, beside the daily file of Osservaprezzi Carburanti
 (`internal/App_FuelsITA/`). The scripts of the original pipeline, the outputs
-of its 66 models (`_archive/fuels/`), the raw results of the simulation study
-(`_archive/results-simulations-raw/`, from which `results/simulations` of the
-package was compacted) and the superseded outputs are in `_archive/`.
+of its 66 models (`fuels/`), the raw results of the simulation study
+(`results/`, from which `results/simulations` of the package was compacted)
+and the superseded outputs are in `_archive/01_original-pipeline`;
+`_archive/README.md` indexes the rest of the archive.

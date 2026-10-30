@@ -192,9 +192,8 @@ measured against the state of the code before these changes:
 
 The column that matters is the last one. Both changes are algebraic identities,
 so the estimates coincide to floating point; the speed-up is the consequence,
-not the claim. The benchmark is `dev/paper/10-engine-benchmark.R` in the
-repository, which reconstructs the previous sources from git and runs the two
-side by side; `dev/paper/11-engine-profile.R` profiles the current one.
+not the claim. The benchmark reconstructed the previous sources from git and
+ran the two side by side on the same data.
 
 ## 7. Where to look in the sources
 

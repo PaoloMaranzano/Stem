@@ -85,6 +85,14 @@ Every script runs from a terminal (`Rscript <script>`, in `code/`) or from
 RStudio (open it and press *Source*). Options are given on the command line as
 `--name=value`; the header of every script lists them.
 
+The scripts were checked on R 4.5.1 and R 4.6.1 (Windows): the two analysis
+scripts, a model of the application run from the weekly data (completion of
+the missing weeks included) and a replication of the simulation study give the
+same tables, numbers and results on both, and the shipped results to within
+$10^{-11}$. The figures differ between the two versions of R only in where the
+text is placed, by a few pixels, since the two versions render fonts slightly
+differently.
+
 ## The data
 
 The prices come from Osservaprezzi Carburanti, the platform on which every

@@ -261,9 +261,9 @@ information criteria all come from the exact cluster-wise likelihoods.
   of the previous code to 1e-13. The smoother gain of the initial state now
   uses the transpose of `G`, which matters only for a non-symmetric `G`.
 * New stopping rule of the EM algorithm, on two criteria: the largest relative
-  change of a free parameter, taken one at a time (as in D-STEM v2), and the
+  change of a free parameter, taken one at a time, and the
   absolute change of the log-likelihood, with a tolerance of `1e-3` on both by
-  default. With `em_stop = "any"` (the default, as in D-STEM v2) the algorithm
+  default. With `em_stop = "any"` (the default) the algorithm
   stops when either criterion is met, with `em_stop = "all"` only when both are;
   in either case after `em_maxit` iterations (default 500). The previous
   rule stopped when the relative change of the whole parameter vector and the

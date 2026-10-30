@@ -1,35 +1,49 @@
 # Computational aspects of Stem
 
-How `Stem` estimates its models: the state-space form, the Kalman filter and
-smoother every algorithm rests on, the EM algorithm and where it is slow, the
-two accelerations the package offers (ECME and SQUAREM), the stopping rule and
-how it relates to that of D-STEM, the limits within which the range is
-estimated, and the numerical experiments behind these choices.
+[Back to the README](../README.md) | [All pages](README.md)
 
-The full technical account, with the proofs and the complete tables, is
-Section S1 of the **Computational Supplement**, which ships with the package:
+How `Stem` estimates STEM and SC-STEM, and why it does what it does: the
+state-space form, the Kalman filter and smoother every algorithm rests on, the
+EM algorithm, its stopping rule and where it is slow, the two accelerations
+(ECME and SQUAREM), the limits within which the range is estimated, the
+treatment of missing responses, and, for SC-STEM, the start of a fit and the
+scale of the Potts penalty, the control of degeneracy, the label update, the
+information criteria, the refit-with-clustering bootstrap and the tests built
+on it, and the use of the Potts penalty on point-referenced data.
+
+This page follows the Computational and Algorithmic Supplement of the paper
+(Supplement A), which ships with the package, section by section, and adds the
+implementation details and the numerical evidence behind the defaults:
 
 ```r
 browseURL(system.file("extdata", "Stem-computational-supplement.pdf", package = "Stem"))
 ```
 
+The numerical experiments are documented in full in the vignette
+`estimation-experiments` (`vignette("estimation-experiments", package = "Stem")`).
+The optional penalty on the regression coefficients (ridge, lasso, elastic net)
+has [a page of its own](regularization.md).
+
 Contents
 
-1. [The model in state-space form](#1-the-model-in-state-space-form)
-2. [The Kalman filter and smoother](#2-the-kalman-filter-and-smoother)
-3. [The EM algorithm](#3-the-em-algorithm)
-4. [The EM algorithm within SC-STEM](#4-the-em-algorithm-within-sc-stem)
-5. [Where the EM algorithm is slow](#5-where-the-em-algorithm-is-slow)
-6. [ECME](#6-ecme)
-7. [SQUAREM](#7-squarem)
-8. [The four algorithms at a glance](#8-the-four-algorithms-at-a-glance)
-9. [The stopping rule, and the rule of D-STEM](#9-the-stopping-rule-and-the-rule-of-d-stem)
-10. [The range at the boundary of what the data identify](#10-the-range-at-the-boundary-of-what-the-data-identify)
-11. [No ridge in the inversions](#11-no-ridge-in-the-inversions)
-12. [Numerical experiments](#12-numerical-experiments)
-13. [Where it is in the code](#13-where-it-is-in-the-code)
+1. [Estimation: the Kalman filter, the EM algorithm and its accelerations](#1-estimation-the-kalman-filter-the-em-algorithm-and-its-accelerations) (Supplement A, Section A1)
+2. [Missing observations](#2-missing-observations) (A2)
+3. [Initialization and the scale of the penalty](#3-initialization-and-the-scale-of-the-penalty) (A3)
+4. [Degeneracy, the minimum-size constraint and the swap pass](#4-degeneracy-the-minimum-size-constraint-and-the-swap-pass) (A4)
+5. [The label update and the monotonicity of the alternation](#5-the-label-update-and-the-monotonicity-of-the-alternation) (A5)
+6. [The information criteria as T and d grow](#6-the-information-criteria-as-t-and-d-grow) (A6)
+7. [Inference under the refit-with-clustering bootstrap](#7-inference-under-the-refit-with-clustering-bootstrap) (A7)
+8. [The Potts penalty on point-referenced data](#8-the-potts-penalty-on-point-referenced-data) (A8)
+9. [What SC-STEM does and does not cover](#9-what-sc-stem-does-and-does-not-cover) (A9)
+10. [No jitter in the inversions](#10-no-jitter-in-the-inversions)
+11. [Numerical experiments](#11-numerical-experiments)
+12. [Where it is in the code](#12-where-it-is-in-the-code)
 
-## 1. The model in state-space form
+---
+
+## 1. Estimation: the Kalman filter, the EM algorithm and its accelerations
+
+### 1.1 The model in state-space form
 
 Within a regime, or in the pooled fit, STEM is the state-space model
 
@@ -42,9 +56,10 @@ y_t = G\, y_{t-1} + \eta_t, \qquad \eta_t \sim N(0, \Sigma_\eta), \qquad y_0 \si
 ```
 
 for $t = 1, \dots, T$, with $z_t$ the $d$ observations at time $t$, $A$ the
-$d \times p$ loading matrix and $C_0$ known. The package writes
-$\Sigma_e = \sigma^2_\omega \Gamma$ with $\Gamma = C_\theta + \gamma I_d$ and
-$\gamma = \sigma^2_\epsilon / \sigma^2_\omega$, and estimates
+$d \times p$ loading matrix and $C_0$ known; in the paper $p = 1$ and
+$A = \mathbf{1}_d$. The package writes $\Sigma_e = \sigma^2_\omega \Gamma$ with
+$\Gamma = C_\theta + \gamma I_d$ and $\gamma = \sigma^2_\epsilon / \sigma^2_\omega$,
+and estimates
 $\psi = (\beta, \sigma^2_\omega, \log\gamma, \log\theta, G, \Sigma_\eta, m_0)$
 by the EM algorithm of Shumway and Stoffer (1982): the E-step is the Kalman
 smoother, the M-step updates $G$, $\Sigma_\eta$, $m_0$, $\sigma^2_\omega$ and
@@ -52,7 +67,7 @@ $\beta$ in closed form and $(\log\theta, \log\gamma)$ by Newton-Raphson. The
 log-likelihood $\ell(\psi)$ is the by-product of the Kalman filter (the
 prediction-error decomposition).
 
-## 2. The Kalman filter and smoother
+### 1.2 The Kalman filter and smoother
 
 Every algorithm of the package rests on three recursions, run at given
 parameters by the internal function `kalman()`.
@@ -72,16 +87,6 @@ K_t = P_{t|t-1} A^\top F_t^{-1}, \quad y_{t|t} = y_{t|t-1} + K_t v_t, \quad P_{t
 \ell(\psi) = -\tfrac12 \sum_{t=1}^T \left\{ d \log(2\pi) + \log|F_t| + v_t^\top F_t^{-1} v_t \right\}.
 ```
 
-The $d \times d$ matrix $F_t$ is never formed: $\Sigma_e$ does not depend on $t$
-and $A P_{t|t-1} A^\top$ has rank $p$, so the Woodbury identity and the matrix
-determinant lemma reduce every step to $p \times p$ algebra against a Cholesky
-factor of $\Sigma_e$ computed once per pass. A pass costs $O(d^3 + T d^2 p)$
-instead of $O(T d^3)$, and the log-density is evaluated directly, since on a
-few hundred locations the density itself underflows. Missing responses are
-handled by dropping the unobserved rows of the measurement equation (Durbin and
-Koopman 2012, Sect. 4.10); the vignette `computational-notes` gives the
-details.
-
 **The smoother.** With $J_t = P_{t|t} G^\top P_{t+1|t}^{-1}$, for
 $t = T-1, \dots, 0$:
 
@@ -96,7 +101,21 @@ P_{T,T-1|T} = (I - K_T A) G P_{T-1|T-1}, \qquad
 P_{t-1,t-2|T} = P_{t-1|t-1} J_{t-2}^\top + J_{t-1} (P_{t,t-1|T} - G P_{t-1|t-1}) J_{t-2}^\top .
 ```
 
-## 3. The EM algorithm
+**The filter never inverts a $d \times d$ matrix.** $\Sigma_e$ does not depend on
+$t$ and $A P_{t|t-1} A^\top$ has rank $p$, so the Woodbury identity and the
+matrix determinant lemma reduce every step to $p \times p$ algebra against a
+Cholesky factor of $\Sigma_e$ computed once per pass. A pass costs
+$O(d^3 + T d^2 p)$ instead of $O(T d^3)$, and the log-density is evaluated in
+closed form rather than as the logarithm of a density, which on a few hundred
+locations underflows to `-Inf`. On a network of 200 stations over 365 days one
+EM iteration is about ten times faster than the direct form, and a network of
+400 stations, which the direct form cannot fit at all, takes about a second per
+iteration. The two forms are algebraic identities of each other and agree to
+about $10^{-13}$ in relative terms. Missing responses are handled by dropping
+the unobserved rows of the measurement equation (Section 2); the vignette
+`computational-notes` gives the details of the computation.
+
+### 1.3 The EM algorithm
 
 **E-step.** The expected complete-data log-likelihood depends on the states
 only through the smoothed initial state and
@@ -111,129 +130,176 @@ S_{10} = \sum_t (y_{t|T} y_{t-1|T}^\top + P_{t,t-1|T}),
 W = \sum_t (A P_{t|T} A^\top + r_t r_t^\top), \qquad r_t = z_t - X_t \beta - A y_{t|T},
 ```
 
-completed by their conditional expectations where responses are missing.
+completed by their conditional expectations where responses are missing
+(Section 2).
 
 **M-step.** The parameters are updated in turn, each given the updates that
-precede it (an ECM algorithm): $m_0 \leftarrow y_{0|T}$; $\Sigma_\eta$ and $G$
-from $S_{11}$, $S_{10}$, $S_{00}$ (element by element when diagonal, the
-default; otherwise
+precede it: $m_0 \leftarrow y_{0|T}$; $\Sigma_\eta$ and $G$ from $S_{11}$,
+$S_{10}$, $S_{00}$ (element by element when diagonal, the default; otherwise
 $\Sigma_\eta \leftarrow T^{-1}(S_{11} - S_{10} S_{00}^{-1} S_{10}^\top)$ and
-$G \leftarrow S_{10} S_{00}^{-1}$); $\sigma^2_\omega \leftarrow \mathrm{tr}(\Gamma^{-1} W)/(dT)$;
-$\beta$ by generalized least squares given the smoothed states,
+$G \leftarrow S_{10} S_{00}^{-1}$);
+$\sigma^2_\omega \leftarrow \mathrm{tr}(\Gamma^{-1} W)/(dT)$; $\beta$ by
+generalized least squares given the smoothed states,
 
 ```math
 \beta \leftarrow \Big(\sum_t X_t^\top \Sigma_e^{-1} X_t\Big)^{-1} \sum_t X_t^\top \Sigma_e^{-1} (\hat z_t - A y_{t|T}),
 ```
 
-(or the corresponding penalized quadratic under a ridge or an elastic net);
 and $(\log\theta, \log\gamma)$ by a safeguarded Newton-Raphson step on
-$Q_e = T \log|\sigma^2_\omega \Gamma| + \mathrm{tr}\{(\sigma^2_\omega \Gamma)^{-1} W\}$
-(Section 10). No step decreases the expected complete-data log-likelihood, so
-the algorithm is a generalized EM algorithm and $\ell$ does not decrease.
 
-## 4. The EM algorithm within SC-STEM
+```math
+Q_e(\theta, \gamma) = T \log|\sigma^2_\omega \Gamma| + \mathrm{tr}\{(\sigma^2_\omega \Gamma)^{-1} W\},
+```
 
-SC-STEM fits one STEM model per regime and alternates between the parameters
-and the labels. The EM algorithm enters twice.
+minus twice the part of $Q$ that depends on them (Section 1.10); finally
+$\sigma^2_\epsilon = \gamma\, \sigma^2_\omega$. $W$ is computed once per
+iteration, at the current $\beta$, so the updates are conditional
+maximizations of $Q$, each in its own block at the current values of the
+others. None of them decreases $Q$, so the algorithm is a generalized EM
+algorithm and $\ell$ does not decrease along the iterations.
 
-- **In the alternation**, where it only has to rank the regimes: a few plain
-  EM (or ECME) iterations per regime, tolerances `1e-2` and `1`, at most 50
-  iterations, never accelerated. A regime first starts from the least-squares
-  coefficients of its own locations (an unpenalized fit) or from the final
-  refit of the unpenalized solution (a penalized fit), and afterwards from its
-  own estimates of the previous iteration.
+### 1.4 Stopping rule
+
+The EM algorithm and the accelerated algorithms below stop by the same rule.
+Two criteria are computed at every iteration (at every cycle under SQUAREM):
+the largest relative change of a free parameter, taken one at a time,
+
+```math
+\max_l \frac{|\psi^{(j+1)}_l - \psi^{(j)}_l|}{\max(|\psi^{(j)}_l|, 10^{-3})},
+```
+
+on the scale on which the algorithm updates it and with the loading matrix and
+$C_0$ excluded, and the absolute change of the log-likelihood,
+$|\ell(\psi^{(j+1)}) - \ell(\psi^{(j)})|$. The algorithm stops as soon as
+either falls below its tolerance (`em_stop = "any"`), or after a maximum number
+of iterations:
+
+| fit | parameters | log-likelihood | iterations | settings of `STEM_control()` |
+|---|---|---|---|---|
+| pooled fit, final refits of SC-STEM | $10^{-3}$ | $10^{-3}$ | 500 | `em_tol_par`, `em_tol_loglik`, `em_maxit` |
+| fits inside the alternation of SC-STEM | $10^{-2}$ | $1$ | 50 | `alt_em_tol_par`, `alt_em_tol_loglik`, `alt_em_maxit` |
+
+The criterion on $\ell$ is absolute because the differences that matter,
+between fits and in the information criteria, are absolute, whereas a relative
+criterion loosens as the log-likelihood grows with the size of the data.
+Tolerances of $10^{-3}$ on both criteria left the estimates within 1 to 2% of
+those at $10^{-4}$ and the selected models unchanged in the simulation study,
+while $10^{-2}$ moved the range and the variances by tens of percent.
+
+### 1.5 The EM algorithm within SC-STEM
+
+SC-STEM fits one STEM model per regime, on the locations of the regime with the
+rows $A_k$ of the loading matrix and the parameters $\psi_k$, and alternates
+between the parameters and the labels (Algorithm 1 of the paper). The EM
+algorithm enters in two places.
+
+- **In the parameter step of the alternation**, where it only has to rank the
+  regimes for the label step: a few plain EM (or ECME) iterations per regime,
+  with the tolerances of the second row above, without acceleration. The first
+  time, a regime starts from the least-squares coefficients of its own
+  locations (an unpenalized fit) or from the final refit of the unpenalized
+  solution the fit starts from (a penalized one, Section 3); every later time,
+  from its own estimates of the previous iteration. The label step scores each
+  location with the smoothed states and the measurement parameters of each
+  regime.
 - **In the final refit**, where the regimes are re-estimated once on the final
   partition, with the settings of the pooled fit and the algorithm chosen,
-  starting from the last estimates of the alternation. The reported estimates
-  and log-likelihoods come from this refit; fits of a grid that end at the same
-  partition share one refit.
+  starting from the estimates of the last iteration of the alternation. The
+  reported estimates and log-likelihoods come from this refit. Fits of a grid
+  that end at the same partition share one refit.
 
-## 5. Where the EM algorithm is slow
+### 1.6 Where the EM algorithm is slow
 
-The EM algorithm is a fixed-point iteration $\psi^{(j+1)} = M(\psi^{(j)})$
-which, near the maximum, is linear:
-$\psi^{(j+1)} - \hat\psi \approx J (\psi^{(j)} - \hat\psi)$ with
-$J = I_c^{-1} I_m$, the fraction of the complete-data information that is
-missing because the states are not observed (Dempster, Laird and Rubin 1977).
-Convergence is linear with rate $\lambda$, the largest eigenvalue of $J$, and a
-stopping rule that looks at the change between two iterations leaves a distance
-from the maximum of about that change divided by $1 - \lambda$. On the regimes
-of SC-STEM three situations make $\lambda$ close to one or the objective flat:
+**The rate of convergence.** An iteration maps the current parameters into new
+ones, $\psi^{(j+1)} = M(\psi^{(j)})$, and the maximum $\hat\psi$ is the point
+the map leaves unchanged. Near it the map is approximately linear,
+
+```math
+\psi^{(j+1)} - \hat\psi \approx J (\psi^{(j)} - \hat\psi), \qquad J = I_c^{-1} I_m ,
+```
+
+with $I_c$ the complete-data information and $I_m = I_c - I_o$ the information
+missing because the states are not observed (Dempster, Laird and Rubin 1977;
+Meng and Rubin 1994). The eigenvalues of $J$ lie in $[0, 1)$; the largest,
+$\lambda$, is the rate of convergence: along its direction every iteration
+removes only the fraction $1 - \lambda$ of the distance left, and reducing it
+by a factor $\varepsilon$ takes about $\log\varepsilon/\log\lambda$ iterations.
+
+**What a slow direction does to the stopping rule.** Along a direction with
+rate $\lambda$ the change of one iteration is only a fraction of the distance
+still to go:
+
+```math
+\|\psi^{(j)} - \hat\psi\| \approx \frac{\|\psi^{(j+1)} - \psi^{(j)}\|}{1-\lambda}, \qquad
+\ell(\hat\psi) - \ell(\psi^{(j)}) \approx \frac{\ell(\psi^{(j+1)}) - \ell(\psi^{(j)})}{1-\lambda^2}.
+```
+
+These are not further rules but the error each criterion leaves when it stops:
+a tolerance $\tau$ on the parameters leaves a relative error of about
+$\tau/(1-\lambda)$, one on the log-likelihood a shortfall of about the
+tolerance divided by $1-\lambda^2$. Where $\lambda$ is close to one the
+iterations stop farther from the maximum, which is why removing the slow
+directions makes the fits both faster and closer to the maximum at the same
+tolerance.
+
+On the regimes of SC-STEM four situations make $\lambda$ close to one or the
+objective flat:
 
 1. **The split of the common variation between the latent process and the
-   field.** The latent process is common to the locations of a regime and the
-   field, with a range comparable to its size, nearly so; only their dynamics
-   tell them apart. Rate about 0.93 on the regimes of the simulation study:
-   this direction sets the number of iterations.
-2. **The intercept and the initial level of the latent process.** A change of
-   $m_0$ moves the first periods, which the intercept and the smoothed states
-   partly absorb, and the EM algorithm corrects only a small part of the error
-   at every iteration. Rate about 0.988, little likelihood: this is where the
-   error at the stop sits. With $G$ near zero, $G$ and $m_0$ trade along a
-   ridge.
-3. **The range at the boundary of what the distances identify** (Section 10).
+   field.** The latent process is common to the locations of a regime; the
+   field, with a range comparable to the size of the regime, is nearly so at
+   every time. Only their dynamics tell them apart, the latent process being
+   persistent and the field white in time. The direction along which
+   $(\sigma^2_\omega, \sigma^2_\epsilon, \theta, \Sigma_\eta)$ move together is
+   slow, and it sets the number of iterations.
+2. **The intercept and the initial level of the latent process.** The mean of
+   the data is $X_t\beta + A G^t m_0$: a change of $m_0$ moves the first
+   periods, which the intercept and the smoothed states partly absorb, and the
+   EM algorithm corrects only a small part of the error at every iteration.
+   This direction is the slowest but carries little likelihood: it is where the
+   error at the stop sits. When $G$ is close to zero, $m_0$ enters only through
+   $G m_0$, and $G$ and $m_0$ trade along a ridge of the likelihood.
+3. **The range at the boundary of what the distances identify** (Section 1.10).
+4. **A maximum on the boundary of the parameter space.** When the data do not
+   support a latent process, as when a pooled model is fitted to regimes whose
+   latent processes differ, the maximum lies at $\Sigma_\eta = 0$. Near a
+   boundary every EM-type algorithm converges sublinearly, and on the
+   logarithmic scale on which the accelerations extrapolate the boundary is
+   never reached: the iterations stop close to it, with a large relative error
+   on $\Sigma_\eta$ and a small absolute one.
 
-## 6. ECME
+### 1.7 The four algorithms at a glance
 
-ECME (Liu and Rubin 1994) lets some conditional maximizations of the M-step
-maximize the observed log-likelihood instead of the expected complete-data one.
-`Stem` updates $\delta = (\beta^\top, m_0^\top)^\top$ in this way, after the
-other parameters, which keeps the algorithm monotone. Given the other
-parameters the log-likelihood depends on $\delta$ only through the mean of the
-data, $E(z_t) = X_t \beta + A G^t m_0$, so it is a quadratic in $\delta$ whose
-maximizer is a generalized least-squares estimator. The augmented Kalman filter
-(de Jong 1991) computes it without the $dT \times dT$ covariance: the filter of
-the current parameters is run on every column of $[\,z_t,\ X_t,\ A G^t\,]$, the
-columns share the gains and $F_t$, and with $[\,e_t,\ E_t\,]$ their innovations,
+The four algorithms maximize the same likelihood and share the E-step, the
+Kalman filter and smoother, which in a linear Gaussian state-space model is
+exact posterior inference on the latent states. They differ in what the M-step
+maximizes and in how successive iterations are combined. In the language of
+machine learning, EM is coordinate ascent on the evidence lower bound, made
+tight by the E-step; ECME replaces some of the coordinate updates by
+"collapsed" ones, with the states integrated out; SQUAREM is an extrapolation of
+the fixed-point map, in the family of Aitken's and Anderson's accelerations,
+with a monotonicity safeguard (Section 1.9 builds it step by step).
 
-```math
-\hat\delta = \Big(\sum_t E_t^\top F_t^{-1} E_t\Big)^{-1} \sum_t E_t^\top F_t^{-1} e_t .
-```
+**What the four share and where they differ.** $M$ is one iteration, an
+E-step followed by an M-step.
 
-The step removes the slow direction of the intercept and $m_0$ (and the ridge
-between $G$ and $m_0$) in one go, at about 25% more time per iteration, and
-leaves the split of the variance as it is.
+| | EM | ECME | SQUAREM | SQUAREM-ECME |
+|---|---|---|---|---|
+| `STEM_control(algorithm = )` | `"EM"` | `"ECME"` | `"SQUAREM"` (default) | `"SQUAREM-ECME"` |
+| E-step | Kalman filter and smoother | same | same | same |
+| update of $\Sigma_\eta$, $G$, $\sigma^2_\omega$, $(\theta, \gamma)$ | conditional maximizations of $Q$; safeguarded Newton-Raphson within the limits of Section 1.10 for $(\theta, \gamma)$ | same | same | same |
+| update of $(\beta, m_0)$ | maximizes $Q$ given the smoothed states | maximizes $\ell$: a GLS step by the augmented Kalman filter | as EM | as ECME |
+| one iteration $M$ | the EM map | the ECME map | the EM map | the ECME map |
+| how the iterations are combined | each starts from the last, $\psi^{(j+1)} = M(\psi^{(j)})$ | as EM | cycles: two iterations, an extrapolation, a stabilizing iteration | as SQUAREM, on the ECME map |
+| cost of one $M$ | one filter and smoother pass | one more filter pass (about +25%) | as EM | as ECME |
+| calls of $M$ per cycle | 1 | 1 | 3 (2 when $\alpha = 1$) | 3 (2 when $\alpha = 1$) |
+| monotone because | no block decreases $Q$ (generalized EM) | the steps on $\ell$ follow those on $Q$ | an extrapolation that lowers $\ell$ is rejected | as SQUAREM |
+| slow directions removed (Section 1.6) | none | intercept and $m_0$, and the ridge between $G$ and $m_0$ | the slowest one, in practice the split of the variance | both |
+| not cured | boundary maximum; $G$-$m_0$ ridge | boundary maximum | boundary maximum; $G$-$m_0$ ridge | boundary maximum |
+| inside the alternation of SC-STEM | EM | ECME | EM, not accelerated | ECME, not accelerated |
+| limit | the maximum | the same maximum | the same maximum | the same maximum |
 
-## 7. SQUAREM
-
-SQUAREM (Varadhan and Roland 2008; the steplength of the R package `SQUAREM`,
-Du and Varadhan 2020) accelerates the EM, or the ECME, iterations by
-extrapolating from two of them. From $\psi_0$, with $\psi_1 = M(\psi_0)$,
-$\psi_2 = M(\psi_1)$ and $u$ the parameters on a scale on which every value is
-admissible (logarithms of the variances and of $\theta$):
-
-```math
-r = u_1 - u_0, \quad w = u_2 - 2u_1 + u_0, \quad
-\alpha = \min\{\alpha_{\max}, \max(1, \|r\|/\|w\|)\}, \quad u' = u_0 + 2\alpha r + \alpha^2 w .
-```
-
-For a linear iteration with rate $\lambda$, $\|r\|/\|w\| = 1/(1-\lambda)$ and
-$u'$ is the maximum itself. One more iteration from $\psi'$ stabilizes the
-extrapolation, which is kept only if $\ell(\psi') \ge \ell(\psi_0)$ (otherwise
-the cycle ends at $\psi_2$); the safeguard costs nothing, since every iteration
-evaluates $\ell$ at its input. $\alpha_{\max}$ starts at 1, grows by a factor 4
-when it binds and shrinks after a rejection. SQUAREM is not used inside the
-alternation of SC-STEM, whose fits stop after a few iterations.
-
-With a ridge on $\beta$ the objective is the penalized log-likelihood
-$\ell(\psi) - \tfrac{\lambda}{2}\sum_j w_j s_j(\psi)^2 \beta_j^2$, whose scale
-$s_j^2 = [\sum_t X_t'\Sigma_e^{-1}X_t]_{jj}$ moves with $\Sigma_e$: there is no
-fixed objective, and the safeguard compares this one with the scale measured
-at each point. Along the plain iterations it decreases by at most $10^{-5}$,
-and on dynamic designs with collinear lags (five seeds, three penalties) the
-accelerated iterations reach the fixed point of the plain ones to $10^{-7}$ in
-about half the time. With the lasso or the elastic net the fits run the
-plain iterations.
-
-## 8. The four algorithms at a glance
-
-All four maximize the same likelihood and share the E-step, the Kalman filter
-and smoother, which in a linear Gaussian state-space model is exact inference
-on the latent states. In the language of machine learning, EM is coordinate
-ascent on the evidence lower bound, made tight by the E-step; ECME replaces
-some of the coordinate updates by "collapsed" ones, with the states integrated
-out; SQUAREM is an extrapolation of the fixed-point map, in the family of
-Aitken's and Anderson's accelerations, with a monotonicity safeguard.
+**What they cost and how close they stop.**
 
 | `STEM_control(algorithm = )` | M-step | iterations combined | time | iterations | shortfall |
 |---|---|---|---|---|---|
@@ -242,85 +308,722 @@ Aitken's and Anderson's accelerations, with a monotonicity safeguard.
 | **`"SQUAREM"`** (default) | as EM | two, extrapolated | **0.53** | 0.41 | 0.0027 |
 | `"SQUAREM-ECME"` | as ECME | two, extrapolated | 0.62 | 0.39 | 0.0023 |
 
-Time and iterations relative to EM on whole SC-STEM grids of six cells of the
-simulation study (two replications each); shortfall: median distance of the
-log-likelihood from the maximum at the stop, on single fits; all at the default
-tolerances.
+Time and iterations relative to EM on whole SC-STEM grids (six cells of the
+simulation study, two replications each); shortfall: median shortfall of the
+log-likelihood at the stop on single fits. All at the default tolerances; all
+four are monotone, the accelerated ones through a safeguard on the
+extrapolation.
 
-## 9. The stopping rule, and the rule of D-STEM
+The four converge to the same maximum, so the choice changes the cost and the
+error left at a given tolerance, not the estimator. ECME buys accuracy rather
+than speed: it removes the error left on the intercepts and on $m_0$, and on
+$G$ when $G$ is near zero, but not the slow split of the variance, which sets
+the number of iterations. SQUAREM buys speed, and with it accuracy at a given
+tolerance; on the ECME map it combines the two. No algorithm cures a maximum on
+the boundary of the parameter space, and only ECME addresses the ridge between
+$G$ and $m_0$. SQUAREM is the default: it took about a third of the time of EM
+on single fits and about half on whole SC-STEM grids, stopped closer to the
+maximum, and selected the same models.
 
-Two criteria are computed at every iteration (at every cycle under SQUAREM):
-the largest relative change of a free parameter, taken one at a time, with a
-floor of $10^{-3}$ on the denominator, and the absolute change of the
-log-likelihood. The algorithm stops when either falls below its tolerance
-(`em_stop = "any"`), or after `em_maxit` iterations.
+### 1.8 ECME
 
-| | Stem | D-STEM v2 |
-|---|---|---|
-| parameters | $\max_l \lvert\Delta\psi_l\rvert / \max(\lvert\psi_l\rvert, 10^{-3}) < 10^{-3}$ | $\max_l \lvert\Delta\psi_l\rvert / \lvert\psi_l\rvert < 10^{-4}$ |
-| log-likelihood | $\lvert\Delta\ell\rvert < 10^{-3}$ (absolute) | $\lvert\Delta\ell\rvert / \lvert\ell\rvert < 10^{-4}$ (relative) |
-| combination | either criterion | either criterion |
-| iterations | at most 500 (50 in the alternation) | at most 100 |
-
-D-STEM is the stricter on the parameters and by far the looser on the
-log-likelihood: with log-likelihoods between $-4000$ and $-15000$ its relative
-tolerance is 0.4 to 1.5 units, 400 to 1500 times the absolute tolerance of
-`Stem`. Since either criterion stops the iterations, D-STEM stops while several
-units can still be gained; `Stem` with SQUAREM stops about $0.003$ units from
-the maximum. The criterion on $\ell$ is absolute because the differences that
-matter, between fits and in the information criteria, are absolute.
-
-## 10. The range at the boundary of what the data identify
-
-On a small set of locations the likelihood is flat in $\theta$ beyond two
-limits: when the range is shorter than the distance between the two closest
-locations the field is white and cannot be told from the nugget; when it is
-much longer than the largest distance the field is constant over the locations
-and cannot be told from an effect common to them. Left free, the Newton-Raphson
-step took steps of any size ($\theta$ from 0.02 to $e^{-700}$ in one M-step was
-seen), every later iteration paid up to thirty grid searches, and SQUAREM ran
-to the limit on the iterations. `Stem` therefore keeps
+ECME (Liu and Rubin 1994) lets some conditional maximizations of the M-step
+maximize the observed log-likelihood $\ell$ instead of $Q$. It remains
+monotone when the steps on $\ell$ follow those on $Q$ within an iteration
+(otherwise the E-step has to be recomputed in between, as in the AECM
+algorithm of Meng and van Dyk 1997). `Stem` updates
+$\delta = (\beta^\top, m_0^\top)^\top$ in this way: an iteration runs the
+E-step, updates $\Sigma_\eta$, $G$, $\sigma^2_\omega$ and $(\theta, \gamma)$
+on $Q$ as EM does, and then maximizes $\ell$ over $\delta$ given all of them.
+Given the other parameters $\ell$ depends on $\delta$ only through the mean of
+the data, $E(z_t) = X_t \beta + A G^t m_0$, which is linear in $\delta$, so its
+maximizer is a generalized least-squares estimator under the covariance the
+model implies. The augmented Kalman filter (de Jong 1991; Durbin and Koopman
+2012, Ch. 6) computes it without forming the $dT \times dT$ covariance: the
+filter of the current parameters is run on every column of
+$[\,z_t,\ X_t,\ A G^t\,]$, the first with the current $m_0$ as initial mean and
+the others with zero; the columns share the gains and $F_t$, and with
+$[\,e_t,\ E_t\,]$ their innovations,
 
 ```math
-\frac{-\log 0.95}{h_{\max}} \;\le\; \theta \;\le\; \frac{-\log 0.05}{h_{\min}},
+\ell = c - \tfrac12 \sum_t (e_t - E_t \delta)^\top F_t^{-1} (e_t - E_t \delta), \qquad
+\hat\delta = \Big(\sum_t E_t^\top F_t^{-1} E_t\Big)^{-1} \sum_t E_t^\top F_t^{-1} e_t ,
+```
+
+with $F_t^{-1}$ applied through the Woodbury identity and the missing rows
+dropped. Without a latent process there is no $m_0$ column. An ECME iteration
+costs one more filter pass than an EM iteration, about 25% more time. The step
+removes the second slow direction of Section 1.6 at once, and with it the ridge
+between $G$ and $m_0$; it does not change the first.
+
+### 1.9 SQUAREM
+
+SQUAREM (Roland and Varadhan 2005; Varadhan and Roland 2008) does **not**
+change the E-step or the M-step: it changes only how successive EM iterations
+are combined. Write $M$ for one whole EM iteration, the E-step followed by the
+M-step, so that the EM algorithm is the repeated application
+$\psi^{(j+1)} = M(\psi^{(j)})$ and its maximum $\hat\psi$ is a fixed point,
+$M(\hat\psi) = \hat\psi$. SQUAREM uses the same map $M$ (an EM iteration, or an
+ECME iteration for SQUAREM-ECME), but instead of taking the last iterate as the
+next starting point it combines the last iterates into a point farther along
+the path the iterations follow. Six steps build it.
+
+**Step 1: the error of EM shrinks geometrically.** Near the maximum the error
+$e_j = \psi^{(j)} - \hat\psi$ obeys $e_{j+1} \approx J e_j$ (Section 1.6).
+Along one direction with rate $\lambda$, $e_j = \lambda^j e_0$: every iteration
+removes the same fraction $1 - \lambda$ of the error that is left. Reducing the
+error by a factor $\varepsilon$ takes $\log\varepsilon/\log\lambda$
+iterations:
+
+| $\lambda$ | iterations to divide the error by 10 | by 1000 |
+|---|---|---|
+| 0.5 | 4 | 10 |
+| 0.9 | 22 | 66 |
+| 0.95 | 45 | 135 |
+| 0.99 | 230 | 688 |
+
+This is the cost SQUAREM attacks: on the regimes of SC-STEM the slow
+directions of Section 1.6 have $\lambda$ close to one.
+
+**Step 2: three successive iterates reveal the rate and the limit.** Start from
+the current point $\psi_0$ and run two plain iterations,
+$\psi_1 = M(\psi_0)$ and $\psi_2 = M(\psi_1)$, as EM would. Their first and
+second differences are observable, and along a direction with rate $\lambda$
+
+```math
+r = \psi_1 - \psi_0 = (\lambda - 1)\, e_0, \qquad
+w = \psi_2 - 2\psi_1 + \psi_0 = (\lambda - 1)^2\, e_0 .
+```
+
+$r$ is the EM step; $w$ says how the step shrinks from one iteration to the
+next. Their ratio gives the unknown rate, $\|r\|/\|w\| = 1/(1-\lambda)$, and in
+one dimension $e_0 = r^2/w$, so the limit is $\hat\psi = \psi_0 - r^2/w$: this
+is Aitken's $\Delta^2$ extrapolation. EM computes $\psi_1$ and $\psi_2$ anyway;
+SQUAREM uses them to estimate where the sequence is going instead of following
+it one step at a time.
+
+*A numerical example.* Take $\lambda = 0.9$, $\hat\psi = 0$ and $\psi_0 = 1$.
+EM gives $\psi_1 = 0.9$ and $\psi_2 = 0.81$, so $r = -0.1$ and $w = 0.01$. The
+ratio $\|r\|/\|w\| = 10 = 1/(1-0.9)$ recovers the rate, and
+$\psi_0 - r^2/w = 1 - 0.01/0.01 = 0$ is the limit, which EM would approach
+within $10^{-3}$ only after 66 iterations.
+
+**Step 3: the extrapolated point.** SQUAREM moves to
+
+```math
+\psi' = \psi_0 + 2\alpha\, r + \alpha^2 w ,
+```
+
+with a steplength $\alpha \ge 1$. Substituting $r$ and $w$,
+
+```math
+\psi' - \hat\psi = \bigl\{1 - \alpha(1-\lambda)\bigr\}^2 e_0 .
+```
+
+Two values of $\alpha$ explain the formula. With $\alpha = 1$,
+$\psi' = \psi_0 + 2r + w = \psi_2$: two plain EM iterations, so **EM is the
+special case $\alpha = 1$ of SQUAREM**. With $\alpha = 1/(1-\lambda)$ the error
+is zero and $\psi'$ is the limit itself, reached in one cycle. Since
+$1/(1-\lambda) = \|r\|/\|w\|$, SQUAREM takes
+
+```math
+\alpha = \min\{\alpha_{\max},\ \max(1, \|r\|/\|w\|)\},
+```
+
+the scheme S3 of Varadhan and Roland (2008). In the example above $\alpha = 10$
+and $\psi' = 1 + 2 \cdot 10 \cdot (-0.1) + 100 \cdot 0.01 = 0$. The name comes
+from the error factor, the square of the factor $1 - \alpha(1-\lambda)$ of a
+single extrapolated step: the method squares a one-step extrapolation.
+
+**Step 4: several directions at once.** The parameters move in many directions
+with different rates, and one $\alpha$ cannot be exact for all of them. Because
+$\alpha$ is computed from the norms of $r$ and $w$, it is dominated by the
+slowest direction, whose components of $r$ and $w$ are the largest after a few
+iterations; that is the direction that costs EM its iterations, and the
+extrapolation removes most of it. A faster direction may be overshot (with
+$\alpha = 20$, a direction with $\lambda = 0.5$ is multiplied by
+$(1 - 20 \cdot 0.5)^2 = 81$), but its error was already small, and the plain
+iteration that follows the extrapolation (Step 6) reduces it again quickly; if
+the overshoot costs likelihood, the safeguard of Step 6 rejects it.
+
+**Step 5: the scale on which to extrapolate.** A straight move could give a
+negative variance or a range outside its limits. The extrapolation is
+therefore computed on a scale on which every value is admissible,
+
+```math
+u(\psi) = \bigl(\beta,\ m_0,\ \mathrm{vec}\,G,\ \log \mathrm{diag}\,\Sigma_\eta,\ \log\sigma^2_\omega,\ \log\gamma,\ \log\theta\bigr)
+```
+
+(the logarithm of the diagonal of the Cholesky factor of $\Sigma_\eta$ and its
+off-diagonal elements when $\Sigma_\eta$ is not diagonal): $r$, $w$ and
+$\psi'$ are computed on $u_i = u(\psi_i)$, the result is mapped back, and the
+extrapolated $\theta$ is kept within the limits of Section 1.10.
+
+**Step 6: the safeguards, which give back what EM guarantees by
+construction.** An EM iteration never decreases the likelihood; an
+extrapolation can. Four safeguards keep SQUAREM monotone.
+
+1. $\alpha \ge 1$: a cycle never does less than two plain iterations.
+2. $\alpha \le \alpha_{\max}$: the bound starts at 1, grows by a factor 4
+   every time it binds and shrinks by the same factor when an extrapolation at
+   the bound is rejected, as in the R package `SQUAREM` (Du and Varadhan 2020),
+   so the method trusts the extrapolation more as it keeps succeeding.
+3. Stabilization: one more plain iteration is run from the extrapolated point,
+   $\psi_3 = M(\psi')$, which also returns $\ell(\psi')$, since every
+   iteration evaluates the log-likelihood at its input by the Kalman filter.
+4. The check: the cycle ends at $\psi_3$ if $\ell(\psi') \ge \ell(\psi_0)$
+   (up to $10^{-6}$), and at $\psi_2$ otherwise, whose increase over $\psi_0$
+   the EM algorithm guarantees. The check costs nothing, since $\ell(\psi')$
+   comes with the stabilizing iteration.
+
+**One cycle, line by line** (`stem_iterate_squarem()` in `R/squarem.R`). The
+lines marked ★ are those that differ from two iterations of EM; with
+$\alpha = 1$ the cycle is exactly two EM iterations.
+
+```text
+  psi1 <- M(psi0)                      # an EM iteration; it also returns loglik(psi0)
+  stop if the rule of Section 1.4 holds for the step psi0 -> psi1
+  psi2 <- M(psi1)                      # a second EM iteration
+★ r <- u(psi1) - u(psi0)               # the first difference
+★ w <- u(psi2) - 2 u(psi1) + u(psi0)   # the second difference
+★ alpha <- min(alpha_max, max(1, |r| / |w|))
+  if alpha > 1:
+★   psi' <- u^-1( u(psi0) + 2 alpha r + alpha^2 w ), theta within its limits
+★   psi3 <- M(psi')                    # stabilization; it also returns loglik(psi')
+★   if loglik(psi') >= loglik(psi0):  return psi3                # accepted
+★   else: shrink alpha_max if alpha = alpha_max; return psi2    # rejected
+  return psi2                          # alpha = 1: two EM iterations
+```
+
+**What SQUAREM does not change.** The E-step and the M-step are those of the
+EM algorithm (or of ECME, for SQUAREM-ECME). A point at which a cycle stops
+moving has $r = 0$, that is $M(\psi_0) = \psi_0$, so SQUAREM has the same fixed
+points as EM and converges to the same maximum: it changes the cost, not the
+estimator. The stopping rule (Section 1.4) is applied at the start of every
+cycle, to the step from $\psi_0$ to $\psi_1$, and the number of iterations
+reported counts every call of $M$, three per extrapolated cycle. A cycle costs
+three EM iterations and pays off when $\lambda$ is close to one, which is the
+case on the regimes of SC-STEM. SQUAREM is not used inside the alternation of
+SC-STEM: there the fits stop after a few iterations, where the cycles cost more
+than they save, and extrapolations from points far from convergence were seen
+to change the partitions the alternation reaches. With a penalty on the
+regression coefficients the safeguard compares the penalized objective: see
+[the page on the penalty](regularization.md#the-penalty-and-the-accelerated-algorithms).
+
+### 1.10 The limits of the range
+
+The distances between the locations identify the range only within limits.
+When the correlation between the two closest locations falls below 0.05 the
+field is white within the set of locations and cannot be told from the nugget;
+when the correlation between the two farthest exceeds 0.95 the field is
+constant over the locations at every time and cannot be told from an effect
+common to them, the latent process included. Beyond either limit $Q_e$ and
+$\ell$ are flat in $\theta$. `Stem` therefore keeps
+
+```math
+\theta_{\min} = \frac{-\log 0.95}{h_{\max}} \;\le\; \theta \;\le\; \theta_{\max} = \frac{-\log 0.05}{h_{\min}},
 ```
 
 with $h_{\min}$ and $h_{\max}$ the smallest and largest distance between two
-locations of the fit, in the Newton-Raphson step and in the extrapolation of
-SQUAREM; a Newton step is taken only with a positive definite Hessian and
-accepted only if it does not worsen the objective (halved otherwise); and one
-grid search per step is allowed, after which a Hessian that is still not
-positive definite ends the step. A fit whose range ends at a limit reports it
+locations of the fit (of the regime, in SC-STEM), in the Newton-Raphson step
+and in the extrapolation of SQUAREM. The Newton-Raphson step on
+$(\log\theta, \log\gamma)$ is safeguarded in two further ways. A Newton step
+$-H^{-1}g$ is taken only when the Hessian $H$ of $Q_e$ is positive definite
+($H_{11} > 0$, $\det H > 10^{-3}$), and is accepted only if it does not
+increase $Q_e$, halving it otherwise up to ten times. When $H$ is not positive
+definite the point moves to the best of a grid of ten by ten values, from 0.01
+to 10 times the current $\theta$ and $\gamma$ within the limits, if that lowers
+$Q_e$, and the iterations resume from there; a second Hessian that is not
+positive definite ends them, since $Q_e$ is then flat. Otherwise the
+Newton-Raphson iterations stop when the relative change of
+$(\log\theta, \log\gamma)$ falls below the tolerance of the EM algorithm, or
+after 50 iterations (`nr_maxit`). A fit whose range ends at a limit reports it
 (`convergence.par$theta.bound` of `STEM_Estimation()`, `theta_bound` of
-`SCSTEM_Estimation()`).
+`SCSTEM_Estimation()`); the range is then not estimated freely, though it is
+still counted among the parameters of the information criteria. The limits and
+the safeguards apply to all four algorithms.
 
-Where nothing binds the results are unchanged (identical to $10^{-9}$ on the
-fits checked). On whole SC-STEM grids the fits at the true number of regimes
-were unchanged in 40 of 48 cases and better in the other 8 (by 0.3 to 16.5
-log-likelihood units), the selections unchanged, and the total time fell by
-19% for EM and by 40% for SQUAREM; on the replication that had cost most, from
-362 to 29 seconds for EM and from 1416 to 25 for SQUAREM.
+Without them, the Newton-Raphson step on a flat $Q_e$ took steps of any size
+($\theta$ was seen to move from 0.02 to $e^{-700}$ in a single M-step), every
+later iteration paid up to thirty grid searches of a hundred evaluations each,
+and SQUAREM, extrapolating along the flat direction, ran to the limit on the
+iterations. With them, where nothing binds the results are unchanged (identical
+to $10^{-9}$ on the fits checked); on whole SC-STEM grids the fits at the true
+number of regimes were unchanged in 40 of 48 cases and better in the other 8
+(by 0.3 to 16.5 log-likelihood units), the selections unchanged, and the total
+time fell by 19% for EM and by 40% for SQUAREM; on the replication that had
+cost most, from 362 to 29 seconds for EM and from 1416 to 25 for SQUAREM.
 
-## 11. No ridge in the inversions
+---
 
-Earlier versions added $0.01 I$ to every matrix the iterations inverted, while
-the filter that computes $\ell$ added nothing. The iterations then converged to
-a point that is not the maximum, displaced along the slow directions by about
-$1/(1-\lambda)$ times the perturbation: the variance parameters were off by 3
-to 13% on the regimes of the simulation study and $\Sigma_\eta$ of a pooled fit
-by 84%, at any tolerance. Every matrix inverted is positive definite at
-admissible parameters, and `regularization = 0` is the default.
+## 2. Missing observations
 
-## 12. Numerical experiments
+The state-space form accommodates gaps in the response (Durbin and Koopman
+2012, Sections 2.7 and 4.10). With $W_t$ the selection matrix of the rows
+observed at time $t$, the measurement equation becomes, at that time,
 
-All on the data-generating process of the simulation study of the paper.
+```math
+z^*_t = W_t X_t \beta + W_t A\, y_t + e^*_t, \qquad e^*_t \sim N(0,\ W_t \Sigma_e W_t^\top),
+```
 
-**Correctness.** With the plain EM algorithm and the old ridge, the current
+and the filter runs on an observation vector whose dimension varies over time.
+When nothing is observed at $t$ the update is skipped, the filtered moments
+equal the predicted ones and the period contributes nothing to the likelihood,
+which remains the exact likelihood of the observed data. The smoother needs no
+change.
+
+**The M-step needs the completed statistics, not the truncated ones.** The EM
+algorithm treats both the states and the unobserved responses as missing, so
+the E-step must return $E[e_t e_t^\top \mid \mathcal{Z}]$ and
+$E[z_t \mid \mathcal{Z}]$. With $O$ and $M$ the observed and missing rows at
+$t$, the measurement error is Gaussian with covariance $\Sigma_e$, so
+
+```math
+e_{M,t} \mid e_{O,t} \sim N(P\, e_{O,t},\ \Omega), \qquad
+P = [\Sigma_e]_{MO}[\Sigma_e]_{OO}^{-1}, \qquad \Omega = [\Sigma_e]_{MM} - P[\Sigma_e]_{OM},
+```
+
+a law that does not depend on $y_t$. With $S$ the $d \times |O|$ matrix that
+lifts a vector on the observed rows to the full vector ($S_{O\cdot} = I$,
+$S_{M\cdot} = P$), $\tilde\Omega$ the matrix with $\Omega$ in the $(M, M)$
+block, $C^s_t$ the smoothed covariance of the state and
+$r_{O,t} = z_{O,t} - X_{O,t}\beta - A_O \hat y_t$,
+
+```math
+E[e_t e_t^\top \mid \mathcal{Z}] = S A_O C^s_t A_O^\top S^\top + \tilde\Omega + (S r_{O,t})(S r_{O,t})^\top, \qquad
+\hat z_t = E[z_t \mid \mathcal{Z}] = X_t\beta + A\hat y_t + S\, r_{O,t}.
+```
+
+With nothing missing the first is the complete-data statistic; with nothing
+observed it is $\Sigma_e$. The update of $\beta$ replaces $z_t$ by $\hat z_t$
+(the design matrix and the covariance keep their full dimension), and the
+divisor of the variance update stays $dT$.
+
+**Why the spatial term matters.** Durbin and Koopman remark that a missing
+element can be estimated by the corresponding element of the fitted signal;
+that is exact when $\Sigma_e$ is diagonal ($P = 0$), not here. The
+exponential covariance couples the locations, so the conditional expectation of
+a missing observation is its signal plus the part of the measurement error
+predicted from the neighbors observed at the same instant, the algebra of
+kriging at a fixed time point. Ignoring that term would bias the variance
+components downward.
+
+**Consequences elsewhere.** The kriging predictor conditions on the observed
+sub-vector at the chosen time; the assignment score of SC-STEM is evaluated on
+the periods at which the location was observed, with $T_i$ in place of $T$,
+which keeps the scores comparable across regimes; the bootstrap reimposes the
+observed pattern of gaps on every replicate. Every location must keep at least
+one observation. $P$ and $\Omega$ depend on $t$ only through its pattern of
+gaps, so they are computed once per distinct pattern and cached
+(`R/missing-utils.R`); the extra cost is negligible.
+
+---
+
+## 3. Initialization and the scale of the penalty
+
+The scale $c$ of the Potts penalty is computed once, at the first sweep of a
+fit, from the scores of the locations under the regimes of its first parameter
+step, and those regimes depend on the partition the fit starts from. That is
+why the start and the scale are treated together. Two rules (Algorithm 1 of
+the paper):
+
+- **An unpenalized fit starts from the departures of the locations from the
+  pooled model** (`init_method = "departures"`, the default).
+- **A fit with $\phi > 0$ starts from the partition to which the fit with
+  $\phi = 0$ at the same $K$ has converged.**
+
+**The departures.** With $\hat\mu_{it} = x_{it}'\hat\beta + A_i\hat y_t$ the
+signal of the pooled fit and $r_{it} = z_{it} - \hat\mu_{it}$, regress $r_{it}$
+on $(1, \tilde x_{it})$ (the covariates that vary) over the periods at which
+$i$ is observed, with slopes $b_i$ and residuals $u_{it}$. The features of
+location $i$ are
+
+```math
+f_i = \Bigl( \bar r_i,\ b_i,\ \mathrm{corr}(u_{it}, u_{i,t-1}),\ \log \widehat{\mathrm{Var}}(u_{it}) \Bigr),
+```
+
+and the partition is the $k$-means of the $f_i$, standardized and compressed by
+principal components retaining 90% of the cumulative variance, with restarts
+and a filter that discards starting partitions whose smallest regime could not
+support a fit (`scstem_departures()`, `scstem_repair_partition()`). Under the
+model, $r_{it} = x_{it}'(\beta_g - \hat\beta) + A_i(y^{(g)}_t - \hat y_t) + e_{it}$
+for a location of regime $g$: the mean and the slopes estimate how $\beta_g$
+departs from the pooled coefficients, the autocorrelation reflects the dynamics
+of $y^{(g)}_t - \hat y_t$, the variance its amplitude together with the error
+variance of the regime. Every term is common to the locations of a regime and
+differs between regimes. The covariate means, the earlier default and still an
+option (`init_method = "kmeans"`), depend on the regime only if the covariates
+do; when the covariates are exogenous to the regimes their $k$-means returns a
+partition unrelated to them. The coordinates are a third option, and any
+partition computed elsewhere can be supplied (`init_partition`). Neither the
+departures nor the covariate means use the coordinates, so spatial contiguity
+is left entirely to the Potts penalty.
+
+**The two rules, formally.** Fix $K$ and write $\mathcal{A}(g^{(0)}, \phi)$ for
+the output of Algorithm 1 started from $g^{(0)}$ with penalty $\phi$:
+
+```math
+(\hat g^{\,0}, \hat\Psi^{0}) = \mathcal{A}(g^{\mathrm{init}}, 0), \qquad
+(\hat g^{\,\phi}, \hat\Psi^{\phi}) = \mathcal{A}(\hat g^{\,0}, \phi) \quad (\phi > 0).
+```
+
+A single penalized fit computes $\hat g^{\,0}$ first; over a grid
+(`SCSTEM_Infocrit()`) the unpenalized fit at every $K$ is a member of the grid
+and its partition is passed on.
+
+**Why the penalty needs a scale.** In a cross-sectional clustered model each
+unit contributes one observation, the differences $\ell_i(k) - \ell_i(k')$ are
+of order one and so is a useful $\phi$. Here each location contributes $T$
+observations, so the differences grow with the length of the series and the
+scale of the response, and a fixed grid of $\phi$ means nothing. The default
+scale is
+
+```math
+c = \frac{1}{\bar m}\,\mathrm{med}_i\,\Delta_i, \qquad
+\Delta_i = \max_h \ell_i(h;\Psi^{(1)}_h) - \min_h \ell_i(h;\Psi^{(1)}_h),
+```
+
+with $\Psi^{(1)}$ the estimates of the first parameter step and $\bar m$ the
+average number of neighbors, computed once and held fixed so that the
+objective does not change between iterations. With it, $\phi = 1$ is the point
+at which full agreement with one's whole neighborhood is worth about as much
+as the typical gain from the best-fitting regime.
+
+**Proposition (Supplement A, A3.1).** Under the rule, $\Psi^{(1)} = \hat\Psi^0$,
+so $c$ is computed on the fitted unpenalized regimes. Consequently (i) $c$ is
+the same for every $\phi > 0$ at the same $K$; (ii) $c$ and the penalized fits
+depend on the initialization only through $\hat g^{\,0}$, so two
+initializations whose unpenalized fits reach the same partition give identical
+penalized fits; (iii) a single penalized fit coincides with the member of a
+grid at the same $(K, \phi)$. The proof: the first parameter step of
+$\mathcal{A}(\hat g^{\,0}, \phi)$ is the same deterministic computation, on the
+same partition and from the same starting values, as the final refit of
+$\mathcal{A}(g^{\mathrm{init}}, 0)$.
+
+**What the scale means.** At fixed parameters, location $i$ leaves its best
+unpenalized regime $g^*$ for $h$ only if
+
+```math
+\ell_i(g^*) - \ell_i(h) < \phi\, c\,\{n_i(h) - n_i(g^*)\} = \phi\;\mathrm{med}_j \Delta_j\;\frac{n_i(h) - n_i(g^*)}{\bar m},
+```
+
+with $n_i(h)$ the number of its neighbors in $h$. On fitted regimes
+$\Delta_j$ is of the order of the whole advantage of the right regime over the
+wrong ones accumulated over $T$ periods, so a few hundredths of $\phi$ already
+move the ambiguous locations and values of order one override the likelihood
+near a border. Hence the default grid
+$\phi \in \{0, 0.025, 0.05, 0.1, 0.2, 0.5, 1\}$ and the band $[0.025, 0.2]$ in
+which `SCSTEM_Select()` chooses $K$, by the modal BIC with the pooled model
+competing, before choosing $\phi$ by the smallest BIC at that $K$ over the
+whole grid. Since every penalized fit starts from the unpenalized one, a
+penalty is chosen only when it leads to a partition with a higher likelihood;
+the strong values 0.5 and 1 stay on the grid for data on which they do.
+
+**Why a penalized fit cannot be started like an unpenalized one.** First, the
+scale would depend on the start: from a start unrelated to the regimes the
+starting regimes are mixtures, their estimates nearly alike and the spreads
+$\Delta_i$ small; from a good start the spreads are several times larger. The
+same $\phi$ would then be a penalty of different strength under different
+initializations, which was the behavior of the package before the rule.
+Second, a strong penalty freezes a poor start: when
+$\phi c > \max_i \max_{h,h'} |\ell_i(h) - \ell_i(h')|$ every location takes the
+label of most of its neighbors whatever its scores, the label step reduces to a
+majority vote, and the alternation stops near the start.
+
+**Cost.** On a grid that contains $\phi = 0$ the rule costs nothing; a single
+penalized fit costs one unpenalized fit more; in the bootstrap every refit at
+$\hat\phi > 0$ fits $\phi = 0$ first, which doubles its cost and is the
+estimator reproduced.
+
+---
+
+## 4. Degeneracy, the minimum-size constraint and the swap pass
+
+**The degeneracy.** Within-regime homogeneity is what the assignment step
+pursues: as locations move to the regime that fits them best, the residual
+variability within each regime falls, and with it $\sigma^2_{\epsilon k}$ and
+$\sigma^2_{\omega k}$. But the assignment score rewards a small total variance
+$\sigma^2_{\epsilon k} + \sigma^2_{\omega k}$, so the regime with the smallest
+residual variance attracts locations, becomes more homogeneous, lowers its
+variance further, and the partition collapses onto one regime: the clusterwise
+counterpart of the degenerate likelihood of Gaussian mixtures. The collapse was
+observed even at $\phi = 0$, so it originates in the likelihood, not in the
+penalty.
+
+**The minimum-size constraint.** A location may leave its regime only if that
+regime stays at or above a minimum size, by default $r + 2$ with $r$ the number
+of covariates (`min_cluster_size`). The constraint acts on the feasible set, not
+on the objective: every configuration visited is admissible and the sweep stays
+monotone within the feasible set.
+
+**The swap pass.** A location in a regime exactly at the minimum size can never
+move, and on small networks a large share of the partition can stay frozen at
+its start. After each sweep, therefore, the labels of two locations of
+different regimes are exchanged whenever the exchange strictly increases the
+penalized objective $Q$ (`scstem_swap_pass()`). A swap leaves every size
+unchanged, so feasibility holds, and it is accepted only on strict improvement,
+so monotonicity holds; in practice the swaps are what lets a well-separated
+partition be recovered on a small network.
+
+**Pruning the swaps.** Evaluating every pair is quadratic in $d$. Exchanging the
+labels of $i$ and $j$ can change the penalty only through the edges incident to
+them, so the penalty gain cannot exceed $\phi c\,(m_i + m_j + 1)$, with $m_i$ the
+number of neighbors of $i$; pairs whose likelihood gain is below the negative
+of that bound are discarded. The bound is exact: the pruning changes the
+running time, not the result.
+
+**Empty and undersized regimes.** A regime that shrinks below the size needed
+to estimate it is frozen at its last valid parameters and stays available to
+the assignment, so that locations can flow back; a regime that never obtained a
+valid fit is excluded from the assignment. A configuration whose final
+partition still has empty or undersized regimes is flagged as inadmissible and
+excluded from model selection.
+
+---
+
+## 5. The label update and the monotonicity of the alternation
+
+**Labels are updated sequentially, by iterated conditional modes (ICM).** Each
+location maximizes its own penalized contribution given the current labels of
+all the others, so a sweep cannot decrease the objective at fixed parameters
+and cannot cycle, unlike a simultaneous update, which remains available as an
+option.
+
+**Two monotone steps, a non-monotone alternation.** The ICM sweep cannot
+decrease $Q$ at fixed parameters, the swap pass accepts only strict
+improvements, and the EM algorithm cannot decrease the exact likelihood of a
+regime at fixed labels. The alternation is nevertheless not monotone in
+general. The label step maximizes the penalized *pseudo*-likelihood $Q$, built
+on the conditional scores; the parameter step maximizes the *exact*
+within-regime likelihood. They agree on what a good partition is but are not
+related by an inequality, so an EM update that raises the exact likelihood of a
+regime can lower the pseudo-likelihood contributions of some of its members.
+Had the exact likelihood factorized across locations the two would coincide; it
+does not, precisely because $\Sigma_{e,k}$ is not diagonal. Non-monotonicity is
+a property of the spatio-temporal specification, not a defect of the
+implementation or a matter of tolerance.
+
+**Consequences.** The algorithm keeps the best configuration visited and returns
+it, and the final refit is performed on the best partition, not on the
+terminal one. Convergence is declared by a combination of criteria: an
+unchanged partition, an improvement below tolerance, the reappearance of a
+partition already visited (which detects cycling), and an iteration budget
+(`alt_maxit`). The trace of the objective is reported as a diagnostic, and a
+decrease in it reflects the tension between the two objectives, not a failure.
+
+---
+
+## 6. The information criteria as T and d grow
+
+Write $q = r + 3 + 3p$ for the parameters of one regime, $\mathrm{df}(K) = Kq$,
+and $n = dT$ for the number of observations (the number of observed values when
+the response has gaps, which is what the package uses). A criterion moves from
+$K$ to $K + 1$ when $2\,\Delta\hat\ell(K) > \Delta\mathrm{pen}(K)$, with the
+maximum of the likelihood taken over the parameters and over the partitions.
+
+**The likelihood gain.** Under the alternative (the truth has more regimes) the
+gain grows like $2 n \delta_K = O_p(dT)$, with $\delta_K$ the Kullback-Leibler
+distance per observation of the best $K$-regime approximation. Under the null
+the extra regime is superfluous: for a fixed refinement of the true partition
+the likelihood ratio is $O_p(1)$ in $T$, but the search over the $S(d, K+1)$
+partitions (a Stirling number of the second kind) gives, by the extreme-value
+heuristic behind the extended BIC,
+
+```math
+2\,\Delta\hat\ell(K) \asymp 2\left[\log S(d,K+1) - \log S(d,K)\right] \approx 2\,d \log\!\left(\tfrac{K+1}{K}\right) = O_p(d),
+```
+
+linear in $d$ and constant in $T$ (an upper bound on the order, since the
+partitions searched are strongly dependent).
+
+**The penalty increments.**
+
+```math
+\Delta\mathrm{AIC} = 2q, \quad
+\Delta\mathrm{AICc} = 2q + \frac{2q^2(2K+1)}{n} + O(n^{-2}), \quad
+\Delta\mathrm{BIC} = q \log(dT), \quad
+\Delta\mathrm{EBIC}_\gamma \approx q\log(dT) + 2\gamma\, d \log\!\left(\tfrac{K+1}{K}\right).
+```
+
+**Consistency, direction by direction.** A criterion avoids a spurious regime
+when its increment exceeds $c\,d$ with $c = 2\log\{(K+1)/K\}$.
+
+- AIC and AICc: the increment is constant, so both are inconsistent, the more
+  so the larger $d$, and neither depends on $T$; the AICc correction
+  $O(K^2q^2/(dT))$ vanishes in both directions.
+- BIC: consistent as $T \to \infty$ with $d$ fixed; it over-selects on every
+  large enough network at fixed $T$; with both growing it needs
+  $d / \log(dT) \to 0$. Lengthening the record helps the BIC, widening the
+  network hurts it.
+- Extended BIC: its multiplicity term has the order of the null gain, and with
+  $\gamma \ge 1$ it holds for all large $d$; $\gamma = 1$ is the calibration
+  point. When it does not change the answer on a long panel, the observed gain
+  is far above anything the null can produce.
+
+With $T \to \infty$ and $d$ fixed every label is consistently estimated, but the
+partition does not extend beyond the locations fitted; with $d \to \infty$ the
+partition is an incidental parameter (Neyman and Scott 1948), not consistently
+estimated at fixed $T$.
+
+**Dependence and the ambiguity of $n$.** For a latent process with persistence
+$G$ an effective count is $T_{\mathrm{eff}} \approx T (1-G)/(1+G)$: at
+$G = 0.97$, $T \times 0.015$, so a series of 1,826 periods carries the
+information of about 28 independent ones. With $n_{\mathrm{eff}}$ the BIC
+increment falls from $q\log(dT)$ to $q\log(d\,T_{\mathrm{eff}})$. The margin of
+the BIC over the null gain depends on a quantity the criterion does not
+determine; on a persistent process and a wide network the extended BIC with
+$\gamma = 1$, whose multiplicity term does not depend on $n$, is the safer
+check.
+
+**In the package.** `SCSTEM_Infocrit()` reports, for every $(K, \phi)$ of the
+grid, the exact total log-likelihood of the final refit, its
+$K_{\mathrm{eff}}\,q$ parameters ($K_{\mathrm{eff}}$ the number of regimes
+actually populated) and the AIC, BIC and KIC; the sample size of the BIC is
+the number of observed values of the response, $dT$ when the panel is
+complete. The other criteria above (AICc, HQ, GCV, EBIC) follow from the same
+log-likelihood and number of parameters, as in the comparison of seven
+criteria of the simulation study (Supplement B). `SCSTEM_Select()` applies the
+two-step rule of Section 3; the paper uses the BIC.
+
+---
+
+## 7. Inference under the refit-with-clustering bootstrap
+
+**Uncertainty includes the partition.** `SCSTEM_Bootstrap()` draws $B$ samples
+from the fitted model, regime by regime (each regime's covariance and latent
+dynamics are reproduced, the observed pattern of gaps reimposed), and re-runs
+the whole procedure at $(\hat K, \hat\phi)$, clustering included, on every draw,
+so the intervals are not conditional on a partition that is itself estimated.
+
+**The aligned draws** (`SCSTEM_BootInference()`). The labels of a refit are
+arbitrary: each refit regime is mapped onto the original regime with which it
+shares most locations, conflicts resolved greedily by decreasing overlap
+(`scstem_align_labels()`). Draws whose refit failed or did not recover all
+$\hat K$ regimes are recorded and excluded, and the share of usable draws is a
+diagnostic in its own right. The outputs:
+
+- the aligned draws of every regime-specific parameter, a
+  $B_{\mathrm{valid}} \times \hat K \times n_{\mathrm{par}}$ array, from which any
+  further statistic can be computed without refitting;
+- for every regime and parameter: the estimate, the bootstrap mean and bias,
+  the bootstrap standard error, the ratio of the estimate to it with its
+  normal-approximation $p$-value, and the normal, basic, percentile and
+  bias-corrected intervals of Davison and Hinkley (1997) (studentized intervals
+  are not computed: they would need an asymptotic standard error at every
+  draw);
+- for every parameter and pair of regimes, the percentile test of their
+  difference;
+- the stability of the partition: the adjusted Rand index between every draw
+  and the estimated partition, and the co-clustering matrix (share of usable
+  draws in which two locations share a regime);
+- the diagnostics of the draws: $B_{\mathrm{valid}}$ out of $B$ and, for every
+  draw, whether its refit succeeded, how many regimes it recovered, its
+  log-likelihood and its number of iterations.
+
+**A bootstrap-based Wald test.** For $q$ linear restrictions
+$H_0^{(k)}: R\beta_k = c$ on the coefficients of regime $k$ (for instance a
+Granger non-causality test on a block of lags), a test that treats the
+partition as given leaves out the uncertainty of the memberships. With the
+covariance of the aligned draws,
+$\hat V_k = (B-1)^{-1}\sum_b (\beta^*_{k,b} - \bar\beta^*_k)(\beta^*_{k,b} - \bar\beta^*_k)'$,
+which includes the variability of re-estimating the partition,
+
+```math
+W_k = (R\hat\beta_k - c)'\,(R\hat V_k R')^{-1}\,(R\hat\beta_k - c) \;\sim\; \chi^2_q ,
+```
+
+and a bootstrap reference from the same draws, centered at the estimate,
+
+```math
+W^*_{k,b} = (R\beta^*_{k,b} - R\hat\beta_k)'\,(R\hat V_k R')^{-1}\,(R\beta^*_{k,b} - R\hat\beta_k), \qquad
+p = \frac{1 + \#\{b : W^*_{k,b} \ge W_k\}}{1 + B}.
+```
+
+The hypothesis in all the regimes at once stacks the $K$ vectors
+$R\beta_k - c$, with their joint covariance from the same draws ($qK$ degrees of
+freedom). In the classical linear model the Wald statistic is a monotone
+function of the $F$ statistic, $W = qF\,n/(n-r)$, and with $q = 1$ the two are
+the squared $t$ and $z$ statistics; a regime of SC-STEM is not that model, and
+the Wald test, with the bootstrap supplying the variance, is the test.
+
+---
+
+## 8. The Potts penalty on point-referenced data
+
+The Potts term comes from a literature on lattices and areal units. Three
+points make its use on point-referenced data legitimate.
+
+**(a) The graph is a modeling choice, not a datum.** The penalty and the ICM
+argument of Besag (1986) hold on any undirected graph. `Stem` uses the
+$m$-nearest-neighbor graph (`knn`, default 5; `scstem_neighbors()`), which keeps
+the degree roughly constant where the network is irregular, while a fixed
+radius would give an urban station twenty neighbors and an isolated one none.
+The relation is symmetrized, so that the label step maximizes a well-defined
+function, and the neighbors are measured with the metric of the covariance,
+geodesic on geographic coordinates (at $45^\circ$ of latitude a degree of
+longitude is about 78 km and one of latitude about 111 km). Under the default
+scale $c$ divides by the mean degree, so raising $m$ spreads the same total
+pull over more and longer edges rather than increasing it.
+
+**(b) Spatial proximity enters the model twice**: in the covariance of the
+errors within a regime, through the distances, and in the objective, through
+the graph. A penalty that rewards neighbors for sharing a label produces
+compact regimes whether or not the data contain any: if every regime carried
+the same parameters, the same latent path and one error field, the label step
+would return the partition that cuts the fewest edges. The compactness of an
+estimated partition is therefore not evidence of regimes, and whether regimes
+exist is decided by a criterion the penalty does not enter, the likelihood of
+the partition against that of the pooled model.
+
+**(c) The normalizing constant is intractable on any graph.** Read as a prior,
+the Potts term is defined up to a constant $Z(\phi, K)$ that is a sum over $K^d$
+configurations, with no closed form on a lattice either. So $\phi$ is a tuning
+constant, chosen by comparing the likelihoods of the partitions estimated at
+different penalties, in which the Potts term does not appear; a criterion built
+on the penalized objective would have to restore $Z$.
+
+---
+
+## 9. What SC-STEM does and does not cover
+
+The response is Gaussian and univariate at each location and time (the latent
+state may have $p > 1$ components); the spatial correlation is exponential,
+hence isotropic and stationary within a regime, though each regime has its own
+range; distances are Euclidean or geodesic; missing values in the response are
+supported, in the covariates and the coordinates not; time is discrete and
+regular, the locations fixed and point-referenced; $G$ and $\Sigma_\eta$ are
+diagonal by default and can be full; $C_0$ is fixed and $m_0$ estimated, both
+regime-specific in SC-STEM; each regime must contain enough locations to
+support its own fit; the loading matrix is known and common to the regimes.
+The page [The models: STEM and SC-STEM](models.md#statistical-features-and-scope)
+gives the full table, with what to do outside these limits.
+
+---
+
+## 10. No jitter in the inversions
+
+Versions up to 2.0.0 added a jitter of $0.01\, I$ to every matrix the
+iterations inverted, while the filter that computes $\ell$ added nothing. The
+iterations then converged to a point that is not the maximum, displaced along
+the slow directions of Section 1.6 by about $1/(1-\lambda)$ times the
+perturbation: the variance parameters were off by 3 to 13% on the regimes of
+the simulation study and $\Sigma_\eta$ of a pooled fit by 84%, at any
+tolerance. Every matrix inverted is positive definite at admissible
+parameters, and `regularization = 0` is the default of `STEM_Estimation()` and
+`SCSTEM_Estimation()`.
+Section 8 of the vignette `estimation-experiments` reports the experiment.
+
+## 11. Numerical experiments
+
+All on the data-generating process of the simulation study of the paper; the
+vignette `estimation-experiments` gives the complete tables.
+
+**Correctness.** With the plain EM algorithm and the old jitter, the current
 code reproduces the previous implementation to $10^{-13}$, iteration by
 iteration, on complete and incomplete data, without latent process or spatial
-correlation, under a ridge and an elastic net, and with $p = 2$. The ECME step
+correlation, with a penalty on the coefficients and with $p = 2$. The ECME step
 reproduces the GLS estimator on the explicit $dT \times dT$ covariance to
-$10^{-10}$. Without the ridge, the iterations converge to the BFGS maximum of
+$10^{-10}$. Without the jitter the iterations converge to the BFGS maximum of
 the exact log-likelihood.
 
 **Exactness.** Against computations on the full covariance of the data, with
@@ -330,17 +1033,12 @@ the estimates are the maximum that `optim()` finds on it (largest relative
 difference $2 \cdot 10^{-5}$); the smoothed states and `STEM_Signal()` are the
 conditional means to $3 \cdot 10^{-15}$. `STEM_Simulation()`, which the
 bootstraps use, reproduces the mean and the covariance of the model within
-Monte Carlo error over 20000 data sets. The first four checks are tests of the
-package (`tests/testthat/test-exact.R`). Every version up to 2.0.0, 1.0
-included, returned four times the log-likelihood in `estimates$loglik` (the
-EM loop stored $-2\ell$ and multiplied it by $-2$ again), so the information
-criteria of SC-STEM weighted the likelihood four times against the penalty;
-the value returned is now $\ell$.
-
-**Information criteria.** AIC, BIC and KIC use the exact total log-likelihood
-of the final refit and $K_{\mathrm{eff}}(r + 3 + 3p)$ parameters; the sample
-size of the BIC is the number of observed values of the response, $dT$ when
-the panel is complete.
+Monte Carlo error over 20,000 data sets. The first four checks are tests of the
+package (`tests/testthat/test-exact.R`). Every version before 2.0.0 returned
+four times the log-likelihood in `estimates$loglik` (the EM loop stored
+$-2\ell$ and multiplied it by $-2$ again), so the information criteria of
+SC-STEM weighted the likelihood four times against the penalty; the value
+returned is now $\ell$.
 
 **The same maximum.** Run to a tolerance of $10^{-7}$, the four algorithms stop
 at the same log-likelihood to $10^{-9}$, after 177 (EM), 178 (ECME), 39
@@ -364,31 +1062,43 @@ $\sigma^2_\epsilon$. The regression coefficients are unaffected.
 
 **Whole SC-STEM grids** (six cells from $n = 40$, $T = 60$ to $n = 400$ and
 $n = 200$, $T = 365$, two replications; the four algorithms run in the same
-process, time net of the position): SQUAREM 0.53 times the time of EM (0.58 on
-the light cells, 0.46 on the heavy ones), SQUAREM-ECME 0.62, ECME 1.17; no fit
-at the limit on the iterations; the same number of regimes selected in every
-job.
+process): SQUAREM 0.53 times the time of EM (0.58 on the light cells, 0.46 on
+the heavy ones), SQUAREM-ECME 0.62, ECME 1.17; no fit at the limit on the
+iterations; the same number of regimes selected in every job.
 
-## 13. Where it is in the code
+## 12. Where it is in the code
 
 | file | content |
 |---|---|
 | `R/kalman.R` | `kalman()`: the filter (`filtering()`, `filterstep()`), the smoother (`smoothing()`), the smoothed initial state and the lag-one covariances |
 | `R/estep.R` | `stem_estep()`: the expected sufficient statistics |
+| `R/missing-utils.R` | the completed statistics of Section 2, cached by pattern of gaps |
 | `R/mstep-updates.R` | the conditional updates: latent process, $\sigma^2_\omega$, $\beta$, the spatial parameters (safeguarded Newton-Raphson), the limits of $\theta$ |
 | `R/mstep-em.R`, `R/mstep-ecme.R` | the M-steps of EM and ECME; the augmented filter `stem_gls_mean()` |
 | `R/squarem.R` | SQUAREM and the unconstrained parametrization |
 | `R/em-fit.R` | the wrapper `stem_em_fit()`, the plain iterations, the stopping rule |
 | `R/STEM_control.R` | the settings: `algorithm`, `em_tol_par`, `em_tol_loglik`, `em_maxit`, `em_stop`, `alt_em_*`, `alt_maxit`, `nr_maxit` |
+| `R/SCSTEM_Estimation.R` | the alternation of SC-STEM: start, scale of the penalty, ICM sweeps, final refit |
+| `R/utils-scstem.R` | the neighbor graph, the assignment score, the departures, the repair of a starting partition, the swap pass, the alignment of labels |
+| `R/SCSTEM_Infocrit.R`, `R/SCSTEM_Select.R` | the grid of $(K, \phi)$, the information criteria, the two-step rule |
+| `R/SCSTEM_Bootstrap.R`, `R/SCSTEM_BootInference.R` | the refit-with-clustering bootstrap, the aligned draws, intervals and tests |
 
 ## References
 
+- Besag, J. (1986). On the statistical analysis of dirty pictures. *JRSS-B*, 48, 259-302.
+- Davison, A. C. and Hinkley, D. V. (1997). *Bootstrap Methods and their Application*. Cambridge University Press.
 - de Jong, P. (1991). The diffuse Kalman filter. *The Annals of Statistics*, 19, 1073-1083.
 - Dempster, A. P., Laird, N. M. and Rubin, D. B. (1977). Maximum likelihood from incomplete data via the EM algorithm. *JRSS-B*, 39, 1-38.
 - Du, Y. and Varadhan, R. (2020). SQUAREM: an R package for off-the-shelf acceleration of EM, MM and other EM-like monotone algorithms. *Journal of Statistical Software*, 92(7).
 - Durbin, J. and Koopman, S. J. (2012). *Time Series Analysis by State Space Methods*, 2nd ed. Oxford University Press.
 - Liu, C. and Rubin, D. B. (1994). The ECME algorithm. *Biometrika*, 81, 633-648.
-- Meng, X.-L. and Rubin, D. B. (1993). Maximum likelihood estimation via the ECM algorithm. *Biometrika*, 80, 267-278.
+- Meng, X.-L. and Rubin, D. B. (1994). On the global and componentwise rates of convergence of the EM algorithm. *Linear Algebra and its Applications*, 199, 413-425.
+- Meng, X.-L. and van Dyk, D. (1997). The EM algorithm: an old folk-song sung to a fast new tune. *JRSS-B*, 59, 511-567.
+- Neyman, J. and Scott, E. L. (1948). Consistent estimates based on partially consistent observations. *Econometrica*, 16, 1-32.
+- Roland, C. and Varadhan, R. (2005). New iterative schemes for nonlinear fixed point problems, with applications to problems with bifurcations and incomplete-data problems. *Applied Numerical Mathematics*, 55, 215-226.
 - Shumway, R. H. and Stoffer, D. S. (1982). An approach to time series smoothing and forecasting using the EM algorithm. *Journal of Time Series Analysis*, 3, 253-264.
 - Varadhan, R. and Roland, C. (2008). Simple and globally convergent methods for accelerating the convergence of any EM algorithm. *Scandinavian Journal of Statistics*, 35, 335-353.
-- Wang, Y., Finazzi, F. and Fasso, A. (2021). D-STEM v2: a software for modeling functional spatio-temporal data. *Journal of Statistical Software*, 99(10).
+
+---
+
+[Back to the README](../README.md) | [All pages](README.md)

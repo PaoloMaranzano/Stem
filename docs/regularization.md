@@ -144,6 +144,20 @@ bootstrap must repeat the selection on every draw, exactly as
 is not smooth, so intervals for a coefficient at the boundary do not have their
 usual coverage interpretation.
 
+## The penalty and the accelerated algorithms
+
+With a ridge on $\beta$ the objective is the penalized log-likelihood
+$\ell(\psi) - \tfrac{\lambda}{2}\sum_j w_j s_j(\psi)^2 \beta_j^2$, whose scale
+$s_j^2 = [\sum_t X_t'\Sigma_e^{-1}X_t]_{jj}$ moves with $\Sigma_e$: there is no
+fixed objective, and the safeguard of SQUAREM
+([computational aspects, Section 1.9](computational-aspects.md#19-squarem))
+compares this one with the scale measured at each point
+(`stem_ridge_merit()` in `R/em-fit.R`). Along the plain iterations it decreases
+by at most $10^{-5}$, and on dynamic designs with collinear lags (five seeds,
+three penalties) the accelerated iterations reach the fixed point of the plain
+ones to $10^{-7}$ in about half the time. With the lasso or the elastic net
+($\alpha > 0$) the fits run the plain iterations of their map.
+
 The derivation -- the penalized EM and its monotonicity, both forms of the
 M-step, the GLS metric, the degrees of freedom and what is still open -- is a
 standalone document at

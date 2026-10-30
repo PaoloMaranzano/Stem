@@ -29,9 +29,8 @@
 #'   |\ell(\psi^{(i)}) - \ell(\psi^{(i-1)})| < \texttt{tol\_loglik}.}{
 #'   max_l |psi_l(i) - psi_l(i-1)| / max(|psi_l(i-1)|, 1e-3) < tol_par  and
 #'   |loglik(i) - loglik(i-1)| < tol_loglik.}
-#' The first is the relative change of every free parameter taken one at a time
-#' (the criterion of D-STEM, Wang, Finazzi and Fasso, 2021), so that a small
-#' parameter still moving -- the persistence of the latent process, for
+#' The first is the relative change of every free parameter taken one at a time,
+#' so that a small parameter still moving -- the persistence of the latent process, for
 #' instance -- is not hidden by the large ones, as it is in the relative change
 #' of the whole parameter vector. The floor \eqn{10^{-3}} keeps the criterion
 #' finite for parameters near zero. The loading matrix and the initial variance
@@ -39,10 +38,7 @@
 #' criterion is the absolute change of the log-likelihood: a relative change of
 #' the log-likelihood depends on its scale, which grows with the size of the
 #' data, while the differences that matter -- between fits, in the information
-#' criteria -- are absolute. D-STEM stops when the relative change of the
-#' parameters or of the log-likelihood is below \eqn{10^{-4}}: with
-#' log-likelihoods of the order of \eqn{10^4} the second is met first, while
-#' several units can still be gained. In a simulation study of SC-STEM,
+#' criteria -- are absolute. In a simulation study of SC-STEM,
 #' tolerances of \eqn{10^{-3}} on both criteria left the estimates within 1 to
 #' 2\% of those at \eqn{10^{-4}} and the selected models unchanged, while
 #' \eqn{10^{-2}} moved the range and the variances by tens of percent.
@@ -91,11 +87,6 @@
 #'
 #' @return An object of class \dQuote{STEM_control}: a named list of the
 #'   settings.
-#'
-#' @references
-#' Wang, Y., Finazzi, F., Fasso, A. (2021) \emph{D-STEM v2: A Software for
-#' Modeling Functional Spatio-Temporal Data}. Journal of Statistical Software,
-#' 99(10), 1--29. \doi{10.18637/jss.v099.i10}
 #'
 #' @seealso \code{\link{STEM_Estimation}}, \code{\link{SCSTEM_Estimation}}
 #'

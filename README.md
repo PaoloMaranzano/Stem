@@ -71,21 +71,20 @@ tolerances. On the same data SQUAREM selected the same models as EM, and its
 estimates matched the exact maximum against the true values.
 
 The iterations stop when the largest relative change of a parameter or the
-absolute change of the log-likelihood falls below `1e-3`. D-STEM uses `1e-4`
-on the relative change of either: stricter on the parameters, but its criterion
-on the log-likelihood amounts to 0.4 to 1.5 units on typical fits, so it stops
-several units short of the maximum, where `Stem` stops about 0.003 units short.
-No ridge is added to the matrices the iterations invert
-(`regularization = 0`): with one, they converged to a point that is not the
-maximum.
+absolute change of the log-likelihood falls below `1e-3`; with SQUAREM they stop
+about 0.003 log-likelihood units short of the maximum. The criterion on the
+log-likelihood is absolute, because the differences that matter, between fits
+and in the information criteria, are absolute. No jitter is added to the
+matrices the iterations invert (`regularization = 0`): with one, they converged
+to a point that is not the maximum.
 
 ### The range at the boundary
 
 On the few locations of a small regime the likelihood is flat in the range
-beyond two limits: a range shorter than the distance between the two closest
-locations, where the spatial field cannot be told from the nugget, and one much
-longer than the largest distance, where it cannot be told from an effect common
-to the locations. `Stem` keeps
+beyond two limits: a range so short that the correlation between the two
+closest locations falls below 0.05, where the spatial field cannot be told from
+the nugget, and one so long that the correlation between the two farthest
+exceeds 0.95, where it cannot be told from an effect common to the locations. `Stem` keeps
 
 ```math
 \frac{-\log 0.95}{h_{\max}} \;\le\; \theta \;\le\; \frac{-\log 0.05}{h_{\min}},
@@ -199,9 +198,8 @@ Topic pages, in [`docs/`](docs/README.md):
 | page | what it covers |
 |---|---|
 | [The models](docs/models.md) | STEM and SC-STEM, their parameters, and what the model class covers and does not |
-| [Computational aspects](docs/computational-aspects.md) | the Kalman filter and smoother, the EM, ECME and SQUAREM algorithms, the stopping rule, the limits of the range, the numerical experiments |
+| [Computational aspects](docs/computational-aspects.md) | how STEM and SC-STEM are estimated, following Supplement A of the paper section by section: the Kalman filter and smoother, the EM, ECME and SQUAREM algorithms, the stopping rule, the limits of the range, missing responses, the start of a fit and the scale of the Potts penalty, degeneracy and the swap pass, the label update, the information criteria, the bootstrap and its tests, the Potts penalty on point-referenced data, the numerical experiments |
 | [Ridge, lasso and elastic net](docs/regularization.md) | the penalty on the regression coefficients |
-| [Design notes](docs/sc-stem-design.md) | the implementation choices of SC-STEM |
 | [How the functions fit together](docs/function-map.md) | the map of the package |
 | [Theoretical references](docs/references.md) | the works behind the package |
 
@@ -212,8 +210,9 @@ vignette("getting-started", package = "Stem")      # the classical STEM workflow
 vignette("SCSTEM", package = "Stem")               # spatially-clustered STEM
 vignette("function-map", package = "Stem")         # map of the package
 vignette("computational-notes", package = "Stem")  # how the filter and the M-step are computed
+vignette("estimation-experiments", package = "Stem") # the numerical experiments behind the defaults
 
-# the Computational Supplement: estimation algorithms, derivations, experiments
+# Supplement A of the paper: the estimation algorithms and their derivations
 browseURL(system.file("extdata", "Stem-computational-supplement.pdf", package = "Stem"))
 # a reading guide from each equation of the papers to the function that implements it
 browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem"))
