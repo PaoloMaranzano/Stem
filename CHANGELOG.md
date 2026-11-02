@@ -16,6 +16,29 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-11-02 (evening)
+
+**The scripts of the replication package restyled.** One command per line,
+with no `;`, and the body of every `if`, `else`, `for` and named function in
+braces on lines of its own; an `if` that is the value of an argument of a call
+(`type = if (cairo) "cairo" else "windows"`) stays on one line. The change was
+made on the parse tree and checked in four ways: apart from braces and
+semicolons, every script keeps the same tokens and comments; the 38 outputs of
+`AppFuels_04_Analysis.R` are identical; the design, three data sets and two
+replications of the simulation study are identical; the data of the three
+settings, the designs and the station-by-station tests of Messina and Florence
+are identical. `AppFuels_00_Setup.R` also brings the edits made on the Drive.
+
+**Figures in the README of the replication package.** Nine figures of the
+paper (`papers/sc-stem-local-leader/figures/`) illustrate the data, the design
+of the simulations and the results, and each part of the README gains a
+section on what it finds.
+
+**The paper.** The code availability statement names the GitHub page of the
+package as the official reference of the STEM project, of which SC-STEM is one
+part; the opening of the introduction cites an example for each kind of data.
+`dev/sync-paper.R` ignores commented text when it reports text in red.
+
 ### 2026-11-02
 
 **Diagrams in the documentation.** Flowcharts in Mermaid, which GitHub draws

@@ -54,7 +54,7 @@ for (d in names(DOCS)) {
   i <- grep("^\\\\begin\\{document\\}", x)[1]
   writeLines(append(x, CLEAN, after = i - 1L), f)
   ## text still in red would appear in the PDF: report it
-  red <- grep("\\\\textcolor\\{red\\}", x, value = TRUE)
+  red <- grep("\\\\textcolor\\{red\\}", sub("(^|[^\\\\])%.*$", "\\1", x), value = TRUE)
   red <- red[!grepl("^\\s*(%|\\\\newcommand|\\\\providecommand|\\\\renewcommand)", red)]
   if (length(red)) message("red text in ", d, ".tex:\n  ", paste(substr(trimws(red), 1, 120), collapse = "\n  "))
 }

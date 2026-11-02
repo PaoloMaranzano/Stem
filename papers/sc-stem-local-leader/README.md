@@ -39,6 +39,7 @@ papers/sc-stem-local-leader/
     supplement-B-simulations.pdf    Supplement B: the simulation study
     supplement-C-application.pdf    Supplement C: the application
     code-supplement.pdf             the implementation in Stem
+  figures/                        figures of the paper shown in this README
   data/                           the dataset of the application (Part I)
     fuel_stations.csv               the 3,136 stations of the eleven cities
     fuel_prices.csv.gz              their Sunday prices, January 2021 to June 2026
@@ -206,8 +207,23 @@ z_{it} = (p_{it} - \bar p_t) - \frac{1}{T_i}\sum_{s \in \mathcal{T}_i}(p_{is} - 
 ```
 
 The relative prices revert to their mean: the augmented Dickey-Fuller test
-rejects a unit root for 96 to 100% of the stations of every city (Figure C1 of
-Appendix C shows the two steps on two stations of Rome).
+rejects a unit root for 96 to 100% of the stations of every city. The figure
+shows the two steps on two gasoline stations of Rome, an Eni station and an
+independent one. The posted prices (a) follow the national mean, through the
+war in Ukraine and the closure of the Strait of Hormuz. Net of the national
+mean (b), the two stations keep different permanent premiums, about one cent
+above the national price for the Eni station and about three cents below for
+the independent one. Net of their own mean as well (c), what is left
+fluctuates around zero: the deviations of a station from its usual position,
+which the models explain by the past prices of the station and of its
+neighbor.
+
+![From posted prices to relative prices](figures/fig_app_centring.png)
+
+*Figure C1 of the paper (Appendix C). Two gasoline stations of Rome, 2022-2026:
+(a) Sunday price, with the national mean of the week (dashed); (b) price net of
+the national mean, with the mean of each station (dashed); (c) the relative
+price of the models. Dotted vertical lines: the changes of the excise duties.*
 
 **Completion of the lags.** The response of a model keeps its missing weeks,
 which the Kalman filter handles exactly; the covariates cannot have gaps, and
@@ -317,6 +333,69 @@ flowchart TD
    heteroskedasticity, autocorrelation), and a check that the selected fit is
    not a local maximum: the selected partition is refitted regime by regime
    from another start, and the two maxima are compared.
+
+### What it finds
+
+The leadership found here is predictive, in the sense of Granger: the past
+prices of the competitor carry information on the future price of the
+station. It is not by itself evidence of coordination or of market power, and
+the data contain neither costs nor margins.
+
+**Local leadership (Q1).** Among the major brands (setting 3) the nearest
+competitor leads almost everywhere: the test rejects in 84% of the regimes for
+gasoline and 81% for diesel, which cover 93% and 89% of the stations, in every
+city. The median long-run pass-through is 0.17 and 0.15: when the relative
+price of the nearest competitor moves permanently by one cent, that of the
+station moves by about a sixth of a cent. Independent stations lead the major
+brands less (setting 1: 62% and 73% of the regimes, pass-through about half as
+large), and major brands lead the independents unevenly (setting 2: half to two
+thirds of the regimes). The pooled model, which has no regimes, answers a
+different question: in setting 1 it misses leadership in Venice and Florence
+for both fuels and in Bologna for gasoline, although most stations there are in
+regimes that follow their neighbor, because it averages relations of different
+form and size. Station by station, the evidence is diluted: the HC1 test
+rejects for only 31 to 37% of the stations.
+
+![Local leadership by city](figures/fig_app_leadership.png)
+
+*Figure 3 of the paper. Share of the stations Y in the regimes where the
+bootstrap Wald test of the eight lags of the neighbor X rejects at 5%, for
+gasoline (blue) and diesel (red). Filled marks: the same test on the pooled STEM
+model also rejects; open marks: it does not. In setting 2 Florence and Venice,
+with fewer than ten independent stations, are fitted by the pooled model.*
+
+**Heterogeneity (Q2).** The stations of a city do not price as one group: in
+settings 1 and 3 every model has four or five regimes. The regimes are groups
+of brands, not districts. The selected penalty is zero in 29 of the 66 models
+and the regimes interpenetrate in space. Their adjusted Rand index with the
+brands is 0.07 to 0.48 (median 0.23), against -0.02 to 0.10 (median 0.01) with a
+purely spatial partition into as many groups. In 25 models one regime consists
+of Eni stations only.
+
+![Regimes of Rome and Milan](figures/fig_app_maps.png)
+
+*Figure 4 of the paper. Two partitions of setting 3: every station Y colored by
+its regime; filled marks: the regimes where the neighbor leads, open marks:
+where it does not; the legend gives the size of each regime and its most
+frequent brand. (a) Rome, gasoline: five regimes, four of them following their
+neighbor. (b) Milan, diesel: regime 3 consists of a single brand, the 74 Eni
+stations of the city.*
+
+**Fiscal pass-through (Q3).** Large changes of the excise duties pass through
+unevenly. In the week of the temporary cut of March 2022, 71% of the regimes
+for gasoline and 81% for diesel deviate from the national price, and the
+regimes of one city differ by a median of 25 to 27 cents: some groups of
+stations passed the cut on within the week, others had not. Small changes pass
+through uniformly: the realignment of May 2025, one and a half cents per liter,
+moves almost no regime (1%).
+
+![Long-run pass-through and the pulses of the excise duties](figures/fig_app_passthrough.png)
+
+*Figure 5 of the paper. (a) Estimated long-run pass-through from the neighbor
+X by setting and fuel, one value per regime; black points: the bootstrap 95%
+interval excludes zero. (b) Estimated coefficient of the pulse of the week of
+each change of the excise duties, one value per regime: the deviation, in cents
+per liter, of the relative price of the regime in that week.*
 
 ### Running it
 
@@ -477,6 +556,18 @@ variance $v = 0.30$, $\sigma^2_\epsilon = \sigma^2_\omega = 0.20$ and $R = 2$:
 the response has variance about one, so every contrast between regimes reads
 in standard deviations of the response.
 
+The figure shows one replication at $d = 100$ and $T = 120$: where the regimes
+lie in the four geometries (a-e), and what the response of every
+scenario-variant looks like (f-n), regime by regime.
+
+![The simulation design](figures/fig_sim_overview.png)
+
+*Figure B1 of the paper (Appendix B). (a)-(e) The locations, colored by
+regime, in the four geometries and with regime sizes 1:2:3; the crosses mark
+the centers of the regimes. (f)-(n) The response of every scenario-variant:
+three locations of each regime (thin lines) and the mean of the response over
+the locations of each regime (thick lines).*
+
 ### Scenarios and variants
 
 A scenario fixes the parameter values of the three regimes (regimes 1 / 2 / 3;
@@ -493,6 +584,22 @@ $\sigma^2_\eta = v(1 - G^2)$):
 | S3Seta | as S1s, common $\sigma^2_\eta = 0.108$ | as S1s | as S1s | as S1s | 0.30 / 0.14 / 0.11 | as S1s | as S1s | as S1s |
 | S3theta | as S1s, common range | as S1s | as S1s | as S1s | as S1s | as S1s | as S1s | 2 |
 | S3error | as S1s, common error | as S1s | as S1s | as S1s | as S1s | 0.20 | 0.20 | 2 |
+
+In S1s the regimes differ in every block: the coefficient of the covariate
+rises from 0.55 to 1.15, the persistence of the latent process falls from 0.8
+to 0.2, the error variance grows from 0.40 to 0.60 and its practical range
+shrinks from 2 to 1. Each S3
+scenario takes one block back to the baseline, so that its comparison with
+S1s isolates what that block contributes to telling the regimes apart. The
+figure shows how the variance of the response splits among the sources in
+every regime of every scenario.
+
+![The variance of the response, by source](figures/fig_sim_variance.png)
+
+*Figure B2 of Supplement B. The variance of the response of every regime of
+every scenario, split into the variance due to the covariate, the latent
+process, the spatially structured error (the partial sill) and the purely
+local error (the nugget).*
 
 A variant fixes how the regimes are linked to one another:
 
@@ -513,6 +620,20 @@ about 25 for S1s-`shr` and S3theta-`shr`; 19.5 and 20.6 for S3G- and
 S3Seta-`shr`; 35.5 for S3error-`shr`; and only 6.6 for S3beta-`shr` and 4.5 for
 S1w-`shr`, the two hard cases of the design. The values of the parameters
 induce the separation; the measure quantifies it.
+
+The figure contrasts the two ends: in S1s-`ind` (left) the latent processes of
+the regimes are independent and the regimes are told apart easily; in S1w-`shr`
+(right) they are driven by the same shocks and the regimes differ only through
+small contrasts in their parameters.
+
+![One data set of S1s-ind and of S1w-shr](figures/fig_sim_data.png)
+
+*Figure B4 of Supplement B. One data set of S1s in the variant `ind` (left)
+and of S1w in the variant `shr` (right), at the reference cell, first
+replication. (a) The latent process of each regime. (b) The response at three
+locations of each regime. (c) The mean of the response over time at every
+location, as a deviation from the mean over the network. (d) The measurement
+error at one time point.*
 
 ### The design
 
@@ -570,6 +691,58 @@ alternation, where it only has to rank the regimes. What is measured:
 Every replication runs in a separate R process under a time limit adapted to
 its cell; a replication over the limit is drawn again with the seed of its next
 attempt.
+
+### What it finds
+
+**The number of regimes.** Homogeneous networks are rarely or never split:
+when the data contain no regimes (S2), the two-step rule keeps the pooled model
+in nearly every replication. Well-separated regimes are found almost always
+from one hundred locations on, and on the smallest networks once the series
+are long; when the rule fails, it merges regimes rather than inventing them.
+Weakly separated regimes (S1w-`shr`, S3beta-`shr`) need data: the rule often
+merges two of them, and the share of correct selections grows steadily with
+the number of locations and the length of the series.
+
+**The partition and the parameters.** With the right number of regimes the
+partition of well-separated regimes is recovered almost exactly, and the
+estimates of every regime are centered on the true values. The regression
+coefficients are the most precise; the persistence, the innovation variance
+and the range, which only the dynamics and the spatial structure of the data
+identify, the least.
+
+![Simulation results](figures/fig_sim_main.png)
+
+*Figure 1 of the paper. (a) Percentage of the replications in which the
+two-step rule selects the true number of regimes (one in S2), over the four
+geometries, by T and d; the scenario-variants run from the most to the least
+separated. (b) Adjusted Rand index between the true and the estimated
+partition, at the reference cell. (c) Relative error of the parameters at the
+true number of regimes, at the reference cell, for the seven well-separated
+scenario-variants (blue) and for S1w-`shr` and S3beta-`shr` (orange).*
+
+**The signal.** Whatever number of regimes is selected, the fitted signal is
+closer to the true conditional mean than that of the pooled STEM model. When
+the rule merges two weak regimes, the merged model fits the signal better than
+the fit with the true number of regimes: merging is a sensible response to data
+that cannot tell the regimes apart.
+
+![Signal extraction](figures/fig_sim_signal.png)
+
+*Figure 2 of the paper. Root mean squared error of the fitted signal against
+the true conditional mean, as a ratio to that of the pooled STEM fit (dashed
+line), over every cell with three regimes. Gray: the fit at the true number of
+regimes; blue and orange: the selected fit, in the replications that select
+the true number of regimes and in those that do not. Below one, SC-STEM
+recovers the signal better than the pooled model.*
+
+**What sets the regimes apart.** Independent regimes (S1s-`ind`) are
+identified in practically every case. When the regimes share their shocks, the
+regression coefficients are the main lever: removing their contrast (S3beta)
+costs almost as much as weakening every contrast (S1w), while a common
+persistence, innovation variance, range or error leaves the procedure close to
+S1s-`shr`. Regimes that are compact in space are harder to count than
+overlapping ones, although the estimated partition hardly depends on the
+geometry.
 
 ### Running it
 

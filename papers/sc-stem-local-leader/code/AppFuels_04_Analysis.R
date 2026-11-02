@@ -61,13 +61,27 @@
 
 suppressPackageStartupMessages(library(data.table))
 HERE <- local({
-  a <- commandArgs(trailingOnly = FALSE); m <- grep("^--file=", a, value = TRUE)
-  f <- if (length(m)) normalizePath(sub("^--file=", "", m[1]), winslash = "/") else NULL
-  if (is.null(f)) for (i in rev(seq_len(sys.nframe()))) {
-    of <- sys.frame(i)$ofile
-    if (!is.null(of)) { f <- normalizePath(of, winslash = "/"); break }
+  a <- commandArgs(trailingOnly = FALSE)
+  m <- grep("^--file=", a, value = TRUE)
+  f <- if (length(m)) {
+    normalizePath(sub("^--file=", "", m[1]), winslash = "/")
+  } else {
+    NULL
   }
-  if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
+  if (is.null(f)) {
+    for (i in rev(seq_len(sys.nframe()))) {
+      of <- sys.frame(i)$ofile
+      if (!is.null(of)) {
+        f <- normalizePath(of, winslash = "/")
+        break
+      }
+    }
+  }
+  if (is.null(f)) {
+    normalizePath(getwd(), winslash = "/")
+  } else {
+    dirname(f)
+  }
 })
 source(file.path(HERE, "AppFuels_00_Setup.R"))
 
@@ -76,37 +90,53 @@ OPT <- fu_options(list(
   eda     = file.path(HERE, "..", "results", "application", "eda"),
   out     = file.path(HERE, "..", "output", "application")
 ))
-OUT <- OPT$out; dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+OUT <- OPT$out
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 options(width = 160)
 
 ## --- helpers -----------------------------------------------------------------
-en <- function(cc) unname(FU_CITY_EN[as.character(cc)])      # English name of a city
-pct <- function(x) round(100 * mean(x, na.rm = TRUE))
-fmt_p <- function(p) ifelse(is.na(p), "--", ifelse(p < 0.001, "$<$0.001", sprintf("%.3f", p)))
-csv_write <- function(d, name) fu_write(d, file.path(OUT, name))
+en <- function(cc) {
+  unname(FU_CITY_EN[as.character(cc)])      # English name of a city
+}
+pct <- function(x) {
+  round(100 * mean(x, na.rm = TRUE))
+}
+fmt_p <- function(p) {
+  ifelse(is.na(p), "--", ifelse(p < 0.001, "$<$0.001", sprintf("%.3f", p)))
+}
+csv_write <- function(d, name) {
+  fu_write(d, file.path(OUT, name))
+}
 ## a .tex file: minus signs in math mode, and no negative zero
 tex_write <- function(lines, name) {
   lines <- gsub("(?<![0-9A-Za-z.$])-(0\\.0+)(?![0-9])", "\\1", lines, perl = TRUE)
   lines <- gsub("(?<![0-9A-Za-z.$-])-(?=[0-9])", "$-$", lines, perl = TRUE)
-  writeLines(lines, file.path(OUT, name)); message("wrote ", file.path(OUT, name))
+  writeLines(lines, file.path(OUT, name))
+  message("wrote ", file.path(OUT, name))
 }
 ## the caption and the header of a longtable, repeated on every page
-lt_head <- function(cap, lab, header)
+lt_head <- function(cap, lab, header) {
   c(sprintf("\\caption{%s}\\label{%s}\\\\", cap, lab), "\\toprule", header, "\\midrule", "\\endfirsthead",
     "\\toprule", header, "\\midrule", "\\endhead")
-fig_open <- function(name, width, height)
+}
+fig_open <- function(name, width, height) {
   grDevices::png(file.path(OUT, name), width = width, height = height, units = "in", res = 300,
                  type = if (isTRUE(capabilities("cairo"))) "cairo" else "windows")
-fig_close <- function(name) { invisible(grDevices::dev.off()); message("wrote ", file.path(OUT, name)) }
+}
+fig_close <- function(name) {
+  invisible(grDevices::dev.off())
+  message("wrote ", file.path(OUT, name))
+}
 PAL3 <- c("#1f6f8b", "#e0a458", "#a8516e")
 EVENTS <- c(pulse_excise_cut = "excise cut\n22 Mar 2022", pulse_cut_reduced = "cut reduced\n1 Dec 2022",
             pulse_cut_ends = "cut ends\n1 Jan 2023", pulse_realignment = "realignment\n15 May 2025",
             pulse_equal_excise = "equal excise\n1 Jan 2026")
 ## the numbers quoted in the text: one row each, with its place in the paper
 NUM <- list()
-num <- function(place, quantity, value)
+num <- function(place, quantity, value) {
   NUM[[length(NUM) + 1]] <<- data.frame(place = place, quantity = quantity,
                                         value = paste(format(value, digits = 3), collapse = "; "))
+}
 
 
 
@@ -119,9 +149,14 @@ num <- function(place, quantity, value)
 ## systems fread decompresses through a temporary file, which is far slower.
 rd <- function(s, m, f, ...) {
   p <- file.path(OPT$results, sprintf("setting%d", s), m, f)
-  if (!file.exists(p)) return(NULL)
-  if (grepl("[.]gz$", p)) as.data.frame(data.table::fread(text = readLines(gzfile(p)), na.strings = c("", "NA"), ...))
-  else as.data.frame(data.table::fread(p, na.strings = c("", "NA"), ...))
+  if (!file.exists(p)) {
+    return(NULL)
+  }
+  if (grepl("[.]gz$", p)) {
+    as.data.frame(data.table::fread(text = readLines(gzfile(p)), na.strings = c("", "NA"), ...))
+  } else {
+    as.data.frame(data.table::fread(p, na.strings = c("", "NA"), ...))
+  }
 }
 SM <- do.call(rbind, lapply(1:3, function(s)
   utils::read.csv(file.path(OPT$results, sprintf("setting%d", s), "models.csv"), stringsAsFactors = FALSE)))
@@ -148,21 +183,34 @@ SM$ari_regimes_space <- vapply(seq_len(nrow(SM)), function(i) {
 ## from X (Equation 10 of the paper): the sum of the coefficients of the lags of
 ## X over one minus the sum of the own lags, with the percentile interval of
 ## its aligned bootstrap draws, on the same fuel and on both fuels.
-LAG <- function(b) paste0(b, "_l", 1:4)
+LAG <- function(b) {
+  paste0(b, "_l", 1:4)
+}
 REG <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) {
-  s <- SM$setting[i]; m <- SM$model[i]; K <- SM$K[i]
+  s <- SM$setting[i]
+  m <- SM$model[i]
+                      K <- SM$K[i]
   g <- rd(s, m, "regimes.csv", colClasses = list(character = c("y_site", "x_site")))
-  w <- rd(s, m, "wald.csv"); w <- w[w$fit == "selected" & w$regime != "all", ]
-  pw <- function(b) w$p_chisq[w$block == b][order(as.integer(w$regime[w$block == b]))]
-  e <- rd(s, m, "estimates.csv"); e <- e[e$fit == "selected", ]
+  w <- rd(s, m, "wald.csv")
+  w <- w[w$fit == "selected" & w$regime != "all", ]
+  pw <- function(b) {
+    w$p_chisq[w$block == b][order(as.integer(w$regime[w$block == b]))]
+  }
+  e <- rd(s, m, "estimates.csv")
+  e <- e[e$fit == "selected", ]
   dr <- rd(s, m, "draws.csv.gz")
   cov <- unique(dr$covariate)
   A <- array(NA_real_, c(max(dr$draw), K, length(cov)), dimnames = list(NULL, NULL, cov))
   A[cbind(dr$draw, dr$regime, match(dr$covariate, cov))] <- dr$value
   lrm <- t(vapply(seq_len(K), function(k) {
-    est <- function(v) sum(e$estimate[e$cluster == k & e$covariate %in% v])
-    drw <- function(v) rowSums(matrix(A[, k, v], ncol = length(v)))
-    l1 <- drw(LAG("nb")) / (1 - drw(LAG("own"))); l2 <- (drw(LAG("nb")) + drw(LAG("nb_other"))) / (1 - drw(LAG("own")))
+    est <- function(v) {
+      sum(e$estimate[e$cluster == k & e$covariate %in% v])
+    }
+    drw <- function(v) {
+      rowSums(matrix(A[, k, v], ncol = length(v)))
+    }
+    l1 <- drw(LAG("nb")) / (1 - drw(LAG("own")))
+    l2 <- (drw(LAG("nb")) + drw(LAG("nb_other"))) / (1 - drw(LAG("own")))
     c(est(LAG("nb")) / (1 - est(LAG("own"))), stats::quantile(l1, c(.025, .975), na.rm = TRUE),
       (est(LAG("nb")) + est(LAG("nb_other"))) / (1 - est(LAG("own"))), stats::quantile(l2, c(.025, .975), na.rm = TRUE),
       est(LAG("own")))
@@ -185,19 +233,24 @@ REG$area <- unname(FU_AREA[as.character(REG$city)])
 
 ## the test of leadership on the pooled model (the selected fit when K = 1)
 POOL <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) {
-  s <- SM$setting[i]; m <- SM$model[i]
-  w <- rd(s, m, "wald.csv"); w <- w[w$fit == (if (SM$K[i] == 1) "selected" else "pooled") & w$regime != "all", ]
+  s <- SM$setting[i]
+  m <- SM$model[i]
+  w <- rd(s, m, "wald.csv")
+  w <- w[w$fit == (if (SM$K[i] == 1) "selected" else "pooled") & w$regime != "all", ]
   data.frame(setting = s, model = m, city = SM$city[i], fuel = SM$fuel[i], block = w$block, p = w$p_chisq)
 }))
 ## the tests in all the regimes of a model at once
 TW <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) {
-  w <- rd(SM$setting[i], SM$model[i], "wald.csv"); w <- w[w$fit == "selected" & w$regime == "all", ]
+  w <- rd(SM$setting[i], SM$model[i], "wald.csv")
+  w <- w[w$fit == "selected" & w$regime == "all", ]
   cbind(city = SM$city[i], fuel = SM$fuel[i], w)
 }))
 ## the pulses of the excise duties, one row per regime and pulse
 PUL <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) {
-  s <- SM$setting[i]; m <- SM$model[i]
-  e <- rd(s, m, "estimates.csv"); e <- e[e$fit == "selected" & startsWith(e$covariate, "pulse_"), ]
+  s <- SM$setting[i]
+  m <- SM$model[i]
+  e <- rd(s, m, "estimates.csv")
+  e <- e[e$fit == "selected" & startsWith(e$covariate, "pulse_"), ]
   data.frame(setting = s, model = m, city = SM$city[i], fuel = SM$fuel[i], regime = e$cluster, pulse = e$covariate,
              est = e$estimate, se = e$se, lo = e$perc_lower_95_CI, hi = e$perc_upper_95_CI)
 }))
@@ -205,7 +258,8 @@ PUL$sig <- PUL$lo > 0 | PUL$hi < 0                              # the interval e
 PUL$area <- unname(FU_AREA[as.character(PUL$city)])
 ## the station-by-station tests, with the distance to X and the regime
 PT <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) {
-  s <- SM$setting[i]; m <- SM$model[i]
+  s <- SM$setting[i]
+  m <- SM$model[i]
   p <- rd(s, m, "pump_tests.csv", colClasses = list(character = "y_site"))
   g <- rd(s, m, "regimes.csv", colClasses = list(character = c("y_site", "x_site")))
   data.frame(setting = s, model = m, city = SM$city[i], fuel = SM$fuel[i], block = p$block, p_F = p$p_F,
@@ -217,7 +271,8 @@ DH <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i)
 DG <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) rd(SM$setting[i], SM$model[i], "diagnostics.csv")))
 OPTR <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) rd(SM$setting[i], SM$model[i], "optima.csv")))
 OPTC <- do.call(rbind, lapply(seq_len(nrow(SM)), function(i) rd(SM$setting[i], SM$model[i], "optima_coefficients.csv")))
-csv_write(REG, "app_regimes.csv"); csv_write(PUL, "app_pulses.csv")
+csv_write(REG, "app_regimes.csv")
+csv_write(PUL, "app_pulses.csv")
 
 
 
@@ -232,7 +287,8 @@ csv_write(REG, "app_regimes.csv"); csv_write(PUL, "app_pulses.csv")
 ## over the regimes and the share whose interval lies above zero; the median
 ## over the cities of the share of stations whose HC1 (and F) test rejects.
 main_rows <- do.call(rbind, lapply(1:3, function(s) do.call(rbind, lapply(c("gasoline", "diesel"), function(f) {
-  r <- REG[REG$setting == s & REG$fuel == f, ]; sm <- SM[SM$setting == s & SM$fuel == f, ]
+  r <- REG[REG$setting == s & REG$fuel == f, ]
+  sm <- SM[SM$setting == s & SM$fuel == f, ]
   po <- POOL[POOL$setting == s & POOL$fuel == f & POOL$block == "nb_both", ]
   dh <- DH[DH$setting == s & DH$fuel == f & DH$block == "nb_both", ]
   data.frame(setting = s, fuel = f, pumps = sum(sm$pumps), regimes = nrow(r),
@@ -251,11 +307,13 @@ tex_write(c(
   "\\cmidrule{6-7}\\cmidrule{9-10}",
   "setting & fuel & pumps & regimes & $\\hat K$ & regimes & pumps & model & median (IQR) & $>0$ (\\%) & HC1 (\\%) \\\\",
   "\\midrule",
-  unlist(lapply(seq_len(nrow(main_rows)), function(j) { x <- main_rows[j, ]
+  unlist(lapply(seq_len(nrow(main_rows)), function(j) {
+    x <- main_rows[j, ]
     sprintf("%s & %s & %d & %d & %s & %d & %d & %d/%d & %.2f (%.2f, %.2f) & %d & %.0f \\\\%s",
             if (x$fuel == "gasoline") as.character(x$setting) else "",
             x$fuel, x$pumps, x$regimes, x$K, x$lead_regimes, x$lead_pumps, x$pooled_lead, x$cities,
-            x$lrm_med, x$lrm_q1, x$lrm_q3, x$lrm_pos, x$hc1, if (x$fuel == "diesel" && x$setting < 3) "[2pt]" else "") })),
+            x$lrm_med, x$lrm_q1, x$lrm_q3, x$lrm_pos, x$hc1, if (x$fuel == "diesel" && x$setting < 3) "[2pt]" else "")
+  })),
   "\\bottomrule", "\\end{tabular}"), "tab_app_main.tex")
 print(main_rows, digits = 3, row.names = FALSE)
 num("Section 5.3, Q1, per pump", "F test: share of stations rejecting, median over the cities, range over settings and fuels (%)",
@@ -274,7 +332,9 @@ city_tab <- do.call(rbind, lapply(1:3, function(s) do.call(rbind, lapply(c("gaso
   do.call(rbind, lapply(FU_CITY_ORDER, function(cc) {
     r <- REG[REG$setting == s & REG$fuel == f & REG$city == cc, ]
     po <- POOL[POOL$setting == s & POOL$fuel == f & POOL$city == cc & POOL$block == "nb_both", ]
-    if (!nrow(r)) return(NULL)
+    if (!nrow(r)) {
+      return(NULL)
+    }
     data.frame(setting = s, fuel = f, city = cc, pumps = sum(r$pumps), K = nrow(r),
                lead_pumps = 100 * sum(r$pumps[r$lead]) / sum(r$pumps), pooled = po$p[1] < 0.05)
   }))))))
@@ -287,7 +347,9 @@ for (s in 1:3) {
   plot(NA, xlim = c(0, 100), ylim = c(0.5, length(FU_CITY_ORDER) + 0.5), yaxt = "n", xlab = "% of the pumps Y",
        ylab = "", main = sprintf("Setting %d\n%s", s, FU_SETTINGS$label[s]), cex.main = 1.05, font.main = 1)
   graphics::abline(h = seq_along(FU_CITY_ORDER), col = "grey92")
-  if (s == 1) graphics::axis(2, at = seq_along(FU_CITY_ORDER), labels = en(rev(FU_CITY_ORDER)), las = 1, cex.axis = 1.05)
+  if (s == 1) {
+    graphics::axis(2, at = seq_along(FU_CITY_ORDER), labels = en(rev(FU_CITY_ORDER)), las = 1, cex.axis = 1.05)
+  }
   off <- ifelse(x$fuel == "gasoline", 0.15, -0.15)
   graphics::points(x$lead_pumps, yy + off, pch = ifelse(x$pooled, 19, 1), cex = 1.5,
                    col = ifelse(x$fuel == "gasoline", PAL3[1], PAL3[3]), lwd = 1.6)
@@ -375,7 +437,9 @@ draw_map <- function(s, m, title) {
 ## Figure C1 of Supplement C: Rome, gasoline, setting 1, and Naples, gasoline,
 ## setting 3 (one file each)
 for (cs in list(c(1, "RM_gasoline"), c(3, "NA_gasoline"))) {
-  s <- as.integer(cs[1]); m <- cs[2]; nm <- sprintf("fig_app_map_s%d_%s.png", s, m)
+  s <- as.integer(cs[1])
+  m <- cs[2]
+                          nm <- sprintf("fig_app_map_s%d_%s.png", s, m)
   fig_open(nm, 5, 5.6)
   draw_map(s, m, sprintf("%s, %s, setting %d", en(FU_CITY[[sub("_.*$", "", m)]]), sub("^.*_", "", m), s))
   fig_close(nm)
@@ -419,7 +483,8 @@ tex_write(c("\\begin{longtable}{llrrrlrrrr}",
 
 ## --- Tables C2 to C4 (Section C4): the regimes, setting by setting ----------
 for (s in 1:3) {
-  r <- REG[REG$setting == s, ]; r <- r[order(r$city, r$fuel, r$regime), ]
+  r <- REG[REG$setting == s, ]
+  r <- r[order(r$city, r$fuel, r$regime), ]
   tex_write(c("\\begin{longtable}{llrrlrrrrrr}",
     lt_head(paste(sprintf("The regimes of setting %d.", s),
                   "Brand: the most frequent brand of the stations $Y$ of the regime, with its share; X: median distance",
@@ -463,9 +528,11 @@ tex_write(c("\\begin{tabular}{lrrrrrrrrr}", "\\toprule",
   " & \\multicolumn{3}{c}{setting 1} & \\multicolumn{3}{c}{setting 2} & \\multicolumn{3}{c}{setting 3} \\\\",
   "\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}",
   "distance to X (km) & pumps & $F$ & HC1 & pumps & $F$ & HC1 & pumps & $F$ & HC1 \\\\", "\\midrule",
-  vapply(levels(PT$dbin), function(b) { z <- dist_tab[dist_tab$dist == b, ]
+  vapply(levels(PT$dbin), function(b) {
+    z <- dist_tab[dist_tab$dist == b, ]
     paste(paste(b, paste(sprintf("%d & %s & %s", z$pumps, ifelse(z$pumps > 0, z$F, "--"),
-                                 ifelse(z$pumps > 0, z$hc1, "--")), collapse = " & "), sep = " & "), "\\\\") }, ""),
+                                 ifelse(z$pumps > 0, z$hc1, "--")), collapse = " & "), sep = " & "), "\\\\")
+  }, ""),
   "\\bottomrule", "\\end{tabular}"), "tab_app_distance.tex")
 
 ## --- Table C7 (Section C7): the pulses of the excise duties ----------------
@@ -492,7 +559,9 @@ tex_write(c("\\begin{tabular}{llrrrrr}", "\\toprule",
 ## ===========================================================================
 ## 7. The numbers quoted in the text
 ## ===========================================================================
-SL <- function(s) sprintf("setting %d", s)
+SL <- function(s) {
+  sprintf("setting %d", s)
+}
 
 ## --- Section 5.3, Q1: local leadership --------------------------------------
 for (s in c(3, 1, 2)) {
@@ -514,7 +583,8 @@ num("Section 5.3, Q1", "setting 2: cities where all the stations Y follow X (bot
 num("Section 5.3, Q1", "setting 2: cities where at most half of the stations Y follow X (both fuels, %)",
     en(names(which(tapply(x$lead_pumps, x$city, max) <= 50))))
 brand_tab <- do.call(rbind, lapply(c(1, 3), function(s) {
-  r <- REG[REG$setting == s, ]; e <- r$eni_share > 0.5
+  r <- REG[REG$setting == s, ]
+  e <- r$eni_share > 0.5
   data.frame(setting = s, regimes = c("Eni > 50%", "other"), number = c(sum(e), sum(!e)),
              lead_pct = c(pct(r$lead[e]), pct(r$lead[!e])),
              lrm_median = round(c(stats::median(r$lrm_nb[e]), stats::median(r$lrm_nb[!e])), 2))
@@ -572,14 +642,21 @@ num("Section 5.3, Q3", "realignment 2025: regimes whose interval excludes 0, bot
 a <- stats::aggregate(cbind(pl = pumps * lead, pumps) ~ setting + area, REG, sum)
 a$pct <- round(100 * a$pl / a$pumps)
 csv_write(a, "app_leadership_by_area.csv")
-for (s in c(1, 3)) num("Section 5.4", paste0(SL(s), ": stations Y in the regimes where X leads, North; Center; South and islands (%)"),
-                       a$pct[a$setting == s][match(c("North", "Center", "South and islands"), a$area[a$setting == s])])
-for (s in c(1, 3)) { x <- city_tab[city_tab$setting == s, ]; x <- x[order(x$lead_pumps), ][1:5, ]
+for (s in c(1, 3)) {
+  num("Section 5.4", paste0(SL(s), ": stations Y in the regimes where X leads, North; Center; South and islands (%)"),
+      a$pct[a$setting == s][match(c("North", "Center", "South and islands"), a$area[a$setting == s])])
+}
+for (s in c(1, 3)) {
+  x <- city_tab[city_tab$setting == s, ]
+  x <- x[order(x$lead_pumps), ][1:5, ]
   num("Section 5.4", paste0(SL(s), ": the five weakest city-fuels (stations following X, %)"),
-      paste(en(x$city), x$fuel, round(x$lead_pumps))) }
+      paste(en(x$city), x$fuel, round(x$lead_pumps)))
+}
 dd <- stats::aggregate(dist_median ~ setting + area, REG, function(v) round(stats::median(v), 2))
-for (s in c(1, 3)) num("Section 5.4", paste0(SL(s), ": median distance to X by area, North; Center; South (km)"),
-                       dd$dist_median[dd$setting == s][match(c("North", "Center", "South and islands"), dd$area[dd$setting == s])])
+for (s in c(1, 3)) {
+  num("Section 5.4", paste0(SL(s), ": median distance to X by area, North; Center; South (km)"),
+      dd$dist_median[dd$setting == s][match(c("North", "Center", "South and islands"), dd$area[dd$setting == s])])
+}
 ll <- stats::aggregate(lrm_nb ~ setting + area, REG, function(v) round(stats::median(v), 2))
 num("Section 5.4", "setting 3: median pass-through over the regimes by area, North; Center; South",
     ll$lrm_nb[ll$setting == 3][match(c("North", "Center", "South and islands"), ll$area[ll$setting == 3])])
@@ -613,9 +690,10 @@ num("Section C3 and Section C8", "models whose partition is not reproduced in th
     paste(SL(x$setting), en(x$city), x$fuel, x$ari_draws_median))
 
 ## --- Section C4: leadership by regime ---------------------------------------
-for (b in c("nb", "nb_other"))
+for (b in c("nb", "nb_other")) {
   num("Section C4", paste0("the four lags of X on the ", if (b == "nb") "same" else "other", " fuel are significant: % of the regimes, settings 1; 2; 3"),
       sapply(1:3, function(s) pct(REG[[paste0("p_", b)]][REG$setting == s] < 0.05)))
+}
 num("Section C4", "the other fuel of Y predicts its price: % of the regimes", pct(REG$p_own_other < 0.05))
 jt <- j
 num("Section C4", "all the regimes at once: models rejecting, chi-square; bootstrap; pooled model (of 66)",
@@ -632,11 +710,14 @@ num("Section C5", "setting 1: HC1 rejections by distance to X, 0-0.5; 0.5-1; 1-2
 
 ## --- Section C6: diagnostics and robustness ---------------------------------
 dg <- merge(DG, unique(REG[, c("setting", "model")]))
-diag_tab <- do.call(rbind, lapply(1:3, function(s) { x <- dg[dg$setting == s, ]; r <- REG[REG$setting == s, ]
+diag_tab <- do.call(rbind, lapply(1:3, function(s) {
+  x <- dg[dg$setting == s, ]
+  r <- REG[REG$setting == s, ]
   data.frame(setting = s, regimes = nrow(x), lb = stats::median(x$ljung_box_reject_pct),
              lb_sq = stats::median(x$ljung_box_sq_reject_pct), acf1 = stats::median(x$acf1_median),
              kurt = stats::median(x$kurtosis_median), theta_upper = sum(r$theta_bound == "upper"),
-             theta_lower = sum(r$theta_bound == "lower")) }))
+             theta_lower = sum(r$theta_bound == "lower"))
+}))
 csv_write(diag_tab, "tab_app_diagnostics.csv")
 num("Section C6, Residuals", "Ljung-Box rejections, median over the regimes, range over the settings (%)", range(diag_tab$lb))
 num("Section C6, Residuals", "Ljung-Box on the squares, median over the regimes, range over the settings (%)", range(diag_tab$lb_sq))
@@ -661,7 +742,8 @@ num("Section C6, Local maxima", "regimes differing by more than 10: median |chan
 bx <- big[big$block %in% c("nb", "nb_other"), ]
 num("Section C6, Local maxima", "coefficients of the lags of X in those regimes; moving by more than two se",
     c(nrow(bx), sum(abs(bx$z_diff) > 2, na.rm = TRUE)))
-sig_s <- abs(big$beta_selected / big$se_boot) > 1.96; sig_l <- abs(big$beta_ls / big$se_boot) > 1.96
+sig_s <- abs(big$beta_selected / big$se_boot) > 1.96
+sig_l <- abs(big$beta_ls / big$se_boot) > 1.96
 num("Section C6, Local maxima", "coefficients that change sign: significant at both maxima; at one of them",
     c(sum(sig_s & sig_l & sign(big$beta_selected) != sign(big$beta_ls), na.rm = TRUE),
       sum(xor(sig_s, sig_l) & sign(big$beta_selected) != sign(big$beta_ls), na.rm = TRUE)))
@@ -730,5 +812,7 @@ if (all(file.exists(file.path(OPT$eda, EDA_FILES)))) {
   dir.create(file.path(OUT, "eda"), showWarnings = FALSE)
   file.copy(file.path(OPT$eda, EDA_FILES), file.path(OUT, "eda"), overwrite = TRUE, copy.date = TRUE)
   message("copied the stored outputs of the exploratory analysis into ", file.path(OUT, "eda"))
-} else message("the stored outputs of the exploratory analysis are not in ", OPT$eda, ": skipped")
+} else {
+  message("the stored outputs of the exploratory analysis are not in ", OPT$eda, ": skipped")
+}
 message("done: outputs in ", OUT)

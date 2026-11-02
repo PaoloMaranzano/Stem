@@ -62,14 +62,22 @@ SIM_SETUP_MAIN <- !exists("SIM_FILE", inherits = FALSE)
 ## machine stays usable while the study runs.
 sim_default_cores <- function() {
   n <- suppressWarnings(parallel::detectCores(logical = FALSE))
-  if (is.na(n)) n <- suppressWarnings(parallel::detectCores())
-  if (is.na(n)) 1L else max(1L, as.integer(n) - 1L)
+  if (is.na(n)) {
+    n <- suppressWarnings(parallel::detectCores())
+  }
+  if (is.na(n)) {
+    1L
+  } else {
+    max(1L, as.integer(n) - 1L)
+  }
 }
 
 ## Definitions only? The worker processes source this file with
 ## SIM_DEFINE_ONLY <- TRUE: they get the generator and the functions, and
 ## nothing is run, installed or read from the command line.
-if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) SIM_DEFINE_ONLY <- FALSE
+if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) {
+  SIM_DEFINE_ONLY <- FALSE
+}
 
 
 ## ---------------------------------------------------------------------------
@@ -81,11 +89,14 @@ if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) SIM_DEFINE_ONLY <- FALSE
 ## ---------------------------------------------------------------------------
 sim_require <- function(pkgs) {
   for (p in pkgs) {
-    if (requireNamespace(p, quietly = TRUE)) next
+    if (requireNamespace(p, quietly = TRUE)) {
+      next
+    }
     message("installing ", p, " ...")
     utils::install.packages(p, repos = "https://cloud.r-project.org")
-    if (!requireNamespace(p, quietly = TRUE))
+    if (!requireNamespace(p, quietly = TRUE)) {
       stop("could not install '", p, "'", call. = FALSE)
+    }
   }
 }
 
@@ -101,14 +112,22 @@ SIM_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
 ## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
 sim_github_sha <- function(ref = SIM_STEM_REF) {
   repo <- sub("@.*$", "", ref)
-  at   <- if (grepl("@", ref, fixed = TRUE)) sub("^.*@", "", ref) else "HEAD"
+  at   <- if (grepl("@", ref, fixed = TRUE)) {
+    sub("^.*@", "", ref)
+  } else {
+    "HEAD"
+  }
   j <- tryCatch({
     con <- url(sprintf("https://api.github.com/repos/%s/commits/%s", repo, at))
     on.exit(close(con))
     paste(readLines(con, warn = FALSE), collapse = "")
   }, error = function(e) "", warning = function(w) "")
   m <- regmatches(j, regexpr("\"sha\" *: *\"[0-9a-f]{40}\"", j))
-  if (length(m)) gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m)) else NA_character_
+  if (length(m)) {
+    gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m))
+  } else {
+    NA_character_
+  }
 }
 
 ## The installed Stem is GitHub's commit when GitHub can be reached, and
@@ -117,12 +136,16 @@ sim_github_sha <- function(ref = SIM_STEM_REF) {
 ## file without loading the package: a namespace loaded before the update would
 ## read the new files with the old index.
 sim_stem_ok <- function(latest = NA_character_) {
-  if (!nzchar(system.file(package = "Stem"))) return(FALSE)
+  if (!nzchar(system.file(package = "Stem"))) {
+    return(FALSE)
+  }
   if (!is.na(latest)) {
     here <- utils::packageDescription("Stem")$RemoteSha
     return(!is.null(here) && identical(here, latest))
   }
-  if (!requireNamespace("Stem", quietly = TRUE)) return(FALSE)
+  if (!requireNamespace("Stem", quietly = TRUE)) {
+    return(FALSE)
+  }
   ns <- asNamespace("Stem")
   have <- c("STEM_control", "STEM_Signal", "SCSTEM_Signal", "SCSTEM_Infocrit", "SCSTEM_Select",
             "scstem_neighbors", "scstem_align_labels", "scstem_ari")
@@ -132,22 +155,33 @@ sim_stem_ok <- function(latest = NA_character_) {
     "algorithm" %in% names(formals(get("STEM_control", envir = ns)))     # the algorithms
 }
 
-SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) NA_character_ else sub("^.*@", "", SIM_STEM_REF)
+SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) {
+  NA_character_
+} else {
+  sub("^.*@", "", SIM_STEM_REF)
+}
 if (!sim_stem_ok(SIM_STEM_SHA)) {
-  message(if (nzchar(system.file(package = "Stem")))
-            "the installed Stem is not the pinned commit: installing it" else
-            "Stem is not installed: installing it from GitHub")
+  if (nzchar(system.file(package = "Stem"))) {
+    message("the installed Stem is not the pinned commit: installing it")
+  } else {
+    message("Stem is not installed: installing it from GitHub")
+  }
   sim_require("remotes")
-  if ("Stem" %in% loadedNamespaces()) try(unloadNamespace("Stem"), silent = TRUE)
+  if ("Stem" %in% loadedNamespaces()) {
+    try(unloadNamespace("Stem"), silent = TRUE)
+  }
   remotes::install_github(SIM_STEM_REF, upgrade = "never", force = TRUE, quiet = TRUE)
-  if (!sim_stem_ok(SIM_STEM_SHA))
+  if (!sim_stem_ok(SIM_STEM_SHA)) {
     stop("Stem could not be installed or brought up to date. Restart R ",
          "(Session > Restart R in RStudio) and run again; if it still fails, ",
          "install it by hand with\n  remotes::install_github(\"", SIM_STEM_REF,
          "\")", call. = FALSE)
+  }
 }
 sim_require("spdep")
-if (!SIM_DEFINE_ONLY) sim_require("callr")   # runs a replication under its time limit
+if (!SIM_DEFINE_ONLY) {
+  sim_require("callr")   # runs a replication under its time limit
+}
 suppressPackageStartupMessages(library("Stem"))
 
 
@@ -161,28 +195,38 @@ sim_config <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
   for (a in kv) {
     nm  <- sub("^--([^=]+)=.*$", "\\1", a)
     val <- sub("^--[^=]+=", "", a)
-    if (!nzchar(val)) next
-    if (!nm %in% names(defaults))
+    if (!nzchar(val)) {
+      next
+    }
+    if (!nm %in% names(defaults)) {
       stop("unknown option --", nm, "; the options are: ",
            paste(names(defaults), collapse = ", "), call. = FALSE)
+    }
     parts <- trimws(strsplit(val, ",", fixed = TRUE)[[1]])
     d <- defaults[[nm]]
     defaults[[nm]] <-
-      if (is.logical(d)) as.logical(parts)
-      else if (is.integer(d)) as.integer(parts)
-      else if (is.numeric(d))
+      if (is.logical(d)) {
+        as.logical(parts)
+      } else if (is.integer(d)) {
+        as.integer(parts)
+      } else if (is.numeric(d)) {
         vapply(parts, function(s) eval(parse(text = s)), numeric(1),
                USE.NAMES = FALSE)
-      else parts
-    if (anyNA(defaults[[nm]])) stop("cannot read --", nm, "=", val, call. = FALSE)
+      } else {
+        parts
+      }
+    if (anyNA(defaults[[nm]])) {
+      stop("cannot read --", nm, "=", val, call. = FALSE)
+    }
   }
   defaults
 }
 
 sim_print_config <- function(cfg) {
   cat("configuration\n")
-  for (nm in names(cfg))
+  for (nm in names(cfg)) {
     cat(sprintf("  %-12s %s\n", nm, paste(format(cfg[[nm]]), collapse = ", ")))
+  }
   cat("\n")
 }
 
@@ -217,24 +261,39 @@ sim_model <- function(dat) {
 ## holds a file while it uploads it -- wait and try again.
 sim_retry <- function(write, tries = 20L, wait = 3) {
   for (i in seq_len(tries)) {
-    ok <- tryCatch({ write(); TRUE }, error = function(e) {
-      if (i == tries) stop(e)
+    ok <- tryCatch({
+      write()
+      TRUE
+    }, error = function(e) {
+      if (i == tries) {
+        stop(e)
+      }
       FALSE
     })
-    if (ok) return(invisible(NULL))
+    if (ok) {
+      return(invisible(NULL))
+    }
     Sys.sleep(wait)
   }
 }
 
 ## Append to a CSV, writing the header only when the file is new.
 sim_append <- function(df, path) {
-  if (is.null(df) || !nrow(df)) return(invisible(NULL))
+  if (is.null(df) || !nrow(df)) {
+    return(invisible(NULL))
+  }
   sim_retry(function()
     utils::write.table(df, path, sep = ",", row.names = FALSE,
                        col.names = !file.exists(path), append = file.exists(path)))
 }
 
-sim_hours <- function(x) if (x < 1) sprintf("%.0f min", 60 * x) else sprintf("%.1f h", x)
+sim_hours <- function(x) {
+  if (x < 1) {
+    sprintf("%.0f min", 60 * x)
+  } else {
+    sprintf("%.1f h", x)
+  }
+}
 
 
 ## ===========================================================================
@@ -257,16 +316,21 @@ N_MIN  <- 6L        # smallest regime the design allows
 IMB_MIN <- 1.5      # smallest largest/smallest ratio that counts as unbalanced
 
 dgp_centres <- function(K, omega) {
-  if (K == 1L) return(cbind(0, 0))
+  if (K == 1L) {
+    return(cbind(0, 0))
+  }
   if (K == 3L) {
-    r <- 2 * omega / sqrt(3); a <- c(90, 210, 330) * pi / 180
+    r <- 2 * omega / sqrt(3)
+    a <- c(90, 210, 330) * pi / 180
     return(cbind(r * cos(a), r * sin(a)))
   }
   stop("the design has K = 1 or K = 3 regimes")
 }
 
 dgp_centre_var <- function(K, omega) {
-  if (K == 1L) return(0)
+  if (K == 1L) {
+    return(0)
+  }
   mu <- dgp_centres(K, omega)
   mean(apply(mu, 2, function(v) mean((v - mean(v))^2)))
 }
@@ -274,23 +338,32 @@ dgp_centre_var <- function(K, omega) {
 ## regime sizes: equal up to the remainder, or proportional to 1:2:3 with no
 ## regime below N_MIN
 dgp_sizes <- function(n, K, balance = "balanced", n_min = N_MIN) {
-  if (K == 1L) return(n)
+  if (K == 1L) {
+    return(n)
+  }
   if (balance == "balanced") {
     s <- rep(n %/% K, K)
-    if (n %% K) s[seq_len(n %% K)] <- s[seq_len(n %% K)] + 1L
+    if (n %% K) {
+      s[seq_len(n %% K)] <- s[seq_len(n %% K)] + 1L
+    }
     return(as.integer(s))
   }
   w <- seq_len(K) / sum(seq_len(K))
   s <- pmax(1L, as.integer(round(n * w)))
   s[K] <- n - sum(s[-K])
-  if (any(s < n_min)) { s <- pmax(s, n_min); s[K] <- n - sum(s[-K]) }
+  if (any(s < n_min)) {
+    s <- pmax(s, n_min)
+    s[K] <- n - sum(s[-K])
+  }
   as.integer(s)
 }
 
 dgp_feasible <- function(n, K, balance = "balanced") {
   s <- dgp_sizes(n, K, balance)
   ok <- all(s >= N_MIN) && sum(s) == n
-  if (ok && K > 1L && balance == "unbalanced") ok <- max(s) / min(s) >= IMB_MIN
+  if (ok && K > 1L && balance == "unbalanced") {
+    ok <- max(s) / min(s) >= IMB_MIN
+  }
   ok
 }
 
@@ -301,7 +374,9 @@ dgp_locations <- function(n, K, omega, balance = "balanced", seed = 1, spread = 
   g  <- rep(seq_len(K), times = dgp_sizes(n, K, balance))
   mu <- dgp_centres(K, omega)
   nu_sp <- NU_TOT - dgp_centre_var(K, if (identical(spread, "regime")) SIM_REFERENCE$omega else omega)
-  if (nu_sp <= 0) stop("omega = ", omega, " spreads the centres beyond NU_TOT", call. = FALSE)
+  if (nu_sp <= 0) {
+    stop("omega = ", omega, " spreads the centres beyond NU_TOT", call. = FALSE)
+  }
   xy <- cbind(sx = mu[g, 1] + stats::rnorm(n, sd = sqrt(nu_sp)),
               sy = mu[g, 2] + stats::rnorm(n, sd = sqrt(nu_sp)))
   list(coords = xy, labels = g)
@@ -351,9 +426,11 @@ sim_scenarios <- function() {
     v <- rbind(
       data.frame(variant = "ind", rho = 0, field = "regime"),
       data.frame(variant = "shr", rho = 1, field = if (theta_common) "one" else "regime"))
-    if (theta_common) v <- rbind(v,
-      data.frame(variant = "lat", rho = 1, field = "regime"),
-      data.frame(variant = "fld", rho = 0, field = "one"))
+    if (theta_common) {
+      v <- rbind(v,
+        data.frame(variant = "lat", rho = 1, field = "regime"),
+        data.frame(variant = "fld", rho = 0, field = "one"))
+    }
     rows[[i]] <- cbind(id = paste0(b$scen, "-", v$variant), b[rep(1, nrow(v)), ], v)
   }
   rows[[length(rows) + 1L]] <- data.frame(
@@ -376,13 +453,28 @@ dgp_psi <- function(row) {
   } else {
     p <- as.data.frame(SIM_S1[[row$level]])
     b <- SIM_BASE
-    if (nzchar(row$common)) switch(row$common,
-      beta  = { p$b0 <- b$b0; p$b1 <- b$b1 },
-      G     = { p$G <- b$G },
-      Seta  = { p$v <- b$v * (1 - b$G^2) / (1 - p$G^2) },
-      theta = { p$R <- b$R },
-      error = { p$se <- b$se; p$so <- b$so; p$R <- b$R },
-      stop("unknown common block '", row$common, "'", call. = FALSE))
+    if (nzchar(row$common)) {
+      switch(row$common,
+        beta  = {
+          p$b0 <- b$b0
+          p$b1 <- b$b1
+        },
+        G     = {
+          p$G <- b$G
+        },
+        Seta  = {
+          p$v <- b$v * (1 - b$G^2) / (1 - p$G^2)
+        },
+        theta = {
+          p$R <- b$R
+        },
+        error = {
+          p$se <- b$se
+          p$so <- b$so
+                        p$R <- b$R
+        },
+        stop("unknown common block '", row$common, "'", call. = FALSE))
+    }
   }
   p$s2eta <- p$v * (1 - p$G^2)
   p$theta <- 3 / p$R
@@ -406,7 +498,9 @@ dgp_latent <- function(TN, psi, rho, burn = 200L) {
   for (tt in seq_len(burn + TN)) {
     eta <- se * (sqrt(rho) * stats::rnorm(1) + sqrt(1 - rho) * stats::rnorm(K))
     cur <- psi$G * cur + eta
-    if (tt > burn) y[tt - burn, ] <- cur
+    if (tt > burn) {
+      y[tt - burn, ] <- cur
+    }
   }
   y
 }
@@ -425,7 +519,9 @@ dgp_error <- function(labels, psi, coords, TN, field) {
   e  <- matrix(NA_real_, TN, d)
   if (field == "one") {
     th <- unique(round(psi$theta, 12))
-    if (length(th) != 1L) stop("one error field needs a common theta", call. = FALSE)
+    if (length(th) != 1L) {
+      stop("one error field needs a common theta", call. = FALSE)
+    }
     L <- chol(exp(-th * dm) + diag(1e-10, d))
     W <- matrix(stats::rnorm(TN * d), TN, d) %*% L
     E <- matrix(stats::rnorm(TN * d), TN, d)
@@ -459,11 +555,18 @@ dgp_error <- function(labels, psi, coords, TN, field) {
 ## seeds of the first design.
 ## ---------------------------------------------------------------------------
 SIM_REP_MAX <- 999L
-sim_rep_id    <- function(r, stream) as.integer((SIM_REP_MAX + 1L) * (as.integer(stream) - 1L) + r)
-sim_stream_of <- function(rep) as.integer((as.integer(rep) - 1L) %/% (SIM_REP_MAX + 1L) + 1L)
-sim_rep_local <- function(rep) as.integer((as.integer(rep) - 1L) %% (SIM_REP_MAX + 1L) + 1L)
-sim_seed      <- function(rep, attempt = 1L)
+sim_rep_id    <- function(r, stream) {
+  as.integer((SIM_REP_MAX + 1L) * (as.integer(stream) - 1L) + r)
+}
+sim_stream_of <- function(rep) {
+  as.integer((as.integer(rep) - 1L) %/% (SIM_REP_MAX + 1L) + 1L)
+}
+sim_rep_local <- function(rep) {
+  as.integer((as.integer(rep) - 1L) %% (SIM_REP_MAX + 1L) + 1L)
+}
+sim_seed      <- function(rep, attempt = 1L) {
   as.integer(1000L * as.integer(rep) + 1L + 100L * (as.integer(attempt) - 1L))
+}
 
 ## ---------------------------------------------------------------------------
 ## One complete data set. Seeds are derived from the replication, so
@@ -474,9 +577,17 @@ sim_seed      <- function(rep, attempt = 1L)
 ## ---------------------------------------------------------------------------
 dgp_draw <- function(cell, rep, attempt = 1L) {
   row  <- SIM_SCEN[SIM_SCEN$id == cell$scenario, , drop = FALSE]
-  K    <- if (row$family == "S2") 1L else 3L
+  K    <- if (row$family == "S2") {
+    1L
+  } else {
+    3L
+  }
   seed <- sim_seed(rep, attempt)
-  spread <- if (is.null(cell$spread) || K == 1L) "total" else cell$spread
+  spread <- if (is.null(cell$spread) || K == 1L) {
+    "total"
+  } else {
+    cell$spread
+  }
   loc  <- dgp_locations(cell$n, K, if (K == 1L) 0 else cell$omega,
                         balance = if (K == 1L) "balanced" else cell$balance,
                         seed = seed, spread = spread)
@@ -513,19 +624,25 @@ dgp_truth <- function(psi) {
 ## The blocks this invocation runs: those named in `blocks`, or, when margins
 ## are given on the command line, one factorial block of those margins.
 sim_blocks <- function(cfg = CFG) {
-  if (length(SIM_CLI_MARGINS)) return(list(command_line = cfg[SIM_CLI_MARGINS]))
+  if (length(SIM_CLI_MARGINS)) {
+    return(list(command_line = cfg[SIM_CLI_MARGINS]))
+  }
   bad <- setdiff(cfg$blocks, names(SIM_BLOCKS))
-  if (length(bad)) stop("unknown block: ", paste(bad, collapse = ", "),
-                        "; the blocks are ", paste(names(SIM_BLOCKS), collapse = ", "),
-                        call. = FALSE)
+  if (length(bad)) {
+    stop("unknown block: ", paste(bad, collapse = ", "),
+         "; the blocks are ", paste(names(SIM_BLOCKS), collapse = ", "),
+         call. = FALSE)
+  }
   SIM_BLOCKS[cfg$blocks]
 }
 
 sim_cells <- function(cfg = CFG, blocks = sim_blocks(cfg)) {
   bad <- setdiff(cfg$scenario, SIM_SCEN$id)
-  if (length(bad)) stop("unknown scenario: ", paste(bad, collapse = ", "),
-                        "; the scenarios are ", paste(SIM_SCEN$id, collapse = ", "),
-                        call. = FALSE)
+  if (length(bad)) {
+    stop("unknown scenario: ", paste(bad, collapse = ", "),
+         "; the scenarios are ", paste(SIM_SCEN$id, collapse = ", "),
+         call. = FALSE)
+  }
   cells <- do.call(rbind, lapply(names(blocks), function(b) {
     m <- utils::modifyList(SIM_REFERENCE, blocks[[b]])
     x <- expand.grid(scenario = cfg$scenario, n = m$n, TN = m$TN, omega = m$omega,
@@ -561,9 +678,13 @@ sim_cell_id <- function(cells) {
 ## The cost of the design: every cell priced at the mean time of its recorded
 ## replications, a cell not yet run at the mean over the cells that were.
 sim_cost <- function(cells, measured, nrep, cores) {
-  if (is.null(measured) || !nrow(measured)) return(NULL)
+  if (is.null(measured) || !nrow(measured)) {
+    return(NULL)
+  }
   measured <- measured[is.finite(measured$secs_total), ]
-  if (!nrow(measured)) return(NULL)
+  if (!nrow(measured)) {
+    return(NULL)
+  }
   m <- tapply(measured$secs_total, measured$cell, mean)
   secs <- as.numeric(m[cells$cell])
   n_meas <- sum(!is.na(secs))
@@ -601,7 +722,11 @@ sim_one <- function(cell, rep, attempt = 1L) {
   ## selection. Both, and the pooled benchmark, are in the grid.
   grab <- function(kk, pp) {
     j <- which(ic$table$K == kk & abs(ic$table$phi - pp) < 1e-8)
-    if (!length(j)) NULL else ic$fits[[j[1]]]
+    if (!length(j)) {
+      NULL
+    } else {
+      ic$fits[[j[1]]]
+    }
   }
   K <- dat$K
   fit_sel  <- sel$fit
@@ -609,7 +734,9 @@ sim_one <- function(cell, rep, attempt = 1L) {
   fit_pool <- grab(1L, CFG$phi_grid[1])
 
   acc <- function(fit) {
-    if (is.null(fit) || is.null(fit$group)) return(c(ari = NA_real_, share = NA_real_))
+    if (is.null(fit) || is.null(fit$group)) {
+      return(c(ari = NA_real_, share = NA_real_))
+    }
     g  <- fit$group
     kk <- max(max(g), K)
     map <- scstem_align_labels(reference = dat$labels, refit = g, K = kk)
@@ -621,13 +748,26 @@ sim_one <- function(cell, rep, attempt = 1L) {
   ## the fitted systematic part x'beta_g + y^(g), scored against the
   ## conditional mean mu, not against z, whose nugget is irreducible
   signal <- function(fit) {
-    if (is.null(fit)) return(NULL)
+    if (is.null(fit)) {
+      return(NULL)
+    }
     mh <- try(Stem::SCSTEM_Signal(fit), silent = TRUE)
-    if (inherits(mh, "try-error")) NULL else mh
+    if (inherits(mh, "try-error")) {
+      NULL
+    } else {
+      mh
+    }
   }
-  mh_true <- signal(fit_true); mh_pool <- signal(fit_pool); mh_sel <- signal(fit_sel)
-  rmse <- function(mh) if (is.null(mh) || all(is.na(mh))) NA_real_ else
-    sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
+  mh_true <- signal(fit_true)
+  mh_pool <- signal(fit_pool)
+                               mh_sel <- signal(fit_sel)
+  rmse <- function(mh) {
+    if (is.null(mh) || all(is.na(mh))) {
+      NA_real_
+    } else {
+      sqrt(mean((mh - dat$mu)^2, na.rm = TRUE))
+    }
+  }
 
   row <- dat$row
   key <- data.frame(cell = cell$cell, stream = sim_stream_of(rep), rep = rep, attempt = as.integer(attempt), scenario = cell$scenario,
@@ -649,8 +789,11 @@ sim_one <- function(cell, rep, attempt = 1L) {
 
   ## parameters at the true number of regimes, the estimated regimes aligned
   ## on the true ones
-  map <- if (is.null(fit_true) || is.null(fit_true$group)) NULL else
+  map <- if (is.null(fit_true) || is.null(fit_true$group)) {
+    NULL
+  } else {
     scstem_align_labels(reference = dat$labels, refit = fit_true$group, K = K)
+  }
   tru <- dgp_truth(dat$psi)
   est <- rep(NA_real_, nrow(tru))
   bound <- rep(NA_character_, nrow(tru))
@@ -659,14 +802,22 @@ sim_one <- function(cell, rep, attempt = 1L) {
     est <- vapply(seq_len(nrow(tru)), function(i) {
       g_fit <- which(map == tru$regime[i])
       p <- tru$parameter[i]
-      if (!length(g_fit) || !(p %in% colnames(ph))) NA_real_ else ph[g_fit[1], p]
+      if (!length(g_fit) || !(p %in% colnames(ph))) {
+        NA_real_
+      } else {
+        ph[g_fit[1], p]
+      }
     }, numeric(1))
     ## whether the range of the regime ended at a limit of what its distances
     ## identify ("lower", "upper") or within them ("none")
     if (!is.null(fit_true$theta_bound)) {
       bound <- vapply(seq_len(nrow(tru)), function(i) {
         g_fit <- which(map == tru$regime[i])
-        if (!length(g_fit)) NA_character_ else fit_true$theta_bound[g_fit[1]]
+        if (!length(g_fit)) {
+          NA_character_
+        } else {
+          fit_true$theta_bound[g_fit[1]]
+        }
       }, "")
     }
   }
@@ -678,16 +829,33 @@ sim_one <- function(cell, rep, attempt = 1L) {
   ## read afterwards without refitting
   grid <- cbind(key[rep(1L, nrow(ic$table)), ], ic$table)
   tags <- paste0("K=", ic$table$K, ", phi=", ic$table$phi)
-  grid$ari <- if (K == 1L) NA_real_ else vapply(tags, function(tg)
-    if (tg %in% colnames(ic$groups)) scstem_ari(ic$groups[, tg], dat$labels) else NA_real_,
-    numeric(1), USE.NAMES = FALSE)
+  grid$ari <- if (K == 1L) {
+    NA_real_
+  } else {
+    vapply(tags, function(tg)
+      if (tg %in% colnames(ic$groups)) scstem_ari(ic$groups[, tg], dat$labels) else NA_real_,
+      numeric(1), USE.NAMES = FALSE)
+  }
   rownames(grid) <- NULL
 
   ## per location
-  g_true_hat <- if (is.null(map)) rep(NA_integer_, cell$n) else as.integer(map)[fit_true$group]
-  g_sel_hat  <- if (is.null(fit_sel)) rep(NA_integer_, cell$n) else fit_sel$group
-  colstat <- function(M) if (is.null(M)) rep(NA_real_, cell$n) else
-    sqrt(colMeans((M - dat$mu)^2, na.rm = TRUE))
+  g_true_hat <- if (is.null(map)) {
+    rep(NA_integer_, cell$n)
+  } else {
+    as.integer(map)[fit_true$group]
+  }
+  g_sel_hat  <- if (is.null(fit_sel)) {
+    rep(NA_integer_, cell$n)
+  } else {
+    fit_sel$group
+  }
+  colstat <- function(M) {
+    if (is.null(M)) {
+      rep(NA_real_, cell$n)
+    } else {
+      sqrt(colMeans((M - dat$mu)^2, na.rm = TRUE))
+    }
+  }
   station <- cbind(key[rep(1L, cell$n), ], data.frame(
     station = seq_len(cell$n),
     sx = dat$coordinates[, 1], sy = dat$coordinates[, 2],
@@ -759,10 +927,12 @@ sim_one_capped <- function(task) {
     timeout = task$cap),
     error = function(e) e)
   secs <- proc.time()[["elapsed"]] - t0
-  if (inherits(res, "callr_timeout_error"))
+  if (inherits(res, "callr_timeout_error")) {
     return(sim_failed(task$cell, task$rep, sprintf("timeout after %.0f s", secs), task$attempt, secs))
-  if (inherits(res, "error"))
+  }
+  if (inherits(res, "error")) {
     return(sim_failed(task$cell, task$rep, conditionMessage(res), task$attempt, secs))
+  }
   res
 }
 
@@ -771,8 +941,11 @@ sim_one_capped <- function(task) {
 ## Running the tasks on several cores
 ## ===========================================================================
 sim_task_fun <- function(task) {
-  if (is.finite(task$cap) && !is.null(task$path) && requireNamespace("callr", quietly = TRUE))
-    sim_one_capped(task) else sim_one_safe(task$cell, task$rep, task$attempt)
+  if (is.finite(task$cap) && !is.null(task$path) && requireNamespace("callr", quietly = TRUE)) {
+    sim_one_capped(task)
+  } else {
+    sim_one_safe(task$cell, task$rep, task$attempt)
+  }
 }
 
 ## What a core does once, when it starts: load Sims_01_Run.R (and with it this
@@ -793,7 +966,9 @@ sim_worker_init <- function(path, cfg) {
 ## to be appended to the queue (a replication drawn again after a timeout).
 sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task) task) {
   n <- length(tasks)
-  if (!n) return(invisible(0L))
+  if (!n) {
+    return(invisible(0L))
+  }
   cores <- max(1L, min(as.integer(cores), n))
   if (cores > 1L && is.null(SIM_FILE)) {
     message("the path of this script is unknown, so it runs on one core; ",
@@ -806,11 +981,14 @@ sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task)
       k <- k + 1L
       tasks[[k]] <- prepare(tasks[[k]])
       again <- on_result(fun(tasks[[k]]), tasks[[k]], k, length(tasks))
-      if (!is.null(again)) tasks[[length(tasks) + 1L]] <- again
+      if (!is.null(again)) {
+        tasks[[length(tasks) + 1L]] <- again
+      }
     }
     return(invisible(length(tasks)))
   }
-  cat(sprintf("starting %d R processes ...\n", cores)); utils::flush.console()
+  cat(sprintf("starting %d R processes ...\n", cores))
+  utils::flush.console()
   cl <- parallel::makePSOCKcluster(cores)
   on.exit(parallel::stopCluster(cl), add = TRUE)
   parallel::clusterCall(cl, sim_worker_init, SIM_FILE, CFG)
@@ -820,15 +998,22 @@ sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task)
     tasks[[i]] <- prepare(tasks[[i]])
     send(cl[[i]], fun, list(tasks[[i]]), tag = i)
   }
-  nxt <- cores + 1L; inflight <- cores; k <- 0L
+  nxt <- cores + 1L
+  inflight <- cores
+                     k <- 0L
   while (inflight > 0L) {
-    d <- recv(cl); inflight <- inflight - 1L; k <- k + 1L
+    d <- recv(cl)
+    inflight <- inflight - 1L
+                   k <- k + 1L
     again <- on_result(d$value, tasks[[d$tag]], k, length(tasks))
-    if (!is.null(again)) tasks[[length(tasks) + 1L]] <- again
+    if (!is.null(again)) {
+      tasks[[length(tasks) + 1L]] <- again
+    }
     if (nxt <= length(tasks)) {
       tasks[[nxt]] <- prepare(tasks[[nxt]])
       send(cl[[d$node]], fun, list(tasks[[nxt]]), tag = nxt)
-      nxt <- nxt + 1L; inflight <- inflight + 1L
+      nxt <- nxt + 1L
+      inflight <- inflight + 1L
     }
   }
   invisible(length(tasks))
@@ -840,10 +1025,15 @@ sim_run_tasks <- function(tasks, fun, on_result, cores, prepare = function(task)
 sim_read_streams <- function(dir, tag, suffix = "") {
   pat <- sprintf("^%s(_s[0-9]+)?%s[.]csv$", gsub(".", "[.]", tag, fixed = TRUE), suffix)
   f <- list.files(dir, pattern = pat, full.names = TRUE)
-  if (!length(f)) return(NULL)
+  if (!length(f)) {
+    return(NULL)
+  }
   d <- lapply(f, utils::read.csv, stringsAsFactors = FALSE)
   cols <- Reduce(union, lapply(d, names))
-  d <- lapply(d, function(x) { x[setdiff(cols, names(x))] <- NA; x[cols] })
+  d <- lapply(d, function(x) {
+    x[setdiff(cols, names(x))] <- NA
+    x[cols]
+  })
   do.call(rbind, d)
 }
 
@@ -854,10 +1044,14 @@ sim_tasks <- function(cells, reps, done) {
   set.seed(20260927)
   ord <- sample(nrow(cells))
   tasks <- list()
-  for (r in reps) for (i in ord) {
-    cell <- cells[i, , drop = FALSE]
-    if (paste(cell$cell, r, sep = "|") %in% done) next
-    tasks[[length(tasks) + 1L]] <- list(cell = cell, rep = r)
+  for (r in reps) {
+    for (i in ord) {
+      cell <- cells[i, , drop = FALSE]
+      if (paste(cell$cell, r, sep = "|") %in% done) {
+        next
+      }
+      tasks[[length(tasks) + 1L]] <- list(cell = cell, rep = r)
+    }
   }
   tasks
 }
@@ -993,12 +1187,16 @@ SIM_SCEN <- sim_scenarios()
 
 ## Run on its own: print the design
 if (SIM_SETUP_MAIN) {
-  if (!exists("SIM_CLI_MARGINS")) SIM_CLI_MARGINS <- character(0)
-  cat("THE SCENARIO-VARIANTS\n"); print(SIM_SCEN[SIM_SCEN$id %in% SIM_SCENARIOS, ], row.names = FALSE)
+  if (!exists("SIM_CLI_MARGINS")) {
+    SIM_CLI_MARGINS <- character(0)
+  }
+  cat("THE SCENARIO-VARIANTS\n")
+  print(SIM_SCEN[SIM_SCEN$id %in% SIM_SCENARIOS, ], row.names = FALSE)
   for (id in SIM_SCENARIOS) {
     cat("\n", id, ": the parameters of the regimes\n", sep = "")
     print(dgp_psi(SIM_SCEN[SIM_SCEN$id == id, ]), row.names = FALSE, digits = 3)
   }
   cells <- sim_cells(list(scenario = SIM_SCENARIOS, blocks = names(SIM_BLOCKS)), SIM_BLOCKS)
-  cat(sprintf("\nTHE CELLS: %d\n", nrow(cells))); print(table(block = cells$block))
+  cat(sprintf("\nTHE CELLS: %d\n", nrow(cells)))
+  print(table(block = cells$block))
 }

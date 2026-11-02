@@ -73,17 +73,30 @@
 ## Definitions only? The worker processes, and Sims_02_Analysis.R, load this file
 ## with SIM_DEFINE_ONLY <- TRUE and SIM_FILE set to its path: they get the
 ## design, the generator and the functions, and nothing is run.
-if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) SIM_DEFINE_ONLY <- FALSE
-if (!exists("SIM_FILE", inherits = FALSE)) SIM_FILE <- local({
-  a <- commandArgs(trailingOnly = FALSE); m <- grep("^--file=", a, value = TRUE)
-  if (length(m)) return(normalizePath(sub("^--file=", "", m[1]), winslash = "/"))
-  for (i in rev(seq_len(sys.nframe()))) {
-    of <- sys.frame(i)$ofile
-    if (!is.null(of)) return(normalizePath(of, winslash = "/"))
-  }
-  NULL
-})
-SIM_HERE <- if (is.null(SIM_FILE)) normalizePath(getwd(), winslash = "/") else dirname(SIM_FILE)
+if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) {
+  SIM_DEFINE_ONLY <- FALSE
+}
+if (!exists("SIM_FILE", inherits = FALSE)) {
+  SIM_FILE <- local({
+    a <- commandArgs(trailingOnly = FALSE)
+    m <- grep("^--file=", a, value = TRUE)
+    if (length(m)) {
+      return(normalizePath(sub("^--file=", "", m[1]), winslash = "/"))
+    }
+    for (i in rev(seq_len(sys.nframe()))) {
+      of <- sys.frame(i)$ofile
+      if (!is.null(of)) {
+        return(normalizePath(of, winslash = "/"))
+      }
+    }
+    NULL
+  })
+}
+SIM_HERE <- if (is.null(SIM_FILE)) {
+  normalizePath(getwd(), winslash = "/")
+} else {
+  dirname(SIM_FILE)
+}
 source(file.path(SIM_HERE, "Sims_00_Setup.R"), local = globalenv())
 
 ## ---------------------------------------------------------------------------
@@ -158,9 +171,12 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
 ## Margins given on the command line replace the blocks with one factorial
 ## block of those margins around the reference, as in
 ##   Rscript Sims_01_Run.R --TN=60,365 --n=50
-SIM_CLI_MARGINS <- if (SIM_DEFINE_ONLY) character(0) else
+SIM_CLI_MARGINS <- if (SIM_DEFINE_ONLY) {
+  character(0)
+} else {
   intersect(names(SIM_REFERENCE),
             sub("^--([^=]+)=.*$", "\\1", grep("^--[^=]+=.", commandArgs(TRUE), value = TRUE)))
+}
 
 
 ## ===========================================================================
@@ -172,12 +188,21 @@ sim_main <- function() {
   sim_print_config(CFG)
 
   stream <- CFG$stream[1]
-  rep_to <- if (is.na(CFG$rep_to[1])) CFG$nrep[1] else CFG$rep_to[1]
-  if (!(stream >= 1L)) stop("stream must be a positive integer", call. = FALSE)
-  if (CFG$rep_from[1] < 1L || rep_to < CFG$rep_from[1] || rep_to > SIM_REP_MAX)
+  rep_to <- if (is.na(CFG$rep_to[1])) {
+    CFG$nrep[1]
+  } else {
+    CFG$rep_to[1]
+  }
+  if (!(stream >= 1L)) {
+    stop("stream must be a positive integer", call. = FALSE)
+  }
+  if (CFG$rep_from[1] < 1L || rep_to < CFG$rep_from[1] || rep_to > SIM_REP_MAX) {
     stop("replications run from rep_from to rep_to, within 1 to ", SIM_REP_MAX,
          " in a stream", call. = FALSE)
-  if (CFG$cap_attempts[1] > 9L) stop("cap_attempts must be at most 9", call. = FALSE)
+  }
+  if (CFG$cap_attempts[1] > 9L) {
+    stop("cap_attempts must be at most 9", call. = FALSE)
+  }
 
   ## the files of this stream; the analysis stacks every stream of the tag
   STEM_F  <- sprintf("%s_s%d", CFG$tag, stream)
@@ -189,7 +214,11 @@ sim_main <- function() {
   DIR_OBS <- file.path(OUT, sprintf("%s-obs", STEM_F))
 
   cells <- sim_cells()
-  prev  <- if (file.exists(CSV)) utils::read.csv(CSV, stringsAsFactors = FALSE) else NULL
+  prev  <- if (file.exists(CSV)) {
+    utils::read.csv(CSV, stringsAsFactors = FALSE)
+  } else {
+    NULL
+  }
   ## every stream of the tag found here, for the times: the cost and the time
   ## limits are measured on all of them
   all_prev <- sim_read_streams(OUT, CFG$tag)
@@ -208,39 +237,58 @@ sim_main <- function() {
 
   dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
   dir.create(DIR_OBS, recursive = TRUE, showWarnings = FALSE)
-  done <- if (is.null(prev)) character(0) else paste(prev$cell, prev$rep, sep = "|")
+  done <- if (is.null(prev)) {
+    character(0)
+  } else {
+    paste(prev$cell, prev$rep, sep = "|")
+  }
 
   ## The durations of the replications that ended normally, by cell and by
   ## (n, T), from which the time limits are computed; they start from what is
   ## already recorded.
-  T_CELL <- new.env(); T_NT <- new.env()
+  T_CELL <- new.env()
+  T_NT <- new.env()
   remember <- function(cell, n, TN, secs) {
-    if (!is.finite(secs)) return(invisible(NULL))
+    if (!is.finite(secs)) {
+      return(invisible(NULL))
+    }
     assign(cell, c(get0(cell, T_CELL, inherits = FALSE), secs), envir = T_CELL)
-    key <- paste(n, TN); assign(key, c(get0(key, T_NT, inherits = FALSE), secs), envir = T_NT)
+    key <- paste(n, TN)
+    assign(key, c(get0(key, T_NT, inherits = FALSE), secs), envir = T_NT)
   }
   if (!is.null(all_prev)) {
     ok <- is.na(all_prev$error) | !nzchar(all_prev$error)
-    for (i in which(ok)) remember(all_prev$cell[i], all_prev$n[i], all_prev$TN[i], all_prev$secs_total[i])
+    for (i in which(ok)) {
+      remember(all_prev$cell[i], all_prev$n[i], all_prev$TN[i], all_prev$secs_total[i])
+    }
   }
   cap_of <- function(cell) {
-    if (!(CFG$cap_mult[1] > 0)) return(Inf)
+    if (!(CFG$cap_mult[1] > 0)) {
+      return(Inf)
+    }
     own <- get0(cell$cell, T_CELL, inherits = FALSE)
-    if (length(own) >= CFG$cap_after[1])
+    if (length(own) >= CFG$cap_after[1]) {
       return(max(CFG$cap_min[1], CFG$cap_mult[1] * stats::median(own)))
+    }
     ref <- get0(paste(cell$n, cell$TN), T_NT, inherits = FALSE)
-    if (length(ref)) return(max(CFG$cap_first_min[1], CFG$cap_first_mult[1] * stats::median(ref)))
+    if (length(ref)) {
+      return(max(CFG$cap_first_min[1], CFG$cap_first_mult[1] * stats::median(ref)))
+    }
     CFG$cap_first_min[1]
   }
   prepare <- function(task) {
-    if (is.null(task$attempt)) task$attempt <- 1L
+    if (is.null(task$attempt)) {
+      task$attempt <- 1L
+    }
     task$cap <- cap_of(task$cell)
     task$path <- SIM_FILE
     task
   }
 
   save_obs <- function(df, cell, rep) {
-    if (is.null(df)) return(invisible(NULL))
+    if (is.null(df)) {
+      return(invisible(NULL))
+    }
     f <- sprintf("obs_%s_rep%04d.rds", gsub("[^A-Za-z0-9_.-]", "", cell$cell), rep)
     sim_retry(function() saveRDS(df, file.path(DIR_OBS, f), compress = "xz"))
   }
@@ -250,25 +298,30 @@ sim_main <- function() {
   cat(sprintf("stream %d, replications %d to %d (recorded as rep %d to %d): %d tasks to run, %d already recorded\n\n",
               stream, CFG$rep_from[1], rep_to, min(reps), max(reps), length(tasks),
               nrow(cells) * length(reps) - length(tasks)))
-  if (!length(tasks)) { cat("nothing to do\n"); return(invisible(NULL)) }
+  if (!length(tasks)) {
+    cat("nothing to do\n")
+    return(invisible(NULL))
+  }
 
   cat(sprintf("%13s %-12s %4s %5s %4s | %8s %5s %6s | %s\n",
               "", "scenario", "n", "T", "rep", "time", "K_hat", "ARI", "elapsed, and left"))
   t_start <- proc.time()[["elapsed"]]
   on_result <- function(out, task, k, n) {
-    if (!is.list(out) || is.null(out$summary))
+    if (!is.list(out) || is.null(out$summary)) {
       out <- sim_failed(task$cell, task$rep, paste(as.character(out), collapse = " "), task$attempt)
+    }
     s  <- out$summary
     el <- (proc.time()[["elapsed"]] - t_start) / 3600
     ## a replication over its time limit: recorded apart and, while attempts
     ## are left, drawn again with the seed of the next attempt (the last
     ## attempt is also written to the results, as a failed replication)
-    if (grepl("^timeout", s$error))
+    if (grepl("^timeout", s$error)) {
       sim_append(data.frame(cell = task$cell$cell, stream = sim_stream_of(task$rep), rep = task$rep, attempt = task$attempt,
                             scenario = task$cell$scenario, n = task$cell$n, TN = task$cell$TN,
                             omega = task$cell$omega, spread = task$cell$spread,
                             cap = round(task$cap), secs = round(s$secs_total),
                             seed = sim_seed(task$rep, task$attempt)), CSV_TO)
+    }
     if (grepl("^timeout", s$error) && task$attempt < CFG$cap_attempts[1]) {
       cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | TIMEOUT after %.0f s (limit %.0f s), attempt %d of %d: drawn again\n",
                   k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, task$cap,
@@ -282,11 +335,15 @@ sim_main <- function() {
     sim_append(out$grid,    CSV_GRD)
     sim_append(out$station, CSV_STA)
     save_obs(out$obs, task$cell, task$rep)
-    if (!nzchar(s$error)) remember(task$cell$cell, task$cell$n, task$cell$TN, s$secs_total)
+    if (!nzchar(s$error)) {
+      remember(task$cell$cell, task$cell$n, task$cell$TN, s$secs_total)
+    }
     cat(sprintf("[%5d/%5d] %-12s %4d %5d %4d | %6.1f s %5s %6s | %s, ~%s left\n",
                 k, n, s$scenario, s$n, s$TN, s$rep, s$secs_total, format(s$K_hat),
                 format(round(s$ari_true, 3)), sim_hours(el), sim_hours(el / k * (n - k))))
-    if (nzchar(s$error)) cat("              FAILED: ", s$error, "\n", sep = "")
+    if (nzchar(s$error)) {
+      cat("              FAILED: ", s$error, "\n", sep = "")
+    }
     utils::flush.console()
     NULL
   }
@@ -297,4 +354,6 @@ sim_main <- function() {
   invisible(NULL)
 }
 
-if (!SIM_DEFINE_ONLY) sim_main()
+if (!SIM_DEFINE_ONLY) {
+  sim_main()
+}

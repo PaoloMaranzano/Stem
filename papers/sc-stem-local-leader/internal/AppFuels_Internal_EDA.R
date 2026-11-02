@@ -57,23 +57,42 @@
 suppressPackageStartupMessages(library(data.table))
 invisible(Sys.setlocale("LC_TIME", "C"))
 HERE <- local({
-  a <- commandArgs(trailingOnly = FALSE); m <- grep("^--file=", a, value = TRUE)
-  f <- if (length(m)) normalizePath(sub("^--file=", "", m[1]), winslash = "/") else NULL
-  if (is.null(f)) for (i in rev(seq_len(sys.nframe()))) {
-    of <- sys.frame(i)$ofile
-    if (!is.null(of)) { f <- normalizePath(of, winslash = "/"); break }
+  a <- commandArgs(trailingOnly = FALSE)
+  m <- grep("^--file=", a, value = TRUE)
+  f <- if (length(m)) {
+    normalizePath(sub("^--file=", "", m[1]), winslash = "/")
+  } else {
+    NULL
   }
-  if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
+  if (is.null(f)) {
+    for (i in rev(seq_len(sys.nframe()))) {
+      of <- sys.frame(i)$ofile
+      if (!is.null(of)) {
+        f <- normalizePath(of, winslash = "/")
+        break
+      }
+    }
+  }
+  if (is.null(f)) {
+    normalizePath(getwd(), winslash = "/")
+  } else {
+    dirname(f)
+  }
 })
 
 ## The package: the folder above internal/ (papers/sc-stem-local-leader in the
 ## repository of Stem, SC-STEM-replication on the Drive). --pkg= overrides it.
 PKG <- local({
   a <- grep("^--pkg=", commandArgs(trailingOnly = TRUE), value = TRUE)
-  cand <- if (length(a)) sub("^--pkg=", "", a[1]) else
+  cand <- if (length(a)) {
+    sub("^--pkg=", "", a[1])
+  } else {
     file.path(HERE, "..")
+  }
   ok <- cand[file.exists(file.path(cand, "code", "AppFuels_00_Setup.R"))]
-  if (!length(ok)) stop("the replication package is not where expected; give it with --pkg=", call. = FALSE)
+  if (!length(ok)) {
+    stop("the replication package is not where expected; give it with --pkg=", call. = FALSE)
+  }
   normalizePath(ok[1], winslash = "/")
 })
 source(file.path(PKG, "code", "AppFuels_00_Setup.R"))
@@ -103,7 +122,8 @@ options(width = 160)
 ## orders by station.
 fu_memory <- function(dfc, fuel, lags = c(1:8, 52)) {
   S <- fu_series(dfc, fuel)
-  Tn <- nrow(S$own); band <- 2 / sqrt(Tn)
+  Tn <- nrow(S$own)
+  band <- 2 / sqrt(Tn)
   pa <- vapply(seq_len(ncol(S$own)), function(i)
     stats::pacf(S$own[, i], lag.max = max(lags), plot = FALSE)$acf[lags], numeric(length(lags)))
   ord <- vapply(seq_len(ncol(S$own)), function(i)
@@ -166,7 +186,8 @@ CITY <- lapply(stats::setNames(CITIES, CITIES), function(cc) {
 ## is saved in output/runs/application/cache/completion of the package and read
 ## back on a later run, by this script and by the run scripts.
 SHA7 <- fu_require_stem()
-COMP <- list(); comp_summary <- list()
+COMP <- list()
+comp_summary <- list()
 for (cc in CITIES) {
   COMP[[cc]] <- list()
   for (fu in c("g", "d")) {
@@ -191,7 +212,9 @@ fu_write(do.call(rbind, comp_summary), file.path(OUT_EDA, "completion_fits.csv")
 CASES <- lapply(stats::setNames(FU_SETTINGS$setting, FU_SETTINGS$setting), function(s) {
   d <- do.call(rbind, lapply(CITIES, function(cc) {
     pr <- fu_pairs(CITY[[cc]]$meta, s)
-    if (is.null(pr)) return(NULL)
+    if (is.null(pr)) {
+      return(NULL)
+    }
     fu_case_frame(cc, s, CITY[[cc]]$meta, CITY[[cc]]$rel, COMP[[cc]], WEEKS, pr, PULSES, !IN_WINDOW)
   }))
   rownames(d) <- NULL
@@ -248,7 +271,8 @@ print(window, row.names = FALSE)
 ## the stations of every city) and Section C1 of Supplement C (the same, the
 ## median first-order autocorrelation, and the stickiness of the Sunday price).
 ss <- do.call(rbind, lapply(CITIES, function(cc) do.call(rbind, lapply(c("g", "d"), function(fu) {
-  R <- CITY[[cc]]$rel[[fu]][, IN_WINDOW, drop = FALSE]; P <- CITY[[cc]]$price[[fu]][, IN_WINDOW, drop = FALSE]
+  R <- CITY[[cc]]$rel[[fu]][, IN_WINDOW, drop = FALSE]
+  P <- CITY[[cc]]$price[[fu]][, IN_WINDOW, drop = FALSE]
   x <- do.call(rbind, lapply(seq_len(nrow(R)), function(i) fu_station_stats(R[i, ], P[i, ])))
   data.frame(city = FU_CITY_EN[[FU_CITY[[cc]]]], fuel = FU_FUEL[[fu]], stations = nrow(R),
              adf_reject_pct = round(100 * mean(x$adf_reject), 1), ar1_median = round(stats::median(x$ar1), 2),
@@ -328,18 +352,23 @@ print(ar_q, row.names = FALSE)
 ## the two stations quoted in its text (0.8 cents above the national price and
 ## 2.7 cents below it).
 if ("RM" %in% CITIES) {
-  P <- CITY$RM$price$g; meta <- CITY$RM$meta
+  P <- CITY$RM$price$g
+  meta <- CITY$RM$meta
   C <- 100 * sweep(P, 2, NAT$g)                                # cents above the national mean
   Z <- CITY$RM$rel$g                                           # the relative price
   full <- rowSums(is.na(C[, IN_WINDOW])) == 0
   pick <- function(brand, q) {
     i <- which(meta$brand == brand & full)
-    dev <- apply(abs(Z[i, IN_WINDOW]), 1, max); i <- i[dev <= stats::median(dev)]
-    prem <- rowMeans(C[i, IN_WINDOW]); i[which.min(abs(prem - stats::quantile(prem, q)))]
+    dev <- apply(abs(Z[i, IN_WINDOW]), 1, max)
+    i <- i[dev <= stats::median(dev)]
+    prem <- rowMeans(C[i, IN_WINDOW])
+    i[which.min(abs(prem - stats::quantile(prem, q)))]
   }
   two <- c(pick("Agip Eni", 0.9), pick("Pompe Bianche", 0.1))
-  col2 <- c("#1f6f8b", "#a8516e"); lab <- c("Eni station", "independent station")
-  w <- which(IN_WINDOW); days <- WEEKS
+  col2 <- c("#1f6f8b", "#a8516e")
+  lab <- c("Eni station", "independent station")
+  w <- which(IN_WINDOW)
+  days <- WEEKS
   f <- file.path(OUT_EDA, "fig_app_centring.png")
   grDevices::png(f, width = 9, height = 7.6, units = "in", res = 300,
                  type = if (isTRUE(capabilities("cairo"))) "cairo" else "windows")
@@ -348,7 +377,9 @@ if ("RM" %in% CITIES) {
     plot(days[w], Y[1, w], type = "n", ylim = range(Y[, w], extra, na.rm = TRUE), xlab = "", ylab = ylab,
          main = title, cex.main = 1.05, font.main = 1, las = 1)
     graphics::abline(v = FU_EVENTS$date, lty = 3, col = "grey60")
-    for (j in 1:2) graphics::lines(days[w], Y[j, w], col = col2[j], lwd = 1.3)
+    for (j in 1:2) {
+      graphics::lines(days[w], Y[j, w], col = col2[j], lwd = 1.3)
+    }
   }
   panel(P[two, , drop = FALSE], "euro per liter", "(a) Sunday price of gasoline", NAT$g[w])
   graphics::lines(days[w], NAT$g[w], col = "grey20", lty = 2, lwd = 1.2)
@@ -358,7 +389,8 @@ if ("RM" %in% CITIES) {
   graphics::abline(h = rowMeans(C[two, IN_WINDOW]), col = col2, lty = 2)
   panel(Z[two, , drop = FALSE], "cents per liter", "(c) Net of the mean of the station: the relative price of the models")
   graphics::abline(h = 0, lty = 2)
-  invisible(grDevices::dev.off()); message("wrote ", f)
+  invisible(grDevices::dev.off())
+  message("wrote ", f)
   fu_write(data.frame(site = meta$site[two], brand = meta$brand[two], premium_cents = round(rowMeans(C[two, IN_WINDOW]), 2)),
            file.path(OUT_EDA, "fig_app_centring_stations.csv"))
 }

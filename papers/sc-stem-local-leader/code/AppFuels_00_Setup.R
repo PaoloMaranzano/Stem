@@ -36,12 +36,13 @@
 ## fu_setting_data() builds the data of a setting: the relative prices, their
 ## missing weeks completed for the lags, the pairs (Y, X) and the pulses.
 ##
-## Conventions. Prices are in cents per liter. A relative price is the Sunday
-## price minus the national mean of that Sunday, minus the mean of the station
-## over the estimation window. Matrices of prices are stations x weeks.
-## Distances are geodesic: in meters inside the Stem package, in kilometers in
-## the tables. Every function of a package other than base R is called as
-## package::function().
+## Conventions.
+##    Prices are in cents per liter.
+##    A relative price is the Sunday price minus the national mean of that 
+##        Sunday, minus the mean of the station over the estimation window.
+##    Matrices of prices are stations x weeks.
+##    Distances are geodesic: in meters inside the Stem package, in 
+##    kilometers in the tables.
 ##
 ## Contents
 ##   0. Settings shared by the scripts
@@ -127,13 +128,16 @@ FU_SEED  <- 20261005L                           # base of the seeds
 
 ## The seed of a model depends on its city and fuel only, so that a model
 ## gives the same results whichever subset of models is run.
-fu_seed <- function(city, fuel)
+fu_seed <- function(city, fuel) {
   FU_SEED + 10L * match(city, names(FU_CITY)) + match(fuel, names(FU_FUEL))
+}
 
 ## The largest number of regimes of a model with n stations: every regime must
 ## have at least FU_M stations, and there are at most FU_KCAP regimes. Below
 ## 2 FU_M stations only the pooled model (one regime) is fitted.
-fu_kmax <- function(n) max(1L, min(FU_KCAP, n %/% FU_M))
+fu_kmax <- function(n) {
+  max(1L, min(FU_KCAP, n %/% FU_M))
+}
 
 
 
@@ -149,13 +153,21 @@ fu_kmax <- function(n) max(1L, min(FU_KCAP, n %/% FU_M))
 fu_options <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
   for (a in grep("^--[^=]+=.", args, value = TRUE)) {
     nm <- sub("^--([^=]+)=.*$", "\\1", a)
-    if (!nm %in% names(defaults))
+    if (!nm %in% names(defaults)) {
       stop("unknown option --", nm, "; the options are: ", paste(names(defaults), collapse = ", "),
            call. = FALSE)
+    }
     v <- trimws(strsplit(sub("^--[^=]+=", "", a), ",", fixed = TRUE)[[1]])
     d <- defaults[[nm]]
-    defaults[[nm]] <- if (is.logical(d)) as.logical(v) else if (is.integer(d)) as.integer(v) else
-      if (is.numeric(d)) as.numeric(v) else v
+    defaults[[nm]] <- if (is.logical(d)) {
+      as.logical(v)
+    } else if (is.integer(d)) {
+      as.integer(v)
+    } else if (is.numeric(d)) {
+      as.numeric(v)
+    } else {
+      v
+    }
   }
   defaults
 }
@@ -165,25 +177,33 @@ fu_options <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
 ## Returns the first seven characters of the commit.
 fu_require_stem <- function(ref = FU_STEM_REF) {
   sha <- sub("^.*@", "", ref)
-  ok <- function() nzchar(system.file(package = "Stem")) &&
-    identical(utils::packageDescription("Stem")$RemoteSha, sha)
+  ok <- function() {
+    nzchar(system.file(package = "Stem")) &&
+      identical(utils::packageDescription("Stem")$RemoteSha, sha)
+  }
   if (!ok()) {
     message("installing Stem at ", ref)
-    if (!requireNamespace("remotes", quietly = TRUE))
+    if (!requireNamespace("remotes", quietly = TRUE)) {
       utils::install.packages("remotes", repos = "https://cloud.r-project.org")
-    if ("Stem" %in% loadedNamespaces()) try(unloadNamespace("Stem"), silent = TRUE)
+    }
+    if ("Stem" %in% loadedNamespaces()) {
+      try(unloadNamespace("Stem"), silent = TRUE)
+    }
     remotes::install_github(ref, upgrade = "never", force = TRUE, quiet = TRUE)
-    if (!ok()) stop("Stem could not be installed at ", ref, ": restart R and run again",
-                    call. = FALSE)
+    if (!ok()) {
+      stop("Stem could not be installed at ", ref, ": restart R and run again",
+           call. = FALSE)
+    }
   }
   ## a session that already has another version of Stem loaded would use it
   if ("Stem" %in% loadedNamespaces()) {
     p <- getNamespaceInfo("Stem", "path")
     s <- tryCatch(unname(read.dcf(file.path(p, "DESCRIPTION"), fields = "RemoteSha")[1, 1]),
                   error = function(e) NA_character_)
-    if (!identical(s, sha))
+    if (!identical(s, sha)) {
       stop("this R session has another version of Stem loaded: restart R and run again",
            call. = FALSE)
+    }
   }
   invisible(substr(sha, 1L, 7L))
 }
@@ -194,14 +214,22 @@ fu_require_stem <- function(ref = FU_STEM_REF) {
 fu_cached <- function(dir, name, expr) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   f <- file.path(dir, paste0(name, ".rds"))
-  if (file.exists(f)) return(readRDS(f))
+  if (file.exists(f)) {
+    return(readRDS(f))
+  }
   t0 <- Sys.time()
   val <- force(expr)
   attr(val, "minutes") <- round(as.numeric(difftime(Sys.time(), t0, units = "mins")), 2)
   saveRDS(val, f)
   val
 }
-fu_minutes <- function(x) if (is.null(attr(x, "minutes"))) NA_real_ else attr(x, "minutes")
+fu_minutes <- function(x) {
+  if (is.null(attr(x, "minutes"))) {
+    NA_real_
+  } else {
+    attr(x, "minutes")
+  }
+}
 
 ## Writing a table: a .csv file, and a message.
 fu_write <- function(d, file) {
@@ -225,11 +253,14 @@ fu_write <- function(d, file) {
 ## which is the order of the stations in every model), prices (long: one row
 ## per station and Sunday) and national (one row per Sunday).
 fu_read_data <- function(dir) {
-  rd <- function(f, ...) as.data.frame(data.table::fread(file.path(dir, f), na.strings = "", ...))
+  rd <- function(f, ...) {
+    as.data.frame(data.table::fread(file.path(dir, f), na.strings = "", ...))
+  }
   st <- rd("fuel_stations.csv", colClasses = list(character = c("city", "site", "province")))
   pr <- rd("fuel_prices.csv.gz", colClasses = list(character = c("city", "site")))
   nat <- rd("fuel_national_means.csv")
-  pr$week <- as.Date(pr$week); nat$week <- as.Date(nat$week)
+  pr$week <- as.Date(pr$week)
+  nat$week <- as.Date(nat$week)
   list(stations = st, prices = pr, national = nat)
 }
 
@@ -262,10 +293,12 @@ fu_pulses <- function(weeks, events = FU_EVENTS) {
   w <- vapply(events$date, function(e) which(weeks >= e)[1], 1L)
   P <- matrix(0, length(weeks), 2 * nrow(events),
               dimnames = list(NULL, paste0("pulse_", rep(events$label, each = 2), c("", "_next"))))
-  for (e in seq_along(w)) if (!is.na(w[e])) {
-    rows <- w[e] + 0:1
-    rows <- rows[rows <= length(weeks)]
-    P[cbind(rows, 2 * e - 1:0)[seq_along(rows), , drop = FALSE]] <- 1
+  for (e in seq_along(w)) {
+    if (!is.na(w[e])) {
+      rows <- w[e] + 0:1
+      rows <- rows[rows <= length(weeks)]
+      P[cbind(rows, 2 * e - 1:0)[seq_along(rows), , drop = FALSE]] <- 1
+    }
   }
   P
 }
@@ -276,7 +309,9 @@ fu_pulses <- function(weeks, events = FU_EVENTS) {
 fu_coords <- function(meta) {
   co <- cbind(lon = meta$lon, lat = meta$lat)
   dup <- duplicated(round(co, 6))
-  if (any(dup)) co[dup, ] <- co[dup, ] + 1e-5 * seq_len(sum(dup))
+  if (any(dup)) {
+    co[dup, ] <- co[dup, ] + 1e-5 * seq_len(sum(dup))
+  }
   co
 }
 
@@ -301,7 +336,8 @@ fu_coords <- function(meta) {
 ## pulses: weeks x pulses. Returns the completed matrix (stations x weeks) and
 ## a one-row summary of the pooled fit.
 fu_complete <- function(Y, meta, pulses) {
-  d <- nrow(Y); Tn <- ncol(Y)
+  d <- nrow(Y)
+  Tn <- ncol(Y)
   pul <- pulses[, colSums(pulses) > 0, drop = FALSE]
   X1 <- cbind(intercept = 1, pul)
   X <- do.call(rbind, rep(list(X1), d))                        # stacked by station
@@ -311,7 +347,8 @@ fu_complete <- function(Y, meta, pulses) {
   ## residual variance between the two error components, and a range equal to
   ## the median distance between the stations
   ols <- stats::lm.fit(X[ok, , drop = FALSE], as.vector(z)[ok])
-  b <- ols$coefficients; b[!is.finite(b)] <- 0
+  b <- ols$coefficients
+  b[!is.finite(b)] <- 0
   s2 <- stats::var(ols$residuals)
   co <- fu_coords(meta)
   dm <- stats::median(geodist::geodist(co, measure = "geodesic"))
@@ -350,11 +387,15 @@ fu_pairs <- function(meta, setting) {
   maj <- which(meta$brand %in% FU_MAJOR)
   ind <- which(meta$group == "independent")
   ys <- switch(as.character(setting), "1" = maj, "2" = ind, "3" = maj)
-  xset <- function(i) switch(as.character(setting), "1" = ind, "2" = maj,
-                             "3" = maj[meta$brand[maj] != meta$brand[i]])
+  xset <- function(i) {
+    switch(as.character(setting), "1" = ind, "2" = maj,
+           "3" = maj[meta$brand[maj] != meta$brand[i]])
+  }
   rows <- lapply(ys, function(i) {
     xs <- xset(i)
-    if (!length(xs)) return(NULL)
+    if (!length(xs)) {
+      return(NULL)
+    }
     dx <- Dkm[i, xs]
     data.frame(y_row = i, x_row = xs[which.min(dx)], x_dist_km = round(min(dx), 3))
   })
@@ -377,7 +418,8 @@ fu_pairs <- function(meta, setting) {
 ## stations x weeks matrices (relative and completed); pairs: fu_pairs().
 fu_case_frame <- function(city, setting, meta, Yrel, Ycomp, weeks, pairs, pulses, presample) {
   one <- function(k) {
-    i <- pairs$y_row[k]; x <- pairs$x_row[k]
+    i <- pairs$y_row[k]
+    x <- pairs$x_row[k]
     data.frame(
       city = city, setting = setting,
       y_site = meta$site[i], y_brand = meta$brand[i], y_group = meta$group[i],
@@ -410,7 +452,9 @@ fu_setting_data <- function(s, data_dir, cache_dir, cities = names(FU_CITY)) {
   d <- do.call(rbind, lapply(intersect(names(FU_CITY), cities), function(cc) {
     meta <- dat$stations[dat$stations$city == cc, ]
     pairs <- fu_pairs(meta, s)
-    if (is.null(pairs)) return(NULL)
+    if (is.null(pairs)) {
+      return(NULL)
+    }
     rel <- lapply(c(g = "g", d = "d"), function(fu)
       fu_relative(fu_price_matrix(dat, cc, fu, weeks), nat[[fu]], in_window))
     comp <- lapply(c(g = "g", d = "d"), function(fu) {
@@ -439,7 +483,9 @@ fu_series <- function(dfc, fuel) {
   fo <- FU_OTHER[[fuel]]
   dfc <- dfc[order(match(dfc$y_site, unique(dfc$y_site)), dfc$t), ]
   W <- max(dfc$t)
-  m <- function(col) matrix(dfc[[col]], nrow = W)
+  m <- function(col) {
+    matrix(dfc[[col]], nrow = W)
+  }
   list(resp = m(paste0("y", fuel)), own = m(paste0("y", fuel, "_c")),
        own_other = m(paste0("y", fo, "_c")), nb = m(paste0("x", fuel)),
        nb_other = m(paste0("x", fo)), sites = unique(dfc$y_site))
@@ -453,7 +499,8 @@ fu_series <- function(dfc, fuel) {
 ## window: the presample provides the lags of its first weeks.
 fu_design <- function(dfc, fuel, lags = FU_LAGS) {
   S <- fu_series(dfc, fuel)
-  W <- nrow(S$own); d <- ncol(S$own)
+  W <- nrow(S$own)
+  d <- ncol(S$own)
   lags <- lags[FU_BLOCKS]
   maxlag <- max(c(0L, unlist(lags)))
   t0 <- max(maxlag + 1L, min(dfc$t[!dfc$presample]))
@@ -463,14 +510,20 @@ fu_design <- function(dfc, fuel, lags = FU_LAGS) {
   pul <- pul[order(dfc$t[first]), , drop = FALSE][tt, , drop = FALSE]
   pul <- pul[, colSums(pul) > 0, drop = FALSE]
   ## the lags of the four blocks of station i, one column per lag
-  block_cols <- function(i) do.call(cbind, lapply(FU_BLOCKS, function(b) {
-    L <- lags[[b]]
-    if (!length(L)) return(NULL)
-    m <- vapply(L, function(l) S[[b]][tt - l, i], numeric(length(tt)))
-    if (is.null(dim(m))) m <- matrix(m, ncol = length(L))
-    colnames(m) <- paste0(b, "_l", L)
-    m
-  }))
+  block_cols <- function(i) {
+    do.call(cbind, lapply(FU_BLOCKS, function(b) {
+      L <- lags[[b]]
+      if (!length(L)) {
+        return(NULL)
+      }
+      m <- vapply(L, function(l) S[[b]][tt - l, i], numeric(length(tt)))
+      if (is.null(dim(m))) {
+        m <- matrix(m, ncol = length(L))
+      }
+      colnames(m) <- paste0(b, "_l", L)
+      m
+    }))
+  }
   covs <- lapply(seq_len(d), function(i) cbind(intercept = 1, block_cols(i), pul))
   nm <- colnames(covs[[1]])
   blocks <- lapply(stats::setNames(FU_BLOCKS, FU_BLOCKS), function(b) grep(paste0("^", b, "_l"), nm))
@@ -489,12 +542,17 @@ fu_design <- function(dfc, fuel, lags = FU_LAGS) {
 ## between the two error components, and a range equal to the median distance
 ## between the stations. SC-STEM starts every regime from these values.
 fu_model <- function(des) {
-  zv <- as.vector(des$z)                                       # stacked by station
+  zv <- as.vector(des$z)  # stacked by station
   ok <- !is.na(zv)
   ols <- stats::lm.fit(des$covariates[ok, , drop = FALSE], zv[ok])
-  b <- ols$coefficients; b[!is.finite(b)] <- 0
+  b <- ols$coefficients
+  b[!is.finite(b)] <- 0
   s2 <- stats::var(ols$residuals)
-  dm <- if (des$d > 1) stats::median(geodist::geodist(des$coords, measure = "geodesic")) else 1000
+  dm <- if (des$d > 1) {
+    stats::median(geodist::geodist(des$coords, measure = "geodesic"))
+  } else {
+    1000
+  }
   Stem::STEM_Model(z = des$z, covariates = des$covariates, coordinates = des$coords,
                    phi = list(beta = matrix(b, ncol = 1), sigma2eps = 0.6 * s2, sigma2omega = 0.4 * s2,
                               theta = 3 / dm, G = matrix(0.3, 1, 1), Sigmaeta = matrix(0.2 * s2, 1, 1),
@@ -539,21 +597,28 @@ fu_tests <- function(des) {
 ## with their joint bootstrap covariance. Draws with a missing value are left
 ## out.
 fu_wald <- function(est, group, inf, des, label) {
-  K <- nrow(est); A <- inf$aligned
+  K <- nrow(est)
+  A <- inf$aligned
   one <- function(e, D) {
     D <- D[stats::complete.cases(D), , drop = FALSE]
-    if (nrow(D) <= length(e)) return(c(NA_real_, NA_real_, nrow(D)))
+    if (nrow(D) <= length(e)) {
+      return(c(NA_real_, NA_real_, nrow(D)))
+    }
     V <- stats::cov(D)
     W <- tryCatch(drop(crossprod(e, solve(V, e))), error = function(err) NA_real_)
     Vi <- tryCatch(solve(V), error = function(err) NULL)
-    if (is.null(Vi) || !is.finite(W)) return(c(W, NA_real_, nrow(D)))
+    if (is.null(Vi) || !is.finite(W)) {
+      return(c(W, NA_real_, nrow(D)))
+    }
     C <- sweep(D, 2, e)
     null <- rowSums((C %*% Vi) * C)
     c(W, (1 + sum(null >= W)) / (1 + length(null)), nrow(D))
   }
   tests <- fu_tests(des)
   do.call(rbind, lapply(names(tests), function(h) {
-    par <- paste0("beta", tests[[h]]); ip <- match(par, dimnames(A)[[3]]); q <- length(ip)
+    par <- paste0("beta", tests[[h]])
+    ip <- match(par, dimnames(A)[[3]])
+    q <- length(ip)
     e <- lapply(seq_len(K), function(g) unname(est[g, par]))
     D <- lapply(seq_len(K), function(g) matrix(A[, g, ip], ncol = q))
     r <- rbind(do.call(rbind, lapply(seq_len(K), function(g) one(e[[g]], D[[g]]))),
@@ -596,19 +661,30 @@ fu_pump_tests <- function(des) {
   tests <- fu_tests(des)
   rows <- lapply(seq_len(des$d), function(i) {
     Z <- des$covariates[(i - 1L) * des$Tn + seq_len(des$Tn), , drop = FALSE]
-    y <- des$z[, i]; ok <- is.finite(y)
-    Z <- Z[ok, , drop = FALSE]; y <- y[ok]
+    y <- des$z[, i]
+    ok <- is.finite(y)
+    Z <- Z[ok, , drop = FALSE]
+    y <- y[ok]
     ## the columns that are not collinear (a pulse may fall in a missing week)
-    q <- qr(Z); keep <- sort(q$pivot[seq_len(q$rank)])
-    Zk <- Z[, keep, drop = FALSE]; n <- nrow(Zk); k <- ncol(Zk)
+    q <- qr(Z)
+    keep <- sort(q$pivot[seq_len(q$rank)])
+    Zk <- Z[, keep, drop = FALSE]
+    n <- nrow(Zk)
+    k <- ncol(Zk)
     A <- tryCatch(solve(crossprod(Zk)), error = function(e) NULL)
-    if (is.null(A) || n <= k) return(NULL)
-    b <- A %*% crossprod(Zk, y); e <- drop(y - Zk %*% b)
+    if (is.null(A) || n <= k) {
+      return(NULL)
+    }
+    b <- A %*% crossprod(Zk, y)
+    e <- drop(y - Zk %*% b)
     V_hc1 <- A %*% crossprod(Zk * e) %*% A * n / (n - k)
     s2 <- sum(e^2) / (n - k)
     do.call(rbind, lapply(names(tests), function(bl) {
-      j <- match(tests[[bl]], keep); j <- j[!is.na(j)]
-      if (!length(j)) return(NULL)
+      j <- match(tests[[bl]], keep)
+      j <- j[!is.na(j)]
+      if (!length(j)) {
+        return(NULL)
+      }
       Fs <- drop(crossprod(b[j], solve(A[j, j, drop = FALSE], b[j]))) / (s2 * length(j))
       Wh <- drop(crossprod(b[j], solve(V_hc1[j, j, drop = FALSE], b[j])))
       data.frame(y_site = des$meta$y_site[i], block = bl, q = length(j), n = n, k = k,
@@ -627,9 +703,13 @@ fu_pump_tests <- function(des) {
 ## test rejects at 5%.
 fu_dh <- function(pt) {
   do.call(rbind, lapply(split(pt, pt$block), function(z) {
-    q <- z$q[1]; N <- nrow(z)
-    zb <- function(W) sqrt(N / (2 * q)) * (mean(W, na.rm = TRUE) - q)
-    zf <- zb(q * z$F); zh <- zb(z$W_hc1)
+    q <- z$q[1]
+    N <- nrow(z)
+    zb <- function(W) {
+      sqrt(N / (2 * q)) * (mean(W, na.rm = TRUE) - q)
+    }
+    zf <- zb(q * z$F)
+    zh <- zb(z$W_hc1)
     data.frame(block = z$block[1], pumps = N, q = q,
                reject_F_pct = round(100 * mean(z$p_F < 0.05, na.rm = TRUE), 1),
                reject_hc1_pct = round(100 * mean(z$p_hc1 < 0.05, na.rm = TRUE), 1),
@@ -646,7 +726,8 @@ fu_dh <- function(pt) {
 fu_diagnostics <- function(fit, des) {
   R <- des$z - Stem::SCSTEM_Signal(fit)
   pp <- do.call(rbind, lapply(seq_len(ncol(R)), function(i) {
-    r <- R[, i]; r <- r[is.finite(r)]
+    r <- R[, i]
+    r <- r[is.finite(r)]
     data.frame(regime = fit$group[i],
                lb = stats::Box.test(r, lag = 4, type = "Ljung-Box")$p.value,
                lb_sq = stats::Box.test(r^2, lag = 4, type = "Ljung-Box")$p.value,
@@ -663,11 +744,20 @@ fu_diagnostics <- function(fit, des) {
 ## The adjusted Rand index between two partitions (Hubert and Arabie 1985):
 ## 1 when they coincide, about 0 when they are unrelated.
 fu_ari <- function(a, b) {
-  tab <- table(a, b); n <- sum(tab)
-  c2 <- function(v) sum(v * (v - 1) / 2)
-  s_ij <- c2(as.vector(tab)); s_i <- c2(rowSums(tab)); s_j <- c2(colSums(tab)); tot <- n * (n - 1) / 2
-  e <- s_i * s_j / tot; mx <- (s_i + s_j) / 2
-  if (isTRUE(all.equal(mx, e))) return(1)
+  tab <- table(a, b)
+  n <- sum(tab)
+  c2 <- function(v) {
+    sum(v * (v - 1) / 2)
+  }
+  s_ij <- c2(as.vector(tab))
+  s_i <- c2(rowSums(tab))
+  s_j <- c2(colSums(tab))
+  tot <- n * (n - 1) / 2
+  e <- s_i * s_j / tot
+  mx <- (s_i + s_j) / 2
+  if (isTRUE(all.equal(mx, e))) {
+    return(1)
+  }
   (s_ij - e) / (mx - e)
 }
 
@@ -682,12 +772,16 @@ fu_ari <- function(a, b) {
 ## of the figures drawn afterwards does not change.
 fu_ari_space <- function(regime, lon, lat, seed, nstart = 50L) {
   K <- length(unique(regime))
-  if (K < 2L) return(NA_real_)
+  if (K < 2L) {
+    return(NA_real_)
+  }
   xy <- 111.2 * cbind(lon * cos(mean(lat) * pi / 180), lat)
   if (exists(".Random.seed", envir = globalenv())) {
     old <- get(".Random.seed", envir = globalenv())
     on.exit(assign(".Random.seed", old, envir = globalenv()))
-  } else on.exit(rm(".Random.seed", envir = globalenv()))
+  } else {
+    on.exit(rm(".Random.seed", envir = globalenv()))
+  }
   set.seed(seed)
   fu_ari(regime, stats::kmeans(xy, K, nstart = nstart, iter.max = 100L)$cluster)
 }
@@ -710,14 +804,18 @@ fu_ari_space <- function(regime, lon, lat, seed, nstart = 50L) {
 ## standard errors. NULL for a pooled model, which has one start only.
 fu_check_optima <- function(fit, des, inf, seed) {
   K <- nrow(fit$phi_hat)
-  if (K == 1L) return(NULL)
+  if (K == 1L) {
+    return(NULL)
+  }
   r <- Stem::SCSTEM_Estimation(
     fu_model(des), K = K, phi_penalty = 0, init_partition = fit$group, max_iter = 0,
     distance = "geo", knn = min(FU_KNN, des$d - 1L), min_cluster_size = FU_M, seed = seed,
     control = Stem::STEM_control(em_stop = "all", em_maxit = 2000L), verbose = FALSE)
   w_sel <- fu_wald(fit$phi_hat, fit$group, inf, des, "selected")
   w_ls <- fu_wald(r$phi_hat, fit$group, inf, des, "least squares")
-  pick <- function(w, col) w[[col]][w$block == "nb_both" & w$regime != "all"]
+  pick <- function(w, col) {
+    w[[col]][w$block == "nb_both" & w$regime != "all"]
+  }
   regimes <- data.frame(
     regime = seq_len(K), size = tabulate(fit$group, K),
     loglik_selected = fit$loglik_g, loglik_ls = r$loglik_g, diff = r$loglik_g - fit$loglik_g,
@@ -729,7 +827,9 @@ fu_check_optima <- function(fit, des, inf, seed) {
     W_nb_both_ls = pick(w_ls, "statistic"), p_nb_both_ls = pick(w_ls, "p_chisq"))
   sm <- as.data.frame(inf$summary)
   block <- rep("intercept", length(des$names))
-  for (b in names(des$blocks)) block[des$blocks[[b]]] <- b
+  for (b in names(des$blocks)) {
+    block[des$blocks[[b]]] <- b
+  }
   p <- paste0("beta", seq_along(des$names))
   coefficients <- do.call(rbind, lapply(seq_len(K), function(g) data.frame(
     regime = g, covariate = des$names, block = block,
@@ -768,7 +868,10 @@ fu_check_optima <- function(fit, des, inf, seed) {
 fu_run_model <- function(s, cc, fu, cases, opt, stem) {
   id <- sprintf("%s_%s", cc, FU_FUEL[[fu]])
   od <- file.path(opt$out, sprintf("setting%d", s), id)
-  if (file.exists(file.path(od, "model.csv"))) { message("done already: setting ", s, ", ", id); return(invisible()) }
+  if (file.exists(file.path(od, "model.csv"))) {
+    message("done already: setting ", s, ", ", id)
+    return(invisible())
+  }
   cache <- file.path(opt$cache, sprintf("setting%d", s))
   seed <- fu_seed(cc, fu)
 
@@ -798,12 +901,18 @@ fu_run_model <- function(s, cc, fu, cases, opt, stem) {
   ## selected (K, phi), partition included; the regimes of a draw are matched
   ## to the estimated ones (Stem::SCSTEM_BootInference()). The pooled model is
   ## bootstrapped in the same way, with the same seed.
-  boot <- function(fit, name) fu_cached(cache, paste0(id, "_", name), {
-    bt <- Stem::SCSTEM_Bootstrap(fit, B = FU_B, seed = seed, verbose = TRUE, cores = opt$cores)
-    list(B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = FU_LEVEL))
-  })
+  boot <- function(fit, name) {
+    fu_cached(cache, paste0(id, "_", name), {
+      bt <- Stem::SCSTEM_Bootstrap(fit, B = FU_B, seed = seed, verbose = TRUE, cores = opt$cores)
+      list(B_valid = bt$B_valid, inf = Stem::SCSTEM_BootInference(bt, level = FU_LEVEL))
+    })
+  }
   b0 <- boot(g$fit, "boot")
-  bP <- if (K == 1L) b0 else boot(g$pooled, "boot_pooled")
+  bP <- if (K == 1L) {
+    b0
+  } else {
+    boot(g$pooled, "boot_pooled")
+  }
 
   ## 4. The tests
   wald <- rbind(fu_wald(g$fit$phi_hat, g$fit$group, b0$inf, des, "selected"),
@@ -819,15 +928,25 @@ fu_run_model <- function(s, cc, fu, cases, opt, stem) {
 
   ## 7. The compact results
   dir.create(od, recursive = TRUE, showWarnings = FALSE)
-  w <- function(d, f) if (!is.null(d)) utils::write.csv(cbind(setting = s, model = id, d), file.path(od, f),
-                                                         row.names = FALSE)
+  w <- function(d, f) {
+    if (!is.null(d)) {
+      utils::write.csv(cbind(setting = s, model = id, d), file.path(od, f),
+                        row.names = FALSE)
+    }
+  }
   w(g$table[, !vapply(g$table, is.list, TRUE)], "grid.csv")
   w(data.frame(des$meta, regime = g$fit$group, theta_bound = g$fit$theta_bound[g$fit$group]), "regimes.csv")
   w(rbind(fu_estimates(b0$inf, des$names, "selected"),
           if (K > 1L) fu_estimates(bP$inf, des$names, "pooled")), "estimates.csv")
   data.table::fwrite(cbind(setting = s, model = id, fu_draws(b0$inf, des$names)), file.path(od, "draws.csv.gz"))
-  w(wald, "wald.csv"); w(pt, "pump_tests.csv"); w(dh, "dumitrescu_hurlin.csv"); w(dg, "diagnostics.csv")
-  if (!is.null(opt_check)) { w(opt_check$regimes, "optima.csv"); w(opt_check$coefficients, "optima_coefficients.csv") }
+  w(wald, "wald.csv")
+  w(pt, "pump_tests.csv")
+  w(dh, "dumitrescu_hurlin.csv")
+  w(dg, "diagnostics.csv")
+  if (!is.null(opt_check)) {
+    w(opt_check$regimes, "optima.csv")
+    w(opt_check$coefficients, "optima_coefficients.csv")
+  }
   brands <- des$meta$y_brand
   row <- data.frame(
     setting = s, model = id, city = cc, fuel = FU_FUEL[[fu]], pumps = des$d, weeks = des$Tn,
@@ -858,12 +977,15 @@ fu_run_setting <- function(s, cases, opt, stem) {
   message(sprintf("setting %d: %d models; Stem %s; bootstrap on %d process(es)", s, nrow(todo), stem, opt$cores))
   for (i in seq_len(nrow(todo))) {
     r <- tryCatch(fu_run_model(s, todo$city[i], todo$fuel[i], cases, opt, stem), error = function(e) e)
-    if (inherits(r, "error"))
+    if (inherits(r, "error")) {
       message("   FAILED: setting ", s, ", ", todo$city[i], ", ", todo$fuel[i], ": ", conditionMessage(r))
+    }
   }
   f <- Sys.glob(file.path(opt$out, sprintf("setting%d", s), "*", "model.csv"))
-  if (length(f)) fu_write(do.call(rbind, lapply(f, utils::read.csv, stringsAsFactors = FALSE)),
-                          file.path(opt$out, sprintf("setting%d", s), "models.csv"))
+  if (length(f)) {
+    fu_write(do.call(rbind, lapply(f, utils::read.csv, stringsAsFactors = FALSE)),
+             file.path(opt$out, sprintf("setting%d", s), "models.csv"))
+  }
   message("done: results of setting ", s, " in ", opt$out)
   invisible()
 }

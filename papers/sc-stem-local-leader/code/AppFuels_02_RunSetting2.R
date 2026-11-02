@@ -91,13 +91,27 @@
 suppressPackageStartupMessages(library(data.table))
 invisible(Sys.setlocale("LC_TIME", "C"))
 HERE <- local({
-  a <- commandArgs(trailingOnly = FALSE); m <- grep("^--file=", a, value = TRUE)
-  f <- if (length(m)) normalizePath(sub("^--file=", "", m[1]), winslash = "/") else NULL
-  if (is.null(f)) for (i in rev(seq_len(sys.nframe()))) {
-    of <- sys.frame(i)$ofile
-    if (!is.null(of)) { f <- normalizePath(of, winslash = "/"); break }
+  a <- commandArgs(trailingOnly = FALSE)
+  m <- grep("^--file=", a, value = TRUE)
+  f <- if (length(m)) {
+    normalizePath(sub("^--file=", "", m[1]), winslash = "/")
+  } else {
+    NULL
   }
-  if (is.null(f)) normalizePath(getwd(), winslash = "/") else dirname(f)
+  if (is.null(f)) {
+    for (i in rev(seq_len(sys.nframe()))) {
+      of <- sys.frame(i)$ofile
+      if (!is.null(of)) {
+        f <- normalizePath(of, winslash = "/")
+        break
+      }
+    }
+  }
+  if (is.null(f)) {
+    normalizePath(getwd(), winslash = "/")
+  } else {
+    dirname(f)
+  }
 })
 source(file.path(HERE, "AppFuels_00_Setup.R"))
 
