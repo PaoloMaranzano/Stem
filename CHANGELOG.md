@@ -31,8 +31,31 @@ the scripts, data and results of the replication package
 
 **The paper.** At the suggestion of a colleague close to the journal, the
 manuscript now places the application in the fuel industry and the data in
-industry and data science (abstract, introduction, application, conclusion),
-without changing its content; the clean PDFs are rebuilt.
+industrial applications (abstract, introduction, application, conclusion),
+without changing its content; the opening of the introduction is rewritten, and
+Section A1.7 of Supplement A gains an opening sentence. The clean PDFs are
+rebuilt. `dev/sync-paper.R` now supplies `WileyNJD-AMA.bst` from the copy kept
+in the project, without which the citations of the manuscript printed as `?`,
+and reports undefined citations and references.
+
+**The replication package in two parts.** `papers/sc-stem-local-leader/README.md`
+now has a part for the application (the question, the data, from the prices to
+the data of the models, the settings, the model, the Granger test regime by
+regime and the long-run pass-through, how every model is estimated, how to run
+it, where every result comes from) and a part for the simulation study (the
+questions, the data-generating process, the scenarios and variants, the design,
+what is fitted and measured, how to run it, the stored results).
+
+**Documentation.** `docs/computational-aspects.md` opens with a map of the
+computations: the four nested levels, from the selection to one iteration of
+the algorithm, with how often each runs, its function and the sections that
+explain it, before the two diagrams. The range at the boundary leaves the
+README, which points to the documentation for it.
+
+**Authorship.** Francesco Caccia moves from author to contributor (`ctb`,
+`cph`) for his earlier contributions to the code and the preparation of the
+`povalley` data, which keeps its credit; his name leaves the `@author` fields of
+the SC-STEM functions.
 
 ### 2026-10-30 (night)
 

@@ -14,8 +14,8 @@ Authors@R:
     person(
       given = "Francesco",
       family = "Caccia",
-      role = c("aut", "cph"),
-      email = "francesco.caccia2000@gmail.com"
+      role = c("ctb", "cph"),
+      comment = "earlier contributions to the code and preparation of the povalley data"
       ),
     person(
       given = "Paolo",

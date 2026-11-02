@@ -363,7 +363,7 @@
 #' }
 #'
 #' @author Paolo Maranzano \email{pmaranzano.ricercastatistica@gmail.com},
-#'   Francesco Caccia, Michela Cameletti
+#'   Michela Cameletti
 #'
 #' @references
 #' Besag, J. (1986) \emph{On the statistical analysis of dirty pictures}.

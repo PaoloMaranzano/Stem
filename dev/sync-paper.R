@@ -42,6 +42,10 @@ DOCS <- c("main"                   = "sc-stem-local-leader.pdf",
 TMP <- file.path(tempdir(), "sc-stem-paper")
 unlink(TMP, recursive = TRUE); dir.create(TMP)
 invisible(file.copy(list.files(SRC, full.names = TRUE, all.files = FALSE), TMP, recursive = TRUE))
+## the class asks for WileyNJD-AMA.bst, which no TeX distribution ships; the
+## project keeps a copy as WileyNJD-AMA_old.bst
+if (!file.exists(file.path(TMP, "WileyNJD-AMA.bst")) && file.exists(file.path(TMP, "WileyNJD-AMA_old.bst")))
+  invisible(file.copy(file.path(TMP, "WileyNJD-AMA_old.bst"), file.path(TMP, "WileyNJD-AMA.bst")))
 CLEAN <- c("\\providecommand{\\rev}[1]{}\\renewcommand{\\rev}[1]{#1}",
            "\\providecommand{\\nota}[1]{}\\renewcommand{\\nota}[1]{}",
            "\\makeatletter\\@ifundefined{modified}{\\newenvironment{modified}{}{}}{\\renewenvironment{modified}{}{}}\\makeatother")
@@ -68,4 +72,8 @@ for (d in names(DOCS)) {
   if (s != 0 || !file.exists(pdf)) { message("FAILED: ", d, " (see ", file.path(TMP, paste0(d, ".log")), ")"); next }
   file.copy(pdf, file.path(OUT, DOCS[[d]]), overwrite = TRUE)
   message("wrote ", DOCS[[d]])
+  ## undefined citations or references would print as ? in the PDF: report them
+  und <- grep("(Citation|Reference) .* undefined", readLines(paste0(d, ".log"), warn = FALSE),
+              value = TRUE, useBytes = TRUE)
+  if (length(und)) message("  ", length(und), " undefined citations or references, e.g. ", trimws(und[1]))
 }

@@ -53,7 +53,7 @@
 #' \url{https://www.eea.europa.eu/en/analysis/publications/air-quality-e-reporting}.
 #' Data prepared by Francesco Caccia.
 #'
-#' @author Francesco Caccia, Paolo Maranzano
+#' @author Paolo Maranzano
 #'
 #' @examples
 #' data(povalley)

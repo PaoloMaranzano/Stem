@@ -78,24 +78,8 @@ and in the information criteria, are absolute. No jitter is added to the
 matrices the iterations invert (`regularization = 0`): with one, they converged
 to a point that is not the maximum.
 
-### The range at the boundary
-
-On the few locations of a small regime the likelihood is flat in the range
-beyond two limits: a range so short that the correlation between the two
-closest locations falls below 0.05, where the spatial field cannot be told from
-the nugget, and one so long that the correlation between the two farthest
-exceeds 0.95, where it cannot be told from an effect common to the locations. `Stem` keeps
-
-```math
-\frac{-\log 0.95}{h_{\max}} \;\le\; \theta \;\le\; \frac{-\log 0.05}{h_{\min}},
-```
-
-accepts a Newton step only if it does not worsen the objective, and reports a
-range that ends at a limit (`theta_bound`). Where nothing binds the estimates
-are unchanged; where something does, the fits were better, and the boundary
-cases that used to dominate the computing time are gone.
-
-Details, with formulas and the numerical experiments:
+Details, with formulas and the numerical experiments, including the limits
+within which the range of the spatial correlation is estimated:
 [computational aspects](docs/computational-aspects.md) and the
 Computational Supplement that ships with the package (see
 [Documentation](#documentation)).
@@ -246,7 +230,9 @@ user-facing summary is [`NEWS.md`](NEWS.md), and the dated development log is
 | Author | Role | ORCID | GitHub |
 |---|---|---|---|
 | Michela Cameletti | aut, cph | [0000-0002-6502-7779](https://orcid.org/0000-0002-6502-7779) | [@michelacameletti](https://github.com/michelacameletti) |
-| Francesco Caccia | aut, cph | | |
 | Paolo Maranzano | aut, cre, cph | [0000-0002-9228-2759](https://orcid.org/0000-0002-9228-2759) | [@PaoloMaranzano](https://github.com/PaoloMaranzano) |
+
+Contributor: Francesco Caccia (ctb, cph), for earlier contributions to the
+code and the preparation of the `povalley` data.
 
 Licensed under GPL (>= 2).

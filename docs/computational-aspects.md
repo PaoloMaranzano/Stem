@@ -26,7 +26,7 @@ has [a page of its own](regularization.md).
 
 Contents
 
-- [At a glance](#at-a-glance): how the computations nest, and Algorithm 1 of the paper as a flowchart
+- [A map of the computations](#a-map-of-the-computations): the four nested levels of the computation, how often each runs and where each is explained, and Algorithm 1 of the paper as a flowchart
 
 1. [Estimation: the Kalman filter, the EM algorithm and its accelerations](#1-estimation-the-kalman-filter-the-em-algorithm-and-its-accelerations) (Supplement A, Section A1)
 2. [Missing observations](#2-missing-observations) (A2)
@@ -43,26 +43,50 @@ Contents
 
 ---
 
-## At a glance
+## A map of the computations
 
-**How the computations nest.** A selection fits a grid of $(K, \phi)$; each fit
-is the alternation of SC-STEM (Algorithm 1 of the paper, below); each
-parameter step of the alternation runs an EM-type algorithm on every regime;
-each iteration of that algorithm runs the Kalman filter and smoother. The
-bootstrap re-runs the selected fit on every draw.
+Estimating SC-STEM and drawing inference on it is not one computation but
+several, nested one inside the other: each calls the next many times. The
+sections below treat them from the inside out, starting from the Kalman filter
+in Section 1, whereas a user meets them from the outside in, starting from the
+selection of the model. This map links the two orders. It can be skipped on a
+first reading and consulted whenever a section refers to a level above or below
+its own.
+
+| level | what it computes | how often it runs | function | sections |
+|---|---|---|---|---|
+| 1a. Selection | the fits on a grid of $(K, \phi)$, and the choice of one of them by the two-step rule on the BIC | once per data set | `SCSTEM_Infocrit()`, `SCSTEM_Select()` | 3, 6 |
+| 1b. Bootstrap | $B$ data sets simulated from the selected fit, each re-estimated at its $(K, \phi)$, and the inference drawn from them | once, after the selection | `SCSTEM_Bootstrap()`, `SCSTEM_BootInference()` | 7 |
+| 2. One fit at $(K, \phi)$ | the partition and the parameters of the regimes, by the alternation of SC-STEM (Algorithm 1 of the paper) | once per configuration of the grid and per draw of the bootstrap | `SCSTEM_Estimation()` | 3, 4, 5, 8 |
+| 3. One regime | the parameters of one regime given its locations, by an EM-type algorithm: EM, ECME, SQUAREM or SQUAREM-ECME | at every parameter step of the alternation, for every regime | `STEM_Estimation()` | 1, 2 |
+| 4. One iteration | the E-step (the Kalman filter and smoother) and the M-step | at every iteration of the algorithm | internal: `stem_estep()`, `stem_mstep_em()`, `stem_mstep_ecme()` | 1.2, 1.3 |
+
+In the diagram, each box is one of these computations, an arrow goes from a
+computation to the one it calls, and its label says how often. The cost
+multiplies along the arrows: every configuration of the grid runs several
+sweeps of the alternation, every sweep runs an EM-type algorithm on every
+regime, and every iteration of that algorithm runs the Kalman filter and
+smoother, so that one selection runs the filter thousands of times. This is why
+the speed of the two innermost levels (Sections 1.6 to 1.9) matters for the
+whole procedure.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
-    SEL["Selection: fits on a grid of (K, φ),<br/>two-step rule on the BIC (Sections 3 and 6)"] -->|"one fit per (K, φ)"| FIT["One fit at (K, φ):<br/>the alternation of SC-STEM (Algorithm 1)"]
-    SEL -->|"selected fit"| BOOT["Bootstrap: B draws, each simulated from the selected fit<br/>and re-estimated at its (K, φ) (Section 7)"]
+    SEL["Level 1a, selection: fits on a grid of (K, φ),<br/>two-step rule on the BIC (Sections 3 and 6)"] -->|"one fit per (K, φ)"| FIT["Level 2, one fit at (K, φ):<br/>the alternation of SC-STEM (Algorithm 1)"]
+    SEL -->|"selected fit"| BOOT["Level 1b, bootstrap: B draws, each simulated from the selected fit<br/>and re-estimated at its (K, φ) (Section 7)"]
     BOOT -->|"one refit per draw"| FIT
-    FIT -->|"parameter step, every regime"| REG["An EM-type algorithm on one regime:<br/>EM, ECME, SQUAREM or SQUAREM-ECME (Section 1)"]
-    REG -->|"every iteration"| KF["E-step: Kalman filter and smoother (Section 1.2);<br/>M-step: conditional maximizations (Section 1.3)"]
+    FIT -->|"parameter step, every regime"| REG["Level 3, one regime: an EM-type algorithm,<br/>EM, ECME, SQUAREM or SQUAREM-ECME (Section 1)"]
+    REG -->|"every iteration"| KF["Level 4, one iteration. E-step: Kalman filter and smoother (Section 1.2);<br/>M-step: conditional maximizations (Section 1.3)"]
 ```
 
-**Algorithm 1 of the paper**, the estimation of SC-STEM at fixed $K$ and $\phi$
-(`SCSTEM_Estimation()`):
+**Level 2 in detail: Algorithm 1 of the paper.** The second level is the core
+of SC-STEM. The flowchart follows one fit at fixed $K$ and $\phi$ as
+`SCSTEM_Estimation()` runs it, and each box names the section that explains
+it. After a start, the fit alternates a parameter step, which estimates every
+regime given the partition (level 3), and a label step, which reassigns the
+locations given the parameters, until the partition settles; it then refits the
+regimes on the best partition it has visited.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 400}}}%%

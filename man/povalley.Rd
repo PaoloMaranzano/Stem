@@ -75,6 +75,6 @@ plot(povalley$dates, povalley$z[, 1], type = "l",
   \code{\link{SCSTEM_Estimation}}
 }
 \author{
-Francesco Caccia, Paolo Maranzano
+Paolo Maranzano
 }
 \keyword{datasets}
