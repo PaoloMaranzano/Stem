@@ -9,7 +9,7 @@ STEM_Simulation(StemModel, distance = "euclidean")
 \arguments{
 \item{StemModel}{an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 }
 \value{
 The functions return a \eqn{n \times d}{n * d} matrix of data.

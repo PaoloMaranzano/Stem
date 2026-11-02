@@ -16,6 +16,26 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-11-02 (night): release of 2.0.0
+
+**Ready for CRAN.** `R CMD check --as-cran` on R 4.6.1, with the `\donttest`
+examples, the tests, the vignettes and the math of the HTML manual: 0 errors,
+0 warnings, 1 note (new submission of an archived package). The check takes
+about seven minutes; how to run it is in `dev/cran-check-locally.md`.
+
+**Fixed for the release.** The `Description` field names the two-step rule on
+the BIC and the regimes (it spoke of a stability-based rule and of clusters).
+Two typos ("geodedic", "optimizm") and the British spellings of the
+documentation are corrected, as the package declares `en-US`. The source of the
+`povalley` data pointed to a page of the EEA that no longer exists; it points
+to the AQ e-Reporting dataset. `NEWS.md` contradicted itself on `mink`/`maxk`
+(removed), still wrote `k` for the number of regimes, mentioned a `LICENSE`
+file that does not exist, and missed the missing responses and the
+`Complete`/`Signal` functions; it is corrected and now goes into the package.
+The links of the README to `docs/`, `dev/` and `CHANGELOG.md`, which are not in
+the package, are absolute links to GitHub. `cran-comments.md` explains the
+history of the package and the change of maintainer, and gives the results.
+
 ### 2026-11-02 (evening)
 
 **The scripts of the replication package restyled.** One command per line,

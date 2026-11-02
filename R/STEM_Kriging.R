@@ -10,7 +10,7 @@
 #' @param A.newlocations a loading matrix of dimension \eqn{S} by p.
 #' @param time.point the time point between 1 and \eqn{n} for which the spatial prediction is performed.
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
-#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
+#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #'
 #'
 #'

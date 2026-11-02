@@ -19,7 +19,7 @@ STEM_Bootstrap(
 
 \item{B}{number of bootstrap iterations.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 
 \item{precision}{optional; when given, it replaces \code{em_tol_par} of \code{control} in every refit (see \code{\link{STEM_Estimation}}). Default \code{NULL}.}
 

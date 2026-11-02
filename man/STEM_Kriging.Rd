@@ -28,7 +28,7 @@ It has the same structure of the  \code{StemModel$data$covariates} object in the
 
 \item{cov.spat}{type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 }
 \value{
 The function returns a list which is given by:

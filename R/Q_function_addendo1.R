@@ -4,9 +4,9 @@
 ### tr(A B) is the sum of the elementwise product of A with the transpose of B,
 ### so it costs O(d^2) and does not need the O(d^3) product to be formed.
 ###
-### The log determinant and the inverse come from ONE Cholesky factorisation
+### The log determinant and the inverse come from ONE Cholesky factorization
 ### rather than from two separate ones. The superseded version called solve(),
-### which factorises S, and then determinant(), which factorises it again: two
+### which factorizes S, and then determinant(), which factorizes it again: two
 ### O(d^3) decompositions of the same positive definite matrix where one does.
 ### The determinant is read off the diagonal of the factor, and chol2inv()
 ### inverts from it. The fallback covers the case of a matrix that has lost

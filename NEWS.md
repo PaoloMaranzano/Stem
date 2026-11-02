@@ -25,8 +25,8 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 ### Regularized regression coefficients
 
 * `STEM_Fit()` is a single entry point for the pooled and the clustered model,
-  with or without a penalty on the regression coefficients. `k = 1` fits the
-  pooled STEM model and `k > 1` the spatially-clustered one; `lambda = 0`, the
+  with or without a penalty on the regression coefficients. `K = 1` fits the
+  pooled STEM model and `K > 1` the spatially-clustered one; `lambda = 0`, the
   default, gives the ordinary maximum likelihood estimator and reproduces
   `STEM_Estimation()` exactly.
 * `alpha` and `lambda` follow the `glmnet` parameterization: `alpha = 0` is
@@ -45,7 +45,7 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 * `latent = FALSE` switches the latent process off and `spatial = FALSE`
   replaces the spatial correlation by the identity. Together with
   `regularization = 0` they reduce the model exactly to penalized linear
-  regression, and with `k > 1` to clusterwise penalized regression.
+  regression, and with `K > 1` to clusterwise penalized regression.
 * The penalty leaves the E-step untouched, so the algorithm remains an EM on the
   penalized likelihood: the M-step keeps a closed form under a ridge and is
   solved exactly by coordinate descent otherwise. The design is scaled
@@ -59,21 +59,20 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 ### Spatially-clustered STEM models
 
 * `SCSTEM_Estimation()` fits an SC-STEM model: the monitoring locations are
-  partitioned into `k` latent spatial regimes and a separate STEM model is
+  partitioned into `K` latent spatial regimes and a separate STEM model is
   estimated within each of them, so that regression coefficients, variance
   components and latent temporal dynamics are all cluster-specific. Labels and
   parameters are estimated jointly by maximizing a Potts-penalized
   log-likelihood.
-* `SCSTEM_Infocrit()` now fits a full `(k, phi)` grid and returns exact
+* `SCSTEM_Infocrit()` now fits a full `(K, phi)` grid and returns exact
   log-likelihoods, AIC, BIC and KIC, an admissibility flag, the cluster sizes
-  and the estimated partitions. The pre-2.0.0 `mink`/`maxk` calling convention
-  still works.
+  and the estimated partitions.
 * `SCSTEM_Select()` implements a two-step rule for choosing the
-  hyperparameters: **(S1)** the modal BIC-minimizing `k` inside a
-  moderate-penalty band, ties resolved towards the smaller `k`; **(S2)** the
-  `phi` with the smallest BIC at that `k` over the whole grid, ties resolved
+  hyperparameters: **(S1)** the modal BIC-minimizing `K` inside a
+  moderate-penalty band, ties resolved towards the smaller `K`; **(S2)** the
+  `phi` with the smallest BIC at that `K` over the whole grid, ties resolved
   towards the smaller `phi`. Only admissible configurations enter the rule.
-  The pooled `k = 1` model competes in (S1) and is returned when no partition
+  The pooled `K = 1` model competes in (S1) and is returned when no partition
   improves on it.
 * `SCSTEM_Bootstrap()` is now a **refit-with-clustering** parametric bootstrap:
   data are generated cluster by cluster from the fitted model and the *entire*
@@ -92,7 +91,7 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   for the differences between clusters; the co-clustering matrix; and the ARI of
   each refit against the original partition.
 * `SCSTEM_CV()` is an optional validation of predictive accuracy, separate
-  from the choice of `(k, phi)`: blocked cross-validation leaving out
+  from the choice of `(K, phi)`: blocked cross-validation leaving out
   locations (`"LKLO"`), time blocks (`"LKTO"`), both (`"LKLHTO"`) or random
   cells, of one fit or of a named list of fits on the same data (the pooled
   model, the selected one, models with different covariates), all refitted on
@@ -101,6 +100,22 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
 * New classes `SCSTEM_Estimation`, `SCSTEM_Infocrit`, `SCSTEM_Select`,
   `SCSTEM_Bootstrap`, `SCSTEM_BootInference` and `SCSTEM_CV`, each with a
   `print()` method.
+
+### Missing values in the response, fitted values
+
+* The response may have missing values (`NA`), so the panel may be
+  unbalanced. The Kalman filter restricts each time point to the locations
+  observed there (Durbin and Koopman 2012), and the M-step completes the
+  sufficient statistics with the conditional moments of the missing values,
+  which the spatial covariance couples to the observed ones. Kriging and both
+  bootstraps follow the same rule. Every location must keep at least one
+  observation; covariates and coordinates cannot be missing.
+* `STEM_Complete()` and `SCSTEM_Complete()` return the conditional expectation
+  of the response given the observed data: the observed value where there is
+  one, the model-based prediction where there is not.
+* `STEM_Signal()` and `SCSTEM_Signal()` return the fitted values, the
+  regression surface plus the smoothed latent process, without the
+  measurement error.
 
 ### Algorithmic changes in the SC-STEM assignment step
 
@@ -149,9 +164,9 @@ its numerical robustness, the whole SC-STEM layer, and the packaging.
   means, the previous default, carry no information on the regimes when the
   covariates are exogenous to them; they remain available as
   `init_method = "kmeans"`. `SCSTEM_Infocrit()` computes the departures once,
-  from its fit at `k = 1`.
+  from its fit at `K = 1`.
 * A fit with `phi_penalty > 0` **starts from the solution of the unpenalized
-  fit** at the same `k` (`SCSTEM_Estimation()` fits `phi = 0` first;
+  fit** at the same `K` (`SCSTEM_Estimation()` fits `phi = 0` first;
   `SCSTEM_Infocrit()` passes on the partition of the `phi = 0` fit it already
   has). A penalty that is strong from the first sweep froze whatever partition
   it was given, so a start unrelated to the regimes stayed where it was. The
@@ -186,7 +201,7 @@ information criteria all come from the exact cluster-wise likelihoods.
 ### Information criteria
 
 * AIC, BIC and KIC are computed on the exact total log-likelihood of the final
-  refit, with `k_eff * (ncov + 3 + 3p)` free parameters and, in the BIC, the
+  refit, with `K_eff * (ncov + 3 + 3p)` free parameters and, in the BIC, the
   number of observed values of the response as the sample size (`d * T` when
   the panel is complete). The previous implementation used the *number of
   clusters* as the number of parameters and the number of locations as the
@@ -200,7 +215,7 @@ information criteria all come from the exact cluster-wise likelihoods.
   iterations were not affected (the stopping rule used differences of the
   stored value, halved), but everything computed from the returned value was:
   the AIC, BIC and KIC of SC-STEM weighted the likelihood four times against
-  the penalty, which favoured more regimes. On the 951 replications of an
+  the penalty, which favored more regimes. On the 951 replications of an
   earlier run of the simulation study, the BIC on the true log-likelihood
   selects fewer regimes in 40, mostly in the weakly separated scenarios. The
   log-likelihood, the smoothed states and the maximum are now tested against
@@ -279,7 +294,7 @@ information criteria all come from the exact cluster-wise likelihoods.
   partition of the unpenalized fit, starts its regimes from the final refit of
   that partition when it is at hand (always within `SCSTEM_Infocrit()`).
 * SC-STEM: the final refit runs with the same settings as the pooled fit at
-  `k = 1`, so that the log-likelihoods compared across `k` are computed to the
+  `K = 1`, so that the log-likelihoods compared across `K` are computed to the
   same accuracy; the fit reports in `em_converged` whether the EM algorithm of
   each regime met its stopping rule.
 * SC-STEM: fits of the same data that end at the same partition share their
@@ -351,7 +366,7 @@ draws out of 12 to 12 out of 12.
   carried as the multiplier of the identity that it is rather than as a dense
   matrix, the products against the inverse covariance are formed once instead
   of three times each, and the log determinant and the inverse now come from a
-  single Cholesky factorisation. The `d x d` matrix products per inner
+  single Cholesky factorization. The `d x d` matrix products per inner
   iteration go from twelve to five.
 * `mvtnorm` moves from `Imports` to `Suggests`: no function in the package uses
   it any more, though the test suite still does, as an independent reference
@@ -386,16 +401,24 @@ Further packaging work required before submission:
 * `dplyr` and `sf` were likewise dropped, as nothing in the package needs them
   any more; every external call is written as `package::function()` and
   `NAMESPACE` no longer carries `importFrom` directives;
-* `URL` and `BugReports` fields added, along with `LICENSE`, `NEWS.md` and a
-  `testthat` suite.
+* `URL` and `BugReports` fields added, along with `NEWS.md` and a `testthat`
+  suite.
 
 ## Documentation
 
+* Five vignettes: getting started with STEM models, spatially-clustered STEM
+  models (from `STEM_Model()` to the selection rule and the bootstrap), a map of
+  the package, computational notes, and numerical experiments on the
+  estimation algorithms.
 * New conceptual map of the package under `inst/extdata/`, showing how the STEM
   and SC-STEM functions call one another, and reachable from R with
   `system.file("extdata", package = "Stem")`.
-* Vignette rewritten around the full workflow, from `STEM_Model()` to the
-  SC-STEM selection rule and bootstrap.
+* The Computational and Algorithmic Supplement of the paper on SC-STEM ships
+  with the package:
+  `system.file("extdata", "Stem-computational-supplement.pdf", package = "Stem")`.
+  The source repository adds documentation pages on the models, the
+  computations and the functions (`docs/`), and the data and code that
+  reproduce the paper (`papers/sc-stem-local-leader`).
 
 
 # Stem 1.0

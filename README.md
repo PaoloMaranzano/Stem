@@ -41,11 +41,11 @@ log-likelihood,
 Q = \sum_{i=1}^{d} \ell_i(k_i) + \phi \, c \sum_{(i,j) \in E} I(k_i = k_j),
 ```
 
-whose penalty rewards neighbouring locations sharing a regime; $K = 1$ is the
+whose penalty rewards neighboring locations sharing a regime; $K = 1$ is the
 pooled model. An optional **ridge, lasso or elastic net** acts on the regression
 coefficients of every regime.
 
-Details: [the models](docs/models.md), [the penalty on the coefficients](docs/regularization.md).
+Details: [the models](https://github.com/PaoloMaranzano/Stem/blob/main/docs/models.md), [the penalty on the coefficients](https://github.com/PaoloMaranzano/Stem/blob/main/docs/regularization.md).
 
 ## Estimation algorithms
 
@@ -80,7 +80,7 @@ to a point that is not the maximum.
 
 Details, with formulas and the numerical experiments, including the limits
 within which the range of the spatial correlation is estimated:
-[computational aspects](docs/computational-aspects.md) and the
+[computational aspects](https://github.com/PaoloMaranzano/Stem/blob/main/docs/computational-aspects.md) and the
 Computational Supplement that ships with the package (see
 [Documentation](#documentation)).
 
@@ -193,15 +193,15 @@ SCSTEM_BootInference(boot)
 
 ## Documentation
 
-Topic pages, in [`docs/`](docs/README.md):
+Topic pages, in [`docs/`](https://github.com/PaoloMaranzano/Stem/blob/main/docs/README.md):
 
 | page | what it covers |
 |---|---|
-| [The models](docs/models.md) | STEM and SC-STEM, their parameters, and what the model class covers and does not |
-| [Computational aspects](docs/computational-aspects.md) | how STEM and SC-STEM are estimated, following Supplement A of the paper section by section: the Kalman filter and smoother, the EM, ECME and SQUAREM algorithms, the stopping rule, the limits of the range, missing responses, the start of a fit and the scale of the Potts penalty, degeneracy and the swap pass, the label update, the information criteria, the bootstrap and its tests, the Potts penalty on point-referenced data, the numerical experiments |
-| [Ridge, lasso and elastic net](docs/regularization.md) | the penalty on the regression coefficients |
-| [How the functions fit together](docs/function-map.md) | the map of the package |
-| [Theoretical references](docs/references.md) | the works behind the package |
+| [The models](https://github.com/PaoloMaranzano/Stem/blob/main/docs/models.md) | STEM and SC-STEM, their parameters, and what the model class covers and does not |
+| [Computational aspects](https://github.com/PaoloMaranzano/Stem/blob/main/docs/computational-aspects.md) | how STEM and SC-STEM are estimated, following Supplement A of the paper section by section: the Kalman filter and smoother, the EM, ECME and SQUAREM algorithms, the stopping rule, the limits of the range, missing responses, the start of a fit and the scale of the Potts penalty, degeneracy and the swap pass, the label update, the information criteria, the bootstrap and its tests, the Potts penalty on point-referenced data, the numerical experiments |
+| [Ridge, lasso and elastic net](https://github.com/PaoloMaranzano/Stem/blob/main/docs/regularization.md) | the penalty on the regression coefficients |
+| [How the functions fit together](https://github.com/PaoloMaranzano/Stem/blob/main/docs/function-map.md) | the map of the package |
+| [Theoretical references](https://github.com/PaoloMaranzano/Stem/blob/main/docs/references.md) | the works behind the package |
 
 Shipped with the package:
 
@@ -220,10 +220,10 @@ browseURL(system.file("extdata", "STEM_model_verification.html", package = "Stem
 
 The development record - the defects fixed in this release and the reasoning
 behind the algorithmic changes - is kept in the repository, outside the built
-package, at [`dev/code-changes-report.html`](dev/code-changes-report.html). The
+package, at [`dev/code-changes-report.html`](https://github.com/PaoloMaranzano/Stem/blob/main/dev/code-changes-report.html). The
 user-facing summary is [`NEWS.md`](NEWS.md), and the dated development log is
-[`CHANGELOG.md`](CHANGELOG.md). The theory of the regularized estimator is at
-[`dev/regularization/stem-elastic-net.tex`](dev/regularization/stem-elastic-net.tex).
+[`CHANGELOG.md`](https://github.com/PaoloMaranzano/Stem/blob/main/CHANGELOG.md). The theory of the regularized estimator is at
+[`dev/regularization/stem-elastic-net.tex`](https://github.com/PaoloMaranzano/Stem/blob/main/dev/regularization/stem-elastic-net.tex).
 
 ## Authors
 

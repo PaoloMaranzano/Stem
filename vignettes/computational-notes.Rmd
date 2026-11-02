@@ -38,7 +38,7 @@ work grows with the size of the problem, ignoring multiplicative constants and
 lower-order terms.
 
 **Why inverting a $d \times d$ matrix costs $O(d^3)$.** Not by cofactors, which
-would cost $d!$. By factorisation: an LU decomposition for a general matrix, a
+would cost $d!$. By factorization: an LU decomposition for a general matrix, a
 Cholesky decomposition for a symmetric positive definite one. Gaussian
 elimination proceeds column by column: at column $k$ it eliminates the $d-k$
 entries below the pivot, and for each of those rows it updates a row of $d-k$
@@ -47,7 +47,7 @@ entries, which is $(d-k)^2$ operations. Summing over the columns,
 $$\sum_{k=1}^{d}(d-k)^2 = \sum_{j=0}^{d-1}j^2 = \frac{d(d-1)(2d-1)}{6}\approx\frac{d^3}{3}$$
 
 multiplications, and as many additions: about $\tfrac{2}{3}d^3$ operations for
-the factorisation. Cholesky, exploiting symmetry, costs half of that. Forming
+the factorization. Cholesky, exploiting symmetry, costs half of that. Forming
 the explicit inverse then needs $d$ triangular solves at $O(d^2)$ each, so
 $O(d^3)$ again.
 
@@ -62,10 +62,10 @@ $$Q_t = A P_t A' + \Sigma_\varepsilon,$$
 
 together with its inverse and its determinant. $P_t$, the predicted variance of
 the state, changes with $t$, so $Q_t$ changes with $t$, so a direct
-implementation factorises a $d\times d$ matrix $T$ times per pass.
+implementation factorizes a $d\times d$ matrix $T$ times per pass.
 
 Concretely, at $d = 400$: $d^3 = 6.4\times 10^{7}$, so about $4\times 10^{7}$
-operations per factorisation, roughly $0.04$ seconds with the reference BLAS
+operations per factorization, roughly $0.04$ seconds with the reference BLAS
 that ships with R. That looks small. Multiplied by $T = 730$ it is 29 seconds
 for **one forward pass**, that is one E-step; an EM run does thirty to fifty of
 them; and `SCSTEM_Estimation()` runs an EM per regime, for every point of the
@@ -120,7 +120,7 @@ again with only a $p\times p$ piece depending on $t$.
   solve against the cached Cholesky factor of $\Sigma_\varepsilon$ at $O(d^2)$,
   corrected by a $p\times p$ term.
 
-So a pass costs $O(d^3)$ **once**, for the factorisation of
+So a pass costs $O(d^3)$ **once**, for the factorization of
 $\Sigma_\varepsilon$, plus $O(d^2)$ per time point: $O(d^3 + T d^2)$ in place
 of $O(T d^3)$.
 
@@ -143,7 +143,7 @@ $$-\tfrac{1}{2}\left\{ d\log 2\pi + \log|Q_t| + e_t'Q_t^{-1}e_t \right\}.$$
 
 Evaluating the **density** and taking its logarithm afterwards is not a matter
 of speed. A Gaussian density on $d$ observations is of order $e^{-d}$; the
-smallest positive normalised double is $2.2\times10^{-308} = e^{-708}$. Past a
+smallest positive normalized double is $2.2\times10^{-308} = e^{-708}$. Past a
 few hundred stations the density underflows to exactly zero, its logarithm is
 `-Inf`, and the EM algorithm stops. Computing the log-density directly never
 touches the small number.
@@ -207,7 +207,7 @@ ran the two side by side on the same data.
 | `R/squarem.R`, `R/em-fit.R` | the SQUAREM acceleration, and the wrapper that runs the algorithm chosen and applies the stopping rule |
 | `R/d1_Q.R`, `R/d2_Q.R`, `R/d12_Q.R` | the derivatives of the objective, with the shared products |
 | `R/Stem-02-internal.R` | the structured products used when a derivative is a multiple of the identity |
-| `R/stem-penalty.R` | the regularised update of the coefficients, a separate matter |
+| `R/stem-penalty.R` | the regularized update of the coefficients, a separate matter |
 
 The files of the filter and of the derivatives keep the expression they
 replaced, commented, immediately above the expression that replaced it; the
@@ -222,7 +222,7 @@ the treatment of missing observations.
 
 Golub, G. H., Van Loan, C. F. (2013) *Matrix Computations*, 4th edition. Johns
 Hopkins University Press. Chapters 2 and 4 for the operation counts and the
-stability of the factorisations.
+stability of the factorizations.
 
 Henderson, H. V., Searle, S. R. (1981) *On deriving the inverse of a sum of
 matrices*. SIAM Review, 23, 53--60. The history of the identity.

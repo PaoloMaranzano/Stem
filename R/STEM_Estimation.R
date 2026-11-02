@@ -24,7 +24,7 @@
 #' @param flag.Gdiag logical, indicating whether the transition matrix \eqn{G} is diagonal.
 #' @param flag.Sigmaetadiag logical, indicating whether the variance-covariance matrix of the state equation \eqn{\Sigma_\eta} is diagonal.
 #' @param cov.spat type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.
-#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
+#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param regularization a non-negative number added to the diagonal of the
 #'   matrices the EM algorithm inverts (the smoother gains at the first and last
 #'   time point, \eqn{\Sigma^*} in the update of \eqn{\sigma^2_\omega},

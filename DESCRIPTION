@@ -42,9 +42,10 @@ Description: Estimation of hierarchical spatio-temporal models through the
     <doi:10.1016/j.spasta.2021.100525> and of the spatially-clustered spatial
     autoregressive models of Cerqueti, Maranzano and Mattera (2025)
     <doi:10.1007/s13253-025-00685-7>. SC-STEM comes with likelihood-based
-    criteria and a stability-based rule for selecting the number of clusters
-    and the spatial penalty, and with a refit-with-clustering parametric
-    bootstrap that propagates the uncertainty of the estimated partition.
+    information criteria, a two-step rule based on the Bayesian information
+    criterion for selecting the number of regimes and the spatial penalty,
+    and a refit-with-clustering parametric bootstrap that propagates the
+    uncertainty of the estimated partition into intervals and tests.
 License: GPL (>= 2)
 URL: https://github.com/PaoloMaranzano/Stem
 BugReports: https://github.com/PaoloMaranzano/Stem/issues

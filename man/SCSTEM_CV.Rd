@@ -122,7 +122,7 @@ cv
 
 }
 \references{
-Otto, P., Fasso, A., Maranzano, P. (2024) \emph{A review of regularised
+Otto, P., Fasso, A., Maranzano, P. (2024) \emph{A review of regularized
 estimation methods and cross-validation in spatiotemporal statistics}.
 Statistics Surveys, 18, 299--340. \doi{10.1214/24-SS150}
 }

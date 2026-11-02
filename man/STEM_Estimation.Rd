@@ -39,7 +39,7 @@ parameter. Kept for the code written before \code{control} existed.}
 
 \item{cov.spat}{type of spatial covariance function. For the moment only the \emph{exponential} function is implemented.}
 
-\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
+\item{distance}{character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.}
 
 \item{regularization}{a non-negative number added to the diagonal of the
 matrices the EM algorithm inverts (the smoother gains at the first and last

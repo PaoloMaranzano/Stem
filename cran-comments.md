@@ -2,9 +2,15 @@
 
 ## Submission
 
-`Stem` was archived from CRAN and is resubmitted here as version 2.0.0. The
-maintainer address is `pmaranzano.ricercastatistica@gmail.com`, the same one
-used for the maintainer's other CRAN packages.
+`Stem` 1.0 was published on CRAN in 2012 and archived on 2022-06-13, as check
+problems were not corrected. It is resubmitted here as version 2.0.0, a
+thorough revision that corrects those problems and extends the package.
+
+The maintainer changes: version 1.0 was maintained by Michela Cameletti
+(`michela.cameletti@unibg.it`), who remains an author of version 2.0.0 and
+agrees that Paolo Maranzano takes over as maintainer. The maintainer address is
+`pmaranzano.ricercastatistica@gmail.com`, the same one used for the
+maintainer's other CRAN packages.
 
 ## Response to the previous review
 
@@ -45,35 +51,26 @@ All the points raised in the previous review have been addressed.
   duplicated in `R/` and `data/`.
 * The dependency on `SCDA`, which is not distributed on CRAN, has been removed;
   `dplyr` and `sf` are no longer needed either.
-* A second dataset (`povalley`), three vignettes, a `testthat` suite and a
+* A second dataset (`povalley`), five vignettes, a `testthat` suite and a
   conceptual map of the package have been added.
 
 ## Test environments
 
-* local Windows 11, R 4.5.1
+* local Windows 11, R 4.6.1 (`R CMD check --as-cran`, with the `\donttest`
+  examples and the HTML math check)
 
 ## R CMD check results
 
-See below; the check is run with `--as-cran`.
+0 errors | 0 warnings | 1 note
 
-## Note on running the checks locally
+* New submission; package was archived on CRAN. This is the resubmission of
+  the archived package described above.
 
-The repository lives inside a OneDrive-synced folder. `R CMD check` creates
-thousands of small files, and the sync client stalls the run - the check hangs
-at "checking package dependencies" for as long as it is left there. Run the
-build and the check from a directory that is not synced:
+The words that a spell check may flag in `Description` are the names of the
+cited authors (Fasso, Cameletti, Nicolis, McLachlan, Krishnan, Sugasawa,
+Murakami, Cerqueti, Maranzano, Mattera) and technical terms (Kalman, Potts,
+STEM, SC-STEM).
 
-```r
-# from any non-synced working directory
-pkg <- "<path to the working copy of this repository>"
-tar <- devtools::build(pkg, path = tempdir())
-rcmdcheck::rcmdcheck(tar, args = c("--as-cran", "--no-manual"),
-                     error_on = "warning")
-```
-
-Building the vignettes also needs pandoc on the path. If it is not, point R at
-the copy that ships with RStudio:
-
-```r
-Sys.setenv(RSTUDIO_PANDOC = "C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools")
-```
+The examples marked `\donttest` fit spatio-temporal models and bootstraps on
+real data and take about four minutes in all; the examples that are run by
+default take a few seconds.

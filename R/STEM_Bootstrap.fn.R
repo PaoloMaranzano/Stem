@@ -15,7 +15,7 @@ function(x, StemModel, seed.list.out, output.kriging=NULL,distance='euclidean',p
 	set.seed(x)
 	position   = which(unlist(seed.list.out)== x)
 	if (isTRUE(verbose)) message("=== Bootstrap iteration n. ", position, " ===")
-	#write(position , file = "position.out", append=T)
+	#write(position , file = "position.out", append=TRUE)
 
 
         ##STEP 2: SIMULATIOM

@@ -24,7 +24,7 @@ A list with five components, following the same conventions as
 }
 \source{
 European Environment Agency, air quality e-reporting database,
-\url{https://www.eea.europa.eu/en/analysis/publications/air-quality-e-reporting}.
+\url{https://www.eea.europa.eu/en/datahub/datahubitem-view/3b390c9c-f321-490a-b25a-ae93b2ed80c1}.
 Data prepared by Francesco Caccia.
 }
 \usage{

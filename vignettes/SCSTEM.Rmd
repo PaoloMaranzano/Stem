@@ -125,7 +125,7 @@ locations and the exact marginal likelihood does not factorize across them,
 while the parameter step maximizes the exact within-cluster likelihood through
 the EM algorithm. A parameter update can therefore lower $Q$ while raising the
 exact likelihood. This is a property of the spatio-temporal specification, not
-a numerical artefact. To keep the answer well defined, `SCSTEM_Estimation()` always
+a numerical artifact. To keep the answer well defined, `SCSTEM_Estimation()` always
 returns the best partition visited, and reports both objectives
 (`best_objective`, `last_objective`).
 
@@ -186,7 +186,7 @@ ic$table[, c("K", "phi", "K_eff", "admissible", "loglik", "BIC", "min_size")]
 ```
 
 Two caveats make a naive "minimize the BIC" rule unsafe here. The partition is
-itself optimized on the data, so the maximized likelihood keeps an optimizm bias
+itself optimized on the data, so the maximized likelihood keeps an optimism bias
 that the parameter count does not fully correct; and the shrinking variance
 components inflate the likelihood of the least regularized configurations. Both
 effects are strongest at $\phi \approx 0$, where in-sample criteria overselect

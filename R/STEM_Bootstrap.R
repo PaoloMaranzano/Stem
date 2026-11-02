@@ -5,7 +5,7 @@
 #'
 #' @param StemModel an object of class \dQuote{STEM_Model} given as output by the \code{\link{STEM_Model}} function.
 #' @param B number of bootstrap iterations.
-#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodedic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
+#' @param distance character, indicating the type of distance. 'euclidean' compute euclidean distance while 'geo' compute the geodesic distance. use 'geo' only if the coordinates format is Longitude, Latitude. Default is 'euclidean'.
 #' @param precision optional; when given, it replaces \code{em_tol_par} of \code{control} in every refit (see \code{\link{STEM_Estimation}}). Default \code{NULL}.
 #' @param control the computational settings of the refits, an object returned by \code{\link{STEM_control}} or a list of some of its settings. Default \code{NULL}, the defaults.
 #' @param regularization a non-negative number added to the diagonal of the matrices inverted by the EM algorithm of every refit; see \code{\link{STEM_Estimation}}. Default is 0.
