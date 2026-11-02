@@ -64,6 +64,7 @@ How the scripts, the data and the results connect (`AppFuels_00_Setup.R` and
 `Sims_00_Setup.R` are sourced by the scripts of their part):
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart LR
     subgraph APP["Application (Section 5, Appendix C, Supplement C)"]
         direction TB

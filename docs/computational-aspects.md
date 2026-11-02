@@ -52,9 +52,10 @@ each iteration of that algorithm runs the Kalman filter and smoother. The
 bootstrap re-runs the selected fit on every draw.
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     SEL["Selection: fits on a grid of (K, φ),<br/>two-step rule on the BIC (Sections 3 and 6)"] -->|"one fit per (K, φ)"| FIT["One fit at (K, φ):<br/>the alternation of SC-STEM (Algorithm 1)"]
-    SEL -->|"selected fit at (K̂, φ̂)"| BOOT["Bootstrap: B draws, each simulated from the fit<br/>and re-estimated at (K̂, φ̂) (Section 7)"]
+    SEL -->|"selected fit"| BOOT["Bootstrap: B draws, each simulated from the selected fit<br/>and re-estimated at its (K, φ) (Section 7)"]
     BOOT -->|"one refit per draw"| FIT
     FIT -->|"parameter step, every regime"| REG["An EM-type algorithm on one regime:<br/>EM, ECME, SQUAREM or SQUAREM-ECME (Section 1)"]
     REG -->|"every iteration"| KF["E-step: Kalman filter and smoother (Section 1.2);<br/>M-step: conditional maximizations (Section 1.3)"]
@@ -64,6 +65,7 @@ flowchart TD
 (`SCSTEM_Estimation()`):
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     IN["Input: data, coordinates, loading matrix,<br/>K, φ, neighbors m, minimum size n_min"] --> GR["Symmetrized m-nearest-neighbor graph<br/>(Section 8)"]
     GR --> Q0{"φ = 0 ?"}
@@ -346,6 +348,7 @@ in the update of $(\beta, m_0)$; the plain and the SQUAREM variants differ in
 how successive iterations are combined.
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart LR
     subgraph IT["One iteration M(ψ)"]
         direction TB
@@ -610,6 +613,7 @@ extrapolation can. Four safeguards keep SQUAREM monotone.
 **One cycle as a flowchart.**
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     P0["ψ0"] --> P1["ψ1 = M(ψ0), which also gives ℓ(ψ0)"]
     P1 --> STP{"stopping rule met<br/>on the step ψ0 → ψ1?"}
@@ -872,15 +876,16 @@ the strong values 0.5 and 1 stay on the grid for data on which they do.
 `SCSTEM_Select()`), with the two rules of the start:
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     G["Grid: K = 1, ..., K_max and<br/>φ in {0, 0.025, 0.05, 0.1, 0.2, 0.5, 1}"] --> F0["At every K: the fit at φ = 0,<br/>started from the departures"]
     F0 --> FP["At every K and φ > 0: the fit started from the partition<br/>of the fit at φ = 0, with its scale c (Proposition A3.1)"]
     FP --> TB["Table of the grid: log-likelihood of the final refit,<br/>number of parameters, AIC, BIC, KIC"]
-    TB --> S1["Step 1: K̂ = the most frequent BIC-best K over φ in [0.025, 0.2],<br/>the pooled model (K = 1) competing; ties to the smaller K"]
-    S1 --> K1{"K̂ = 1 ?"}
+    TB --> S1["Step 1: the selected K is the most frequent BIC-best K<br/>over φ in [0.025, 0.2], the pooled model (K = 1) competing;<br/>ties to the smaller K"]
+    S1 --> K1{"selected K = 1 ?"}
     K1 -->|"yes"| PO["The pooled STEM fit"]
-    K1 -->|"no"| S2["Step 2: φ̂ = the φ with the smallest BIC at K̂,<br/>over the whole grid; ties to the smaller φ"]
-    S2 --> SF["Selected fit at (K̂, φ̂)"]
+    K1 -->|"no"| S2["Step 2: the selected φ has the smallest BIC at that K,<br/>over the whole grid; ties to the smaller φ"]
+    S2 --> SF["Selected fit"]
 ```
 
 **Why a penalized fit cannot be started like an unpenalized one.** First, the
@@ -1066,15 +1071,16 @@ uncertainty of the memberships.
 summaries) do.
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
-    A["Selected fit at (K̂, φ̂):<br/>partition ĝ, regime parameters Ψ̂_k"] --> B["Draw B seeds<br/>from seed"]
+    A["Selected fit: the estimated partition<br/>and the parameters of every regime"] --> B["Draw B seeds<br/>from seed"]
     B --> C{"for b = 1, ..., B<br/>(in parallel, each under its own seed)"}
-    C --> D["Simulate each regime k from its STEM model at Ψ̂_k,<br/>on its observed covariates, coordinates, loading rows"]
+    C --> D["Simulate each regime from its STEM model at its estimates,<br/>on its observed covariates, coordinates, loading rows"]
     D --> E["Put the locations back in their original order;<br/>reimpose the observed pattern of missing values"]
-    E --> F["Re-run SC-STEM at (K̂, φ̂) with the settings of the original fit:<br/>start, scale of the penalty, algorithm, tolerances"]
-    F --> G["Record ĝ*_b, Ψ̂*_b, log-likelihood, iterations;<br/>usable if the refit succeeded with K̂ regimes"]
+    E --> F["Re-run SC-STEM at the selected (K, φ) with the settings<br/>of the original fit: start, scale of the penalty, algorithm, tolerances"]
+    F --> G["Record the partition and the parameters of the refit,<br/>its log-likelihood and iterations; usable if the refit<br/>succeeded with all its regimes"]
     G --> C
-    C -->|all draws done| H["Align the labels of every usable draw<br/>to ĝ (majority rule)"]
+    C -->|all draws done| H["Align the labels of every usable draw<br/>to the estimated partition (majority rule)"]
     H --> I["Summaries: bias, standard errors, intervals,<br/>tests between regimes, stability of the partition"]
     H --> J["Aligned draws: any further test<br/>(e.g. Wald) without refitting"]
 ```

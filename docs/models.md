@@ -30,6 +30,7 @@ $y_0 \sim N(m_0, C_0)$. The three error components are mutually independent and
 white over time.
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart LR
     X["Covariates X_t"] -->|"regression β"| Z["Observations Z_t<br/>at the d locations"]
     Y["Latent process y_t = G y_t−1 + η_t:<br/>the dynamics shared by the network"] -->|"loadings A"| Z

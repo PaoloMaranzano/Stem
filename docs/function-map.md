@@ -12,6 +12,7 @@ The layers of the estimation, from the entry point down to the Kalman filter
 (the exported functions have upper-case names, the internal ones lower-case):
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     FIT["STEM_Fit()"] -->|"K = 1"| SE["STEM_Estimation()"]
     FIT -->|"K > 1"| SC["SCSTEM_Estimation():<br/>the alternation of SC-STEM"]

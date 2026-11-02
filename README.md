@@ -114,6 +114,7 @@ Two functions are all a first session needs: `STEM_Model()` to build the object,
 uncertainty, prediction) or an engine below.
 
 ```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 400}}}%%
 flowchart TD
     D["Data: series z, covariates,<br/>coordinates, starting values"] --> M["STEM_Model()"]
     M --> F["STEM_Fit()"]
