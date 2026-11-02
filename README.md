@@ -113,6 +113,21 @@ Two functions are all a first session needs: `STEM_Model()` to build the object,
 `STEM_Fit()` to estimate it. Everything else is either a layer above (selection,
 uncertainty, prediction) or an engine below.
 
+```mermaid
+flowchart TD
+    D["Data: series z, covariates,<br/>coordinates, starting values"] --> M["STEM_Model()"]
+    M --> F["STEM_Fit()"]
+    F -->|"K = 1"| E1["STEM_Estimation():<br/>pooled STEM"]
+    F -->|"K > 1"| E2["SCSTEM_Estimation():<br/>SC-STEM"]
+    M --> I["SCSTEM_Infocrit():<br/>fits on a grid of (K, φ)"]
+    I --> S["SCSTEM_Select():<br/>the two-step rule"]
+    S -->|"selected fit"| B["SCSTEM_Bootstrap():<br/>the partition re-estimated at every draw"]
+    B --> BI["SCSTEM_BootInference():<br/>standard errors, intervals, tests"]
+    E1 --> P1["STEM_Signal(), STEM_Complete(),<br/>STEM_Kriging(), STEM_Simulation(), STEM_Bootstrap()"]
+    E2 --> P2["SCSTEM_Signal(), SCSTEM_Complete(),<br/>SCSTEM_CV()"]
+    S --> P2
+```
+
 **Build and fit**
 
 | Function | Purpose |

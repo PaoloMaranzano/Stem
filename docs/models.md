@@ -29,6 +29,20 @@ with $e_t \sim N(0, \Sigma_e)$, $\eta_t \sim N(0, \Sigma_\eta)$ and
 $y_0 \sim N(m_0, C_0)$. The three error components are mutually independent and
 white over time.
 
+```mermaid
+flowchart LR
+    X["Covariates X_t"] -->|"regression β"| Z["Observations Z_t<br/>at the d locations"]
+    Y["Latent process y_t = G y_t−1 + η_t:<br/>the dynamics shared by the network"] -->|"loadings A"| Z
+    N["Nugget σ²_ε:<br/>local noise"] --> E["Measurement error e_t"]
+    W["Spatial field σ²_ω exp(−θ h):<br/>correlated noise"] --> E
+    E --> Z
+```
+
+In SC-STEM (below) each regime carries its own copy of this structure, with
+its own $\beta_k$, $G_k$, $\Sigma_{\eta,k}$, $\sigma^2_{\varepsilon,k}$,
+$\sigma^2_{\omega,k}$ and $\theta_k$, and the partition of the locations into
+regimes is estimated together with them.
+
 | Symbol | Role | How to read it |
 |---|---|---|
 | $\beta$ | Regression coefficients on the covariates $X_t$ | The part of the concentration explained by observable drivers: altitude, emissions, a co-pollutant. Constant over space and time. |

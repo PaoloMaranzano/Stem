@@ -16,6 +16,24 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-11-02
+
+**Diagrams in the documentation.** Flowcharts in Mermaid, which GitHub draws
+from the text of the page, with no image files: the workflow of the functions
+(README); how the computations nest and Algorithm 1 of the paper, one
+iteration and the four algorithms, the cycle of SQUAREM, the grid and the
+two-step rule (`docs/computational-aspects.md`, with the bootstrap of
+2026-10-30); the layers of the estimation from `STEM_Fit()` to `kalman()`
+(`docs/function-map.md`); the structure of the STEM model (`docs/models.md`);
+the scripts, data and results of the replication package
+(`papers/sc-stem-local-leader/README.md`). They are not shipped to CRAN:
+`docs/` and `papers/` are outside the build.
+
+**The paper.** At the suggestion of a colleague close to the journal, the
+manuscript now places the application in the fuel industry and the data in
+industry and data science (abstract, introduction, application, conclusion),
+without changing its content; the clean PDFs are rebuilt.
+
 ### 2026-10-30 (night)
 
 **ECME and the bootstrap explained step by step.** `docs/computational-aspects.md`

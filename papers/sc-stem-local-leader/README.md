@@ -60,6 +60,35 @@ papers/sc-stem-local-leader/
                                     the simulations, with their caches
 ```
 
+How the scripts, the data and the results connect (`AppFuels_00_Setup.R` and
+`Sims_00_Setup.R` are sourced by the scripts of their part):
+
+```mermaid
+flowchart LR
+    subgraph APP["Application (Section 5, Appendix C, Supplement C)"]
+        direction TB
+        D["data/<br/>weekly prices of 3,136 stations"] --> R1["AppFuels_01_RunSetting1.R"]
+        D --> R2["AppFuels_02_RunSetting2.R"]
+        D --> R3["AppFuels_03_RunSetting3.R"]
+        R1 --> RR["results of the 66 models:<br/>results/application (the paper)<br/>or output/runs/application (a new run)"]
+        R2 --> RR
+        R3 --> RR
+        D --> EDA["internal/AppFuels_Internal_EDA.R"]
+        EDA --> RE["results/application/eda"]
+        RR --> A4["AppFuels_04_Analysis.R"]
+        RE --> A4
+        A4 --> OA["output/application:<br/>every table, figure and number"]
+    end
+    subgraph SIM["Simulations (Section 4, Appendix B, Supplement B)"]
+        direction TB
+        S0["Sims_00_Setup.R:<br/>generator, Monte Carlo, design"] --> S1["Sims_01_Run.R<br/>(streams 1 and 2)"]
+        S1 --> SR["results of the 66,400 replications:<br/>results/simulations (the paper)<br/>or output/runs/simulations (a new run)"]
+        SR --> S2["Sims_02_Analysis.R"]
+        S0 --> S2
+        S2 --> OS["output/simulations:<br/>every table, figure and number"]
+    end
+```
+
 `results/` and `output/` differ in who made them. `results/` holds what the
 long runs of the paper produced (some 150 hours for the 66 models, 2,170
 core-hours for the simulations), shipped so that the analysis scripts rebuild

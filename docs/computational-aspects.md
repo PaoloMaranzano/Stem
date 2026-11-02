@@ -26,6 +26,8 @@ has [a page of its own](regularization.md).
 
 Contents
 
+- [At a glance](#at-a-glance): how the computations nest, and Algorithm 1 of the paper as a flowchart
+
 1. [Estimation: the Kalman filter, the EM algorithm and its accelerations](#1-estimation-the-kalman-filter-the-em-algorithm-and-its-accelerations) (Supplement A, Section A1)
 2. [Missing observations](#2-missing-observations) (A2)
 3. [Initialization and the scale of the penalty](#3-initialization-and-the-scale-of-the-penalty) (A3)
@@ -38,6 +40,45 @@ Contents
 10. [No jitter in the inversions](#10-no-jitter-in-the-inversions)
 11. [Numerical experiments](#11-numerical-experiments)
 12. [Where it is in the code](#12-where-it-is-in-the-code)
+
+---
+
+## At a glance
+
+**How the computations nest.** A selection fits a grid of $(K, \phi)$; each fit
+is the alternation of SC-STEM (Algorithm 1 of the paper, below); each
+parameter step of the alternation runs an EM-type algorithm on every regime;
+each iteration of that algorithm runs the Kalman filter and smoother. The
+bootstrap re-runs the selected fit on every draw.
+
+```mermaid
+flowchart TD
+    SEL["Selection: fits on a grid of (K, φ),<br/>two-step rule on the BIC (Sections 3 and 6)"] -->|"one fit per (K, φ)"| FIT["One fit at (K, φ):<br/>the alternation of SC-STEM (Algorithm 1)"]
+    SEL -->|"selected fit at (K̂, φ̂)"| BOOT["Bootstrap: B draws, each simulated from the fit<br/>and re-estimated at (K̂, φ̂) (Section 7)"]
+    BOOT -->|"one refit per draw"| FIT
+    FIT -->|"parameter step, every regime"| REG["An EM-type algorithm on one regime:<br/>EM, ECME, SQUAREM or SQUAREM-ECME (Section 1)"]
+    REG -->|"every iteration"| KF["E-step: Kalman filter and smoother (Section 1.2);<br/>M-step: conditional maximizations (Section 1.3)"]
+```
+
+**Algorithm 1 of the paper**, the estimation of SC-STEM at fixed $K$ and $\phi$
+(`SCSTEM_Estimation()`):
+
+```mermaid
+flowchart TD
+    IN["Input: data, coordinates, loading matrix,<br/>K, φ, neighbors m, minimum size n_min"] --> GR["Symmetrized m-nearest-neighbor graph<br/>(Section 8)"]
+    GR --> Q0{"φ = 0 ?"}
+    Q0 -->|"yes"| ST0["Pooled STEM fit; k-means of the departures<br/>of the locations from it (Section 3)"]
+    Q0 -->|"no"| ST1["Start from the partition of the fit<br/>at φ = 0 and the same K (Section 3)"]
+    ST0 --> PS["Parameter step: EM on the locations of each regime<br/>(Section 1.5); a regime below n_min keeps its last parameters"]
+    ST1 --> PS
+    PS --> SC["Scores ℓ_i(k) of every location under every regime;<br/>at the first sweep only, the scale c of the penalty"]
+    SC --> ICM["Label step (ICM): in turn, each location takes the label<br/>that maximizes ℓ_i(k) + φ c · (neighbors in k),<br/>within the minimum size (Sections 4 and 5)"]
+    ICM --> SW["Swap pass: exchange the labels of two locations<br/>whenever Q strictly increases (Section 4)"]
+    SW --> EV["Evaluate Q; keep the best configuration visited"]
+    EV --> STOP{"partition unchanged, gain below tolerance,<br/>partition seen before, or budget spent?"}
+    STOP -->|"no"| PS
+    STOP -->|"yes"| FR["Final refit of the K regimes on the best partition:<br/>estimates, log-likelihood, criteria (Section 1.5)"]
+```
 
 ---
 
@@ -299,6 +340,23 @@ E-step followed by an M-step.
 | inside the alternation of SC-STEM | EM | ECME | EM, not accelerated | ECME, not accelerated |
 | limit | the maximum | the same maximum | the same maximum | the same maximum |
 
+**One picture of the four.** One iteration $M$ is the same E-step and the same
+updates of the variance and dynamic parameters in all four; EM and ECME differ
+in the update of $(\beta, m_0)$; the plain and the SQUAREM variants differ in
+how successive iterations are combined.
+
+```mermaid
+flowchart LR
+    subgraph IT["One iteration M(ψ)"]
+        direction TB
+        E["E-step: Kalman filter and smoother,<br/>S11, S10, S00, W"] --> Q1["Σ_η, G, σ²_ω, (θ, γ):<br/>conditional maximizations of Q"]
+        Q1 --> BQ["(β, m0) on Q, given the smoothed states:<br/>the EM map"]
+        Q1 --> BL["(β, m0) on ℓ, a GLS step by the augmented filter:<br/>the ECME map"]
+    end
+    IT --> PL["Plain iterations: ψ ← M(ψ)<br/>EM, ECME"]
+    IT --> SQ["SQUAREM cycles: two iterations, an extrapolation,<br/>a stabilizing iteration, a check on ℓ<br/>SQUAREM, SQUAREM-ECME"]
+```
+
 **What they cost and how close they stop.**
 
 | `STEM_control(algorithm = )` | M-step | iterations combined | time | iterations | shortfall |
@@ -549,6 +607,24 @@ extrapolation can. Four safeguards keep SQUAREM monotone.
    the EM algorithm guarantees. The check costs nothing, since $\ell(\psi')$
    comes with the stabilizing iteration.
 
+**One cycle as a flowchart.**
+
+```mermaid
+flowchart TD
+    P0["ψ0"] --> P1["ψ1 = M(ψ0), which also gives ℓ(ψ0)"]
+    P1 --> STP{"stopping rule met<br/>on the step ψ0 → ψ1?"}
+    STP -->|"yes"| END["stop at ψ1"]
+    STP -->|"no"| P2["ψ2 = M(ψ1)"]
+    P2 --> RW["r = u1 − u0, w = u2 − 2 u1 + u0<br/>α = min(α_max, max(1, ‖r‖ / ‖w‖))"]
+    RW --> A1{"α > 1 ?"}
+    A1 -->|"no"| N2["next cycle from ψ2:<br/>two EM iterations"]
+    A1 -->|"yes"| EX["ψ′ = u⁻¹(u0 + 2α r + α² w),<br/>θ within its limits"]
+    EX --> P3["ψ3 = M(ψ′), which also gives ℓ(ψ′)"]
+    P3 --> CK{"ℓ(ψ′) ≥ ℓ(ψ0) ?"}
+    CK -->|"yes: accepted"| N3["next cycle from ψ3;<br/>α_max × 4 if α was at the bound"]
+    CK -->|"no: rejected"| N2b["next cycle from ψ2;<br/>α_max ÷ 4 if α was at the bound"]
+```
+
 **One cycle, line by line** (`stem_iterate_squarem()` in `R/squarem.R`). The
 lines marked ★ are those that differ from two iterations of EM; with
 $\alpha = 1$ the cycle is exactly two EM iterations.
@@ -791,6 +867,21 @@ competing, before choosing $\phi$ by the smallest BIC at that $K$ over the
 whole grid. Since every penalized fit starts from the unpenalized one, a
 penalty is chosen only when it leads to a partition with a higher likelihood;
 the strong values 0.5 and 1 stay on the grid for data on which they do.
+
+**The grid and the two-step rule** (`SCSTEM_Infocrit()`, then
+`SCSTEM_Select()`), with the two rules of the start:
+
+```mermaid
+flowchart TD
+    G["Grid: K = 1, ..., K_max and<br/>φ in {0, 0.025, 0.05, 0.1, 0.2, 0.5, 1}"] --> F0["At every K: the fit at φ = 0,<br/>started from the departures"]
+    F0 --> FP["At every K and φ > 0: the fit started from the partition<br/>of the fit at φ = 0, with its scale c (Proposition A3.1)"]
+    FP --> TB["Table of the grid: log-likelihood of the final refit,<br/>number of parameters, AIC, BIC, KIC"]
+    TB --> S1["Step 1: K̂ = the most frequent BIC-best K over φ in [0.025, 0.2],<br/>the pooled model (K = 1) competing; ties to the smaller K"]
+    S1 --> K1{"K̂ = 1 ?"}
+    K1 -->|"yes"| PO["The pooled STEM fit"]
+    K1 -->|"no"| S2["Step 2: φ̂ = the φ with the smallest BIC at K̂,<br/>over the whole grid; ties to the smaller φ"]
+    S2 --> SF["Selected fit at (K̂, φ̂)"]
+```
 
 **Why a penalized fit cannot be started like an unpenalized one.** First, the
 scale would depend on the start: from a start unrelated to the regimes the
