@@ -48,8 +48,9 @@
 ##                      exploratory tables then describe that subset only
 ##
 ## Requirements: R (>= 4.2) with data.table, geodist, urca and Stem at the
-## commit pinned in AppFuels_00_Setup.R of the package (installed from GitHub
-## when another version is installed). Time: the completion fits 22 pooled STEM
+## release named in AppFuels_00_Setup.R of the package, 2.0.0 (installed from
+## GitHub when another version is installed). Time: the completion fits 22
+## pooled STEM
 ## models, from a few minutes for the smaller cities to about an hour for Rome
 ## on one core; with the cache, the whole script takes a few minutes.
 ## ===========================================================================

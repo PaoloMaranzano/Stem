@@ -86,8 +86,16 @@ Computational Supplement that ships with the package (see
 
 ## Installation
 
+The released version, 2.0.0 (submitted to CRAN):
+
 ```r
 # install.packages("remotes")
+remotes::install_github("PaoloMaranzano/Stem@v2.0.0")
+```
+
+The development version:
+
+```r
 remotes::install_github("PaoloMaranzano/Stem")
 ```
 

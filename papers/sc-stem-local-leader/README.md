@@ -87,23 +87,26 @@ the table or figure of the paper it produces.
 
 - R 4.2 or later, with the packages `data.table` and `geodist` from CRAN (and
   `remotes`, to install Stem).
-- For the application, Stem at commit `09e9cdb` of its GitHub repository, the
-  version the results were computed with. The run scripts check the installed
-  version and, when it differs, install this one with
-  `remotes::install_github("PaoloMaranzano/Stem@09e9cdb2d13fdfc94d8bc74e62645ebbc0b16a54")`.
-  Restart R before running a script in a session where another version of Stem
-  is loaded. `AppFuels_04_Analysis.R` does not need Stem; the exploratory
-  analysis also needs `urca`.
-- For the simulations, Stem at commit `0f7b744`
-  (`remotes::install_github("PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad")`),
-  and the packages `spdep` and `callr`.
+- Stem 2.0.0, the [release](https://github.com/PaoloMaranzano/Stem/releases/tag/v2.0.0)
+  of its GitHub repository. The scripts that fit models check the installed
+  version and, when it differs, install the release with
+  `remotes::install_github("PaoloMaranzano/Stem@v2.0.0")`. Restart R before
+  running a script in a session where another version of Stem is loaded.
+  `AppFuels_04_Analysis.R` does not need Stem; the exploratory analysis also
+  needs `urca`; the simulations also need `spdep` and `callr`.
+- The results were computed with two earlier commits of Stem: `09e9cdb` for
+  the application and `0f7b744` for the simulations. The release reproduces
+  both: its code is that of `09e9cdb`, and what changed after `0f7b744` (the
+  parallel bootstrap, the sample size of the BIC with missing responses,
+  SQUAREM with a ridge penalty) is not used by the simulations, whose
+  replications the release reproduces exactly.
 
 Every script runs from a terminal (`Rscript <script>`, in `code/`) or from
 RStudio (open it and press *Source*). Options are given on the command line as
 `--name=value`; the header of every script lists them.
 
 The scripts use Stem as an ordinary dependency: they check that the installed
-version is the one the results were computed with, and install it otherwise.
+version is the release named above, and install it otherwise.
 Every routine that uses randomness takes an explicit seed and restores the
 state of the random number generator on exit: the seed of a model of the
 application depends only on its city and fuel, the seed of a replication of
@@ -746,8 +749,8 @@ geometry.
 
 ### Running it
 
-The study ran on Stem at commit `0f7b744`, which `Sims_01_Run.R` installs when
-another version is installed:
+The study ran on Stem at commit `0f7b744`; `Sims_01_Run.R` installs the release
+2.0.0, which reproduces it, when another version is installed:
 
 ```
 cd papers/sc-stem-local-leader/code

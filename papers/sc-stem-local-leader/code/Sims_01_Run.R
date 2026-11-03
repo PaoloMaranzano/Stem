@@ -45,7 +45,8 @@
 ##
 ## The study of the paper: 332 cells, 200 replications per cell, run as two
 ## streams of 100 on two machines (--stream=1 and --stream=2, --nrep=100), on
-## Stem at the commit pinned in Sims_00_Setup.R (SIM_STEM_REF). A stream draws
+## Stem at commit 0f7b744, whose code the release 2.0.0 installed by
+## Sims_00_Setup.R (SIM_STEM_REF) reproduces exactly. A stream draws
 ## its own data, with seeds no other stream uses: replication r of stream s is
 ## recorded as rep = 1000 (s - 1) + r, and its seed is 1000 rep + 1. Never run
 ## the same stream on two machines at once. The 66,400 replications took
@@ -65,9 +66,9 @@
 ## replace the blocks with one factorial block of those margins around the
 ## reference, as in  Rscript Sims_01_Run.R --TN=60,120,365 --mode=dry
 ##
-## Requirements: R (>= 4.2) with spdep and callr, and Stem at the commit pinned
-## in Sims_00_Setup.R (installed from GitHub when another version is
-## installed).
+## Requirements: R (>= 4.2) with spdep and callr, and Stem at the release
+## named in Sims_00_Setup.R, 2.0.0 (installed from GitHub when another version
+## is installed).
 ## ===========================================================================
 
 ## Definitions only? The worker processes, and Sims_02_Analysis.R, load this file
@@ -160,7 +161,7 @@ CFG <- sim_config(args = if (SIM_DEFINE_ONLY) character(0) else commandArgs(TRUE
     ## Bookkeeping. `out` defaults to output/runs/simulations in the
     ## folder of the paper.
     ## "main3": the design of October 2026 (new values of the strong level,
-    ## the fourth geometry) with the estimator of the commit pinned above
+    ## the fourth geometry) with the estimator of the release named above
     ## (SQUAREM, tolerances 1e-3, no regularization). "main2", the same design
     ## with the EM algorithm at regularization 0.01, and "main", the first pass
     ## of September, are not comparable with it.

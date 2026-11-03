@@ -80,9 +80,10 @@
 ## on which models are run together, nor on --cores, and the three settings can
 ## run at the same time on different machines.
 ##
-## Requirements: R (>= 4.2) with data.table and geodist, and Stem at the commit
-## pinned in AppFuels_00_Setup.R (installed from GitHub when another version is
-## installed). Time: on a first run, the completion of the series takes about
+## Requirements: R (>= 4.2) with data.table and geodist, and Stem at the release
+## named in AppFuels_00_Setup.R, 2.0.0 (installed from GitHub when another
+## version is installed). Time: on a first run, the completion of the series
+## takes about
 ## an hour (most of it for Rome) and serves the three settings; in the run of
 ## the paper the 22 models took about 5 hours (columns minutes_* of
 ## models.csv), none of them more than half an hour.

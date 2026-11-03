@@ -83,9 +83,9 @@ if (!exists("SIM_DEFINE_ONLY", inherits = FALSE)) {
 ## ---------------------------------------------------------------------------
 ## The only prerequisite: Stem
 ##
-## Stem is installed from GitHub at the commit the study was run with
-## (SIM_STEM_REF) whenever the installed copy is another commit. The worker
-## processes only check that the installed Stem carries what the study uses.
+## Stem is installed from GitHub at the release of the scripts (SIM_STEM_REF)
+## whenever the installed copy is another version. The worker processes only
+## check that the installed Stem carries what the study uses.
 ## ---------------------------------------------------------------------------
 sim_require <- function(pkgs) {
   for (p in pkgs) {
@@ -100,48 +100,29 @@ sim_require <- function(pkgs) {
   }
 }
 
-## Pinned to the commit of 2026-10-03 (third): the commit of 2026-10-02 (STEM_control,
-## the stopping rule with em_stop = "any", the regimes started from their own
-## least squares and then warm, the final refits shared across the grid, the
-## names K and A) plus the four estimation algorithms with SQUAREM as the
-## default, tolerances 1e-3 on both criteria, regularization 0, the penalized
-## fits started from the refits of the unpenalized solution, and the range kept
-## within the limits that the distances identify
-SIM_STEM_REF <- "PaoloMaranzano/Stem@0f7b74479b03a7fe5508eafe68fc7510c21422ad"
+## The release of Stem the scripts install: 2.0.0 on GitHub. The study was run
+## with the commit of 2026-10-03 (0f7b744: STEM_control, the stopping rule with
+## em_stop = "any", the regimes started from their own least squares and then
+## warm, the final refits shared across the grid, the names K and A, the four
+## estimation algorithms with SQUAREM as the default, tolerances 1e-3 on both
+## criteria, regularization 0, the penalized fits started from the refits of
+## the unpenalized solution, and the range kept within the limits that the
+## distances identify). The release changes nothing the study uses: it
+## reproduces its replications exactly.
+SIM_STEM_REF <- "PaoloMaranzano/Stem@v2.0.0"
 
-## The commit GitHub holds for SIM_STEM_REF, or NA when it cannot be reached.
-sim_github_sha <- function(ref = SIM_STEM_REF) {
-  repo <- sub("@.*$", "", ref)
-  at   <- if (grepl("@", ref, fixed = TRUE)) {
-    sub("^.*@", "", ref)
-  } else {
-    "HEAD"
-  }
-  j <- tryCatch({
-    con <- url(sprintf("https://api.github.com/repos/%s/commits/%s", repo, at))
-    on.exit(close(con))
-    paste(readLines(con, warn = FALSE), collapse = "")
-  }, error = function(e) "", warning = function(w) "")
-  m <- regmatches(j, regexpr("\"sha\" *: *\"[0-9a-f]{40}\"", j))
-  if (length(m)) {
-    gsub("[^0-9a-f]", "", sub("^\"sha\" *: *", "", m))
-  } else {
-    NA_character_
-  }
-}
-
-## The installed Stem is GitHub's commit when GitHub can be reached, and
-## otherwise carries what the study uses. The version number cannot tell: the
-## development builds all say 2.0.0. The commit is read from the DESCRIPTION
-## file without loading the package: a namespace loaded before the update would
-## read the new files with the old index.
-sim_stem_ok <- function(latest = NA_character_) {
+## The installed Stem is the release of the scripts (given) or carries what the
+## study uses (otherwise). The version number cannot tell: the development
+## builds all say 2.0.0. The release is read from the DESCRIPTION file without
+## loading the package: a namespace loaded before the update would read the new
+## files with the old index.
+sim_stem_ok <- function(release = NA_character_) {
   if (!nzchar(system.file(package = "Stem"))) {
     return(FALSE)
   }
-  if (!is.na(latest)) {
-    here <- utils::packageDescription("Stem")$RemoteSha
-    return(!is.null(here) && identical(here, latest))
+  if (!is.na(release)) {
+    here <- utils::packageDescription("Stem")$RemoteRef
+    return(!is.null(here) && identical(here, release))
   }
   if (!requireNamespace("Stem", quietly = TRUE)) {
     return(FALSE)
@@ -155,14 +136,14 @@ sim_stem_ok <- function(latest = NA_character_) {
     "algorithm" %in% names(formals(get("STEM_control", envir = ns)))     # the algorithms
 }
 
-SIM_STEM_SHA <- if (SIM_DEFINE_ONLY) {
+SIM_STEM_TAG <- if (SIM_DEFINE_ONLY) {
   NA_character_
 } else {
   sub("^.*@", "", SIM_STEM_REF)
 }
-if (!sim_stem_ok(SIM_STEM_SHA)) {
+if (!sim_stem_ok(SIM_STEM_TAG)) {
   if (nzchar(system.file(package = "Stem"))) {
-    message("the installed Stem is not the pinned commit: installing it")
+    message("the installed Stem is not the release of the scripts: installing it")
   } else {
     message("Stem is not installed: installing it from GitHub")
   }
@@ -171,7 +152,7 @@ if (!sim_stem_ok(SIM_STEM_SHA)) {
     try(unloadNamespace("Stem"), silent = TRUE)
   }
   remotes::install_github(SIM_STEM_REF, upgrade = "never", force = TRUE, quiet = TRUE)
-  if (!sim_stem_ok(SIM_STEM_SHA)) {
+  if (!sim_stem_ok(SIM_STEM_TAG)) {
     stop("Stem could not be installed or brought up to date. Restart R ",
          "(Session > Restart R in RStudio) and run again; if it still fails, ",
          "install it by hand with\n  remotes::install_github(\"", SIM_STEM_REF,

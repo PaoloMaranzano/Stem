@@ -16,6 +16,24 @@ between the reference papers and the code, see
 
 ## Unreleased
 
+### 2026-11-03
+
+**The replication package installs the release.** The scripts of
+`papers/sc-stem-local-leader` install Stem 2.0.0 from GitHub
+(`PaoloMaranzano/Stem@v2.0.0`), recognized by the `RemoteRef` of the installed
+package, instead of the commits the results were computed with (`09e9cdb` for
+the application, `0f7b744` for the simulations); they will install it from CRAN
+once it is accepted there. The release reproduces both: no line of code has
+changed since `09e9cdb`, and what changed after `0f7b744` (the parallel
+bootstrap, the sample size of the BIC with missing responses, SQUAREM with a
+ridge) is not used by the simulations. Checked: two replications of the study
+(S2 and S3error-`shr`) are identical with Stem at `0f7b744` and at `v2.0.0`,
+and the installation path, tried in a temporary library, installs the release
+from GitHub and accepts it in both the application and the simulation scripts.
+The unused `sim_github_sha()` is removed. The README of the package gives the
+installation of the release, and the code supplement of the paper says which
+version the scripts install.
+
 ### 2026-11-02 (night): release of 2.0.0
 
 **Ready for CRAN.** `R CMD check --as-cran` on R 4.6.1, with the `\donttest`

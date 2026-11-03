@@ -64,10 +64,11 @@
 ## 0. Settings shared by the scripts
 ## ===========================================================================
 
-## The version of the Stem package the results were computed with (a commit of
-## its GitHub repository). fu_require_stem() installs it when another version
-## is installed.
-FU_STEM_REF <- "PaoloMaranzano/Stem@09e9cdb2d13fdfc94d8bc74e62645ebbc0b16a54"
+## The version of the Stem package the scripts use: the release 2.0.0 on
+## GitHub. The results in results/application were computed with commit
+## 09e9cdb, whose code is that of the release. fu_require_stem() installs the
+## release when another version is installed.
+FU_STEM_REF <- "PaoloMaranzano/Stem@v2.0.0"
 
 ## The eleven cities (codes of the provinces) and their names.
 FU_CITY <- c(RM = "Roma", MI = "Milano", "NA" = "Napoli", TO = "Torino", PA = "Palermo",
@@ -172,14 +173,15 @@ fu_options <- function(defaults, args = commandArgs(trailingOnly = TRUE)) {
   defaults
 }
 
-## Stem at the version of the results. The installed version is read from its
-## DESCRIPTION file; when it is another one, Stem is installed from GitHub.
-## Returns the first seven characters of the commit.
+## Stem at the release of the scripts. The installed version is read from its
+## DESCRIPTION file, which records the release it was installed from; when it
+## is another one, Stem is installed from GitHub. Returns the first seven
+## characters of the commit of the release.
 fu_require_stem <- function(ref = FU_STEM_REF) {
-  sha <- sub("^.*@", "", ref)
+  tag <- sub("^.*@", "", ref)
   ok <- function() {
     nzchar(system.file(package = "Stem")) &&
-      identical(utils::packageDescription("Stem")$RemoteSha, sha)
+      identical(utils::packageDescription("Stem")$RemoteRef, tag)
   }
   if (!ok()) {
     message("installing Stem at ", ref)
@@ -198,14 +200,14 @@ fu_require_stem <- function(ref = FU_STEM_REF) {
   ## a session that already has another version of Stem loaded would use it
   if ("Stem" %in% loadedNamespaces()) {
     p <- getNamespaceInfo("Stem", "path")
-    s <- tryCatch(unname(read.dcf(file.path(p, "DESCRIPTION"), fields = "RemoteSha")[1, 1]),
+    s <- tryCatch(unname(read.dcf(file.path(p, "DESCRIPTION"), fields = "RemoteRef")[1, 1]),
                   error = function(e) NA_character_)
-    if (!identical(s, sha)) {
+    if (!identical(s, tag)) {
       stop("this R session has another version of Stem loaded: restart R and run again",
            call. = FALSE)
     }
   }
-  invisible(substr(sha, 1L, 7L))
+  invisible(substr(utils::packageDescription("Stem")$RemoteSha, 1L, 7L))
 }
 
 ## A step whose value is saved to <dir>/<name>.rds and read back on a later
