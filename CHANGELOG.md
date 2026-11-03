@@ -18,6 +18,11 @@ between the reference papers and the code, see
 
 ### 2026-11-03
 
+**The manuscript as submitted.** The manuscript, submitted to the ASMBI
+special issue "Advancing Data Science in the AI Era", ends with a declaration
+of the use of generative AI, as Wiley's policy requires; the clean PDFs are
+rebuilt.
+
 **The replication package installs the release.** The scripts of
 `papers/sc-stem-local-leader` install Stem 2.0.0 from GitHub
 (`PaoloMaranzano/Stem@v2.0.0`), recognized by the `RemoteRef` of the installed
